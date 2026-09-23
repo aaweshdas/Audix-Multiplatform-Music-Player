@@ -1,0 +1,44 @@
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT NOT NULL,
+    extension_id TEXT NOT NULL,
+    extension_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    cover TEXT,
+    subtitle TEXT,
+    extras TEXT NOT NULL DEFAULT '{}',
+    is_current INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (id, extension_id, extension_type)
+);
+
+selectAllForExtension:
+SELECT * FROM users WHERE extension_id = :extId AND extension_type = :extType;
+
+getCurrentUser:
+SELECT * FROM users
+WHERE extension_id = :extId AND extension_type = :extType AND is_current = 1
+LIMIT 1;
+
+getUserById:
+SELECT * FROM users WHERE id = :id AND extension_id = :extId AND extension_type = :extType;
+
+upsertUser:
+INSERT OR REPLACE INTO users
+VALUES (:id, :extensionId, :extensionType, :name, :cover, :subtitle, :extras, :isCurrent);
+
+clearCurrentUser:
+UPDATE users SET is_current = 0
+WHERE extension_id = :extId AND extension_type = :extType;
+
+setCurrentUser:
+UPDATE users SET is_current = 1
+WHERE id = :id AND extension_id = :extId AND extension_type = :extType;
+
+deleteUser:
+DELETE FROM users WHERE id = :id AND extension_id = :extId AND extension_type = :extType;
+
+deleteAllForExtension:
+DELETE FROM users WHERE extension_id = :extId AND extension_type = :extType;
+
+getAllCurrentUsers:
+SELECT * FROM users WHERE is_current = 1;
+

@@ -1,0 +1,400 @@
+Summary for s:\All Code\Antigravity\echo-nightly\recovered_classes.jar
+Decompiled with CFR 0.152
+
+
+dev.brahmkshatriya.echo.MainActivity
+----------------------------
+
+applyUiChanges(android.content.Context dev.brahmkshatriya.echo.ui.common.UiViewModel )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.MainApplication
+----------------------------
+
+getPackageName()
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.common.helpers.Injectable
+----------------------------
+
+value-IoAF18A(kotlin.coroutines.Continuation<? super kotlin.Result<? extends T>> )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Tried to end blocks [2[TRYBLOCK], 1[TRYBLOCK]], but top level block is 14[WHILELOOP]
+injectOrRun(java.lang.String kotlin.jvm.functions.Function2<? super T, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.common.helpers.PagedData
+----------------------------
+
+loadAll(kotlin.coroutines.Continuation<? super java.util.List<? extends T>> )
+  Unable to fully structure code
+loadPage(java.lang.String kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.helpers.Page<T>> )
+  Unable to fully structure code
+loadAllInternal(kotlin.coroutines.Continuation<? super java.util.List<? extends T>> )
+  Unable to fully structure code
+loadListInternal(java.lang.String kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.helpers.Page<T>> )
+  Unable to fully structure code
+loadListInternal(java.lang.String kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.helpers.Page<T>> )
+  Unable to fully structure code
+  Could not resolve type clashes
+loadAllInternal(kotlin.coroutines.Continuation<? super java.util.List<? extends T>> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+loadList(kotlin.coroutines.Continuation<? super java.util.List<? extends T>> )
+  Unable to fully structure code
+loadListInternal(java.lang.String kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.helpers.Page<T>> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+data(kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.helpers.PagedData<T>> )
+  Unable to fully structure code
+loadAllInternal(kotlin.coroutines.Continuation<? super java.util.List<? extends T>> )
+  Unable to fully structure code
+loadListInternal(java.lang.String kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.helpers.Page<T>> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.common.models.Feed
+----------------------------
+
+loadAll(dev.brahmkshatriya.echo.common.models.Feed<T> kotlin.coroutines.Continuation<? super java.util.List<? extends T>> )
+  Unable to fully structure code
+pagedDataOfFirst(dev.brahmkshatriya.echo.common.models.Feed<T> kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.helpers.PagedData<T>> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.core.SpotifyExtensionTest
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.core.extensions.ExtensionManager
+----------------------------
+
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+  Could not resolve type clashes
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+emit(java.util.List<? extends dev.brahmkshatriya.echo.common.Extension<? extends dev.brahmkshatriya.echo.common.clients.ExtensionClient>> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+emit(kotlin.Pair<? extends dev.brahmkshatriya.echo.common.models.NetworkConnection, ? extends java.util.List<? extends dev.brahmkshatriya.echo.common.Extension<? extends dev.brahmkshatriya.echo.common.clients.ExtensionClient>>> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.core.extensions.ExtensionUtils
+----------------------------
+
+get-0E7RQCE(dev.brahmkshatriya.echo.common.Extension<?> kotlin.jvm.functions.Function2<? super dev.brahmkshatriya.echo.common.clients.ExtensionClient, ? super kotlin.coroutines.Continuation<? super R>, ? extends java.lang.Object> kotlin.coroutines.Continuation<? super kotlin.Result<? extends R>> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+getOrEmit(java.lang.Object kotlinx.coroutines.flow.MutableSharedFlow<java.lang.Throwable> kotlin.coroutines.Continuation<? super T> )
+  Unable to fully structure code
+inject(dev.brahmkshatriya.echo.common.Extension<?> java.lang.String kotlinx.coroutines.flow.MutableSharedFlow<java.lang.Throwable> kotlin.jvm.functions.Function2<? super dev.brahmkshatriya.echo.common.clients.ExtensionClient, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+getExtension(kotlinx.coroutines.flow.Flow<? extends java.util.List<? extends T>> java.lang.String kotlin.coroutines.Continuation<? super T> )
+  Unable to fully structure code
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.core.extensions.JarExtensionRepository
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.core.extensions.builtin.SpotifyExtension
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.core.platform.DesktopBrowserLauncher
+----------------------------
+
+open(java.lang.String java.lang.String kotlin.coroutines.Continuation<? super java.util.Map<java.lang.String, java.lang.String>> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.core.platform.VlcAudioPlayer
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+dev.brahmkshatriya.echo.desktop.download.DesktopDownloadManager
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.desktop.ui.screensaver.EchoScreensaverKt
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.desktop.viewmodel.HomeViewModel
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+dev.brahmkshatriya.echo.desktop.viewmodel.LyricsViewModel
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.desktop.viewmodel.PlayerViewModel
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.desktop.viewmodel.SearchViewModel
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+dev.brahmkshatriya.echo.di.App
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+dev.brahmkshatriya.echo.download.DownloadWorker
+----------------------------
+
+doWork(kotlin.coroutines.Continuation<? super androidx.work.ListenableWorker$Result> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.Downloader
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+  Could not resolve type clashes
+downloadExtension(kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.MiscExtension> )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+getServer(long dev.brahmkshatriya.echo.download.db.models.DownloadEntity kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.models.Streamable$Media$Server> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.db.models.DownloadEntity
+----------------------------
+
+exception_delegate$lambda$5(dev.brahmkshatriya.echo.download.db.models.DownloadEntity )
+  Unable to fully structure code
+_init_$lambda$12(dev.brahmkshatriya.echo.download.db.models.DownloadEntity )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.tasks.BaseTask
+----------------------------
+
+withDownloadExtension(kotlin.jvm.functions.Function2<? super dev.brahmkshatriya.echo.common.clients.DownloadClient, ? super kotlin.coroutines.Continuation<? super T>, ? extends java.lang.Object> kotlin.coroutines.Continuation<? super T> )
+  Unable to fully structure code
+doWork-IoAF18A(kotlin.coroutines.Continuation<? super kotlin.Result<kotlin.Unit>> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+getDownload(kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.download.db.models.DownloadEntity> )
+  Unable to fully structure code
+getDownloadContext(kotlin.coroutines.Continuation<? super dev.brahmkshatriya.echo.common.models.DownloadContext> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.tasks.DownloadingTask
+----------------------------
+
+work(long kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.tasks.LoadingTask
+----------------------------
+
+work(long kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.tasks.MergingTask
+----------------------------
+
+work(long kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.tasks.SaveToUnifiedTask
+----------------------------
+
+work(long kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.tasks.TaggingTask
+----------------------------
+
+work(long kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.download.tasks.TaskManager
+----------------------------
+
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+invoke(kotlinx.coroutines.flow.FlowCollector java.lang.Object[] kotlin.coroutines.Continuation )
+  Ignored method signature, as it can't be verified against descriptor
+invoke(kotlinx.coroutines.flow.FlowCollector java.lang.Object[] kotlin.coroutines.Continuation )
+  Ignored method signature, as it can't be verified against descriptor
+invokeSuspend(java.lang.Object )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Tried to end blocks [0[TRYBLOCK]], but top level block is 7[WHILELOOP]
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.extensions.ExtensionLoader
+----------------------------
+
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Could not resolve type clashes
+  Unable to fully structure code
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+emit(java.util.List<? extends dev.brahmkshatriya.echo.common.Extension<? extends dev.brahmkshatriya.echo.common.clients.ExtensionClient>> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+emit(kotlin.Pair<? extends dev.brahmkshatriya.echo.common.models.NetworkConnection, ? extends java.util.List<? extends dev.brahmkshatriya.echo.common.Extension<? extends dev.brahmkshatriya.echo.common.clients.ExtensionClient>>> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.extensions.ExtensionUtils
+----------------------------
+
+get-0E7RQCE(dev.brahmkshatriya.echo.common.Extension<?> kotlin.jvm.functions.Function2<? super dev.brahmkshatriya.echo.common.clients.ExtensionClient, ? super kotlin.coroutines.Continuation<? super R>, ? extends java.lang.Object> kotlin.coroutines.Continuation<? super kotlin.Result<? extends R>> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+getOrThrow(java.lang.Object kotlinx.coroutines.flow.MutableSharedFlow<java.lang.Throwable> kotlin.coroutines.Continuation<? super T> )
+  Unable to fully structure code
+inject(dev.brahmkshatriya.echo.common.Extension<?> java.lang.String kotlinx.coroutines.flow.MutableSharedFlow<java.lang.Throwable> kotlin.jvm.functions.Function2<? super dev.brahmkshatriya.echo.common.clients.ExtensionClient, ? super kotlin.coroutines.Continuation<? super kotlin.Unit>, ? extends java.lang.Object> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+getExtension(kotlinx.coroutines.flow.Flow<? extends java.util.List<? extends T>> java.lang.String kotlin.coroutines.Continuation<? super T> )
+  Unable to fully structure code
+getExtensionOrThrow(kotlinx.coroutines.flow.Flow<? extends java.util.List<? extends T>> java.lang.String kotlin.coroutines.Continuation<? super T> )
+  Unable to fully structure code
+emit(java.lang.Object kotlin.coroutines.Continuation )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.extensions.InstallationUtils
+----------------------------
+
+installApp(androidx.fragment.app.FragmentActivity java.io.File kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+openFileSelector(androidx.fragment.app.FragmentActivity java.lang.String kotlin.coroutines.Continuation<? super java.io.File> )
+  Unable to fully structure code
+uninstallApp(androidx.fragment.app.FragmentActivity java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+dev.brahmkshatriya.echo.extensions.WebViewClientFactory
+----------------------------
+
+await-yxL6bBk(dev.brahmkshatriya.echo.common.model

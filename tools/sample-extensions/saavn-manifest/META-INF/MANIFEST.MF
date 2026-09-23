@@ -1,0 +1,17 @@
+Manifest-Version: 1.0
+Extension-Id: saavn_music
+Extension-Type: music
+Extension-Class: SaavnExtension
+Extension-Version-Code: 8
+Extension-Version-Name: vc2c45d2
+Extension-Icon-Url: https://i1.sndcdn.com/avatars-zySzcgF78hDPnz2w-JK1fp
+ A-t240x240.jpg
+Extension-Name: Saavn Music
+Extension-Description: Saavn Music Extension for Echo.
+Extension-Author: TAbhishekkumar6
+Extension-Author-Url: https://github.com/TAbhishekkumar6
+Extension-Repo-Url: https://github.com/TAbhishekkumar6/Echo-Saavn-Extens
+ ion
+Extension-Update-Url: https://api.github.com/repos/Abhishek890/Echo-Saav
+ n-Extension/releases
+

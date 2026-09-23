@@ -1,0 +1,14 @@
+*.iml
+*.class
+.gradle/
+.idea/
+.DS_Store
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+.kotlin/
+*.hprof
+tools/recovered-reference/recovered_classes/

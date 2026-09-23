@@ -1,0 +1,39 @@
+CREATE TABLE IF NOT EXISTS extensions (
+    id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    version TEXT NOT NULL,
+    description TEXT,
+    author TEXT,
+    icon_url TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    path TEXT NOT NULL,
+    import_type TEXT NOT NULL DEFAULT 'local',
+    PRIMARY KEY (id, type)
+);
+
+selectAll:
+SELECT * FROM extensions;
+
+selectEnabled:
+SELECT * FROM extensions WHERE enabled = 1;
+
+selectById:
+SELECT * FROM extensions WHERE id = :id AND type = :type;
+
+upsert:
+INSERT OR REPLACE INTO extensions
+VALUES (:id, :type, :name, :version, :description, :author, :iconUrl, :enabled, :path, :importType);
+
+setEnabled:
+UPDATE extensions SET enabled = :enabled WHERE id = :id AND type = :type;
+
+deleteById:
+DELETE FROM extensions WHERE id = :id AND type = :type;
+
+deleteAll:
+DELETE FROM extensions;
+
+countAll:
+SELECT COUNT(*) FROM extensions;
+

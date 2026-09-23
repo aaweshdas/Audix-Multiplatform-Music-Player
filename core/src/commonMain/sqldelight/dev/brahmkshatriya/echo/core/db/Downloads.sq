@@ -1,0 +1,42 @@
+CREATE TABLE IF NOT EXISTS downloads (
+    id TEXT PRIMARY KEY,
+    track_id TEXT NOT NULL,
+    extension_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    progress REAL NOT NULL DEFAULT 0.0,
+    file_path TEXT,
+    created_at INTEGER NOT NULL,
+    track_json TEXT NOT NULL,
+    context_json TEXT NOT NULL DEFAULT '{}'
+);
+
+selectAll:
+SELECT * FROM downloads ORDER BY created_at DESC;
+
+selectById:
+SELECT * FROM downloads WHERE id = :id;
+
+selectByStatus:
+SELECT * FROM downloads WHERE status = :status ORDER BY created_at ASC;
+
+insert:
+INSERT INTO downloads
+VALUES (:id, :trackId, :extensionId, :status, :progress, :filePath, :createdAt, :trackJson, :contextJson);
+
+updateStatus:
+UPDATE downloads
+SET status = :status, progress = :progress, file_path = :filePath
+WHERE id = :id;
+
+updateProgress:
+UPDATE downloads SET progress = :progress WHERE id = :id;
+
+deleteById:
+DELETE FROM downloads WHERE id = :id;
+
+deleteCompleted:
+DELETE FROM downloads WHERE status = 'COMPLETED';
+
+countByStatus:
+SELECT COUNT(*) FROM downloads WHERE status = :status;
+

@@ -8,7 +8,7 @@ plugins {
     alias(libs.plugins.crashlytics) apply false
 }
 
-val hasGoogleServices = file("google-services.json").exists()
+val hasGoogleServices = file("google-services.json").let { it.exists() && it.length() > 20L }
 val hasGit = file("../.git").exists() || file(".git").exists()
 fun executeOrDefault(default: String, vararg command: String): String = runCatching {
     if (!hasGit) return@runCatching default

@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   publish:
+    if: ${{ secrets.MAVEN_CENTRAL_USERNAME != '' }}
     name: Release build and publish
     runs-on: macOS-latest
     steps:

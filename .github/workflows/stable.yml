@@ -26,11 +26,11 @@ jobs:
           cache: 'gradle'
 
       - name: Cook KeyStore
-        if: ${{ secrets.KEYSTORE_B64 != '' }}
+        if: secrets.KEYSTORE_B64 != ''
         run: echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > $GITHUB_WORKSPACE/signing-key.jks
 
       - name: Cook Google Services
-        if: ${{ secrets.GOOGLE_SERVICES_B64 != '' }}
+        if: secrets.GOOGLE_SERVICES_B64 != ''
         run: echo "${{ secrets.GOOGLE_SERVICES_B64 }}" | base64 -d > app/google-services.json
 
       - name: Make gradlew executable
@@ -65,7 +65,7 @@ jobs:
           files: app/build/${{ env.VERSION }}.apk
 
       - name: Upload APK to Discord
-        if: ${{ secrets.DISCORD_RELEASE_WEBHOOK != '' }}
+        if: secrets.DISCORD_RELEASE_WEBHOOK != ''
         shell: bash
         env:
           WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
@@ -76,7 +76,7 @@ jobs:
           ${{ env.WEBHOOK }}
 
       - name: Upload APK to Telegram
-        if: ${{ secrets.TELEGRAM_BOT_ID != '' && secrets.TELEGRAM_CHANNEL_ID != '' }}
+        if: secrets.TELEGRAM_BOT_ID != '' && secrets.TELEGRAM_CHANNEL_ID != ''
         shell: bash
         env:
           BOT_ID: ${{ secrets.TELEGRAM_BOT_ID }}

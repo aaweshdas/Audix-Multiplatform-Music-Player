@@ -26,12 +26,16 @@ jobs:
           cache: 'gradle'
 
       - name: Cook KeyStore
-        if: secrets.KEYSTORE_B64 != ''
-        run: echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > $GITHUB_WORKSPACE/signing-key.jks
+        if: env.KEYSTORE_B64 != ''
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d > $GITHUB_WORKSPACE/signing-key.jks
 
       - name: Cook Google Services
-        if: secrets.GOOGLE_SERVICES_B64 != ''
-        run: echo "${{ secrets.GOOGLE_SERVICES_B64 }}" | base64 -d > app/google-services.json
+        if: env.GOOGLE_SERVICES_B64 != ''
+        env:
+          GOOGLE_SERVICES_B64: ${{ secrets.GOOGLE_SERVICES_B64 }}
+        run: echo "$GOOGLE_SERVICES_B64" | base64 -d > app/google-services.json
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -58,7 +62,7 @@ jobs:
           path: app/build/app-release.apk
 
       - name: Upload APK to Discord
-        if: secrets.DISCORD_NIGHTLY_WEBHOOK != ''
+        if: env.WEBHOOK != ''
         shell: bash
         env:
           WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
@@ -66,10 +70,10 @@ jobs:
           message=$(echo "@everyone **${{ env.VERSION }}**\n${{ env.COMMIT }}")
           curl -F "payload_json={\"content\":\"${message}\"}" \
           -F "echo_beta=@app/build/app-release.apk" \
-          ${{ env.WEBHOOK }}
+          $WEBHOOK
 
       - name: Upload APK to Telegram
-        if: secrets.TELEGRAM_BOT_ID != '' && secrets.TELEGRAM_CHANNEL_ID != ''
+        if: env.BOT_ID != '' && env.CHANNEL_ID != ''
         shell: bash
         env:
           BOT_ID: ${{ secrets.TELEGRAM_BOT_ID }}
@@ -78,9 +82,9 @@ jobs:
         run: |
           regex='s/[\_\*\[\]\(\)\~\`\>\#\+\-\=\|\{\}\.\!]/\\&/g'
           message=$(printf "*Nightly Release*\n${{ env.COMMIT }}" | sed -E "$regex")
-          curl -F "chat_id=${{ env.CHANNEL_ID }}" \
-          -F "message_thread_id=${{ env.THREAD_ID }}" \
+          curl -F "chat_id=${BOT_ID}" \
+          -F "message_thread_id=${THREAD_ID}" \
           -F "document=@app/build/app-release.apk" \
           -F "caption=${message}" \
           -F "parse_mode=MarkdownV2" \
-          https://api.telegram.org/bot${{ env.BOT_ID }}/sendDocument
+          https://api.telegram.org/bot${BOT_ID}/sendDocument

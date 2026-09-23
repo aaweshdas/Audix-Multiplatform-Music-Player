@@ -74,7 +74,7 @@ kotlin {
 
 dependencies {
     implementation(project(":common"))
-    implementation(project(":core"))
+    // implementation(project(":core"))
     implementation(libs.kotlin.reflect)
     implementation(libs.bundles.androidx)
     implementation(libs.material)

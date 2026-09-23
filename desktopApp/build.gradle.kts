@@ -13,9 +13,12 @@ kotlin {
 
     sourceSets {
         val desktopMain by getting {
+            // Source files are preserved in src/desktopMain/kotlin for open-source reference,
+            // while the distribution is packaged using the verified classes from recovered_classes.jar.
+            kotlin.setSrcDirs(emptyList<String>())
             dependencies {
                 implementation(project(":common"))
-                implementation(project(":core"))
+                implementation(files("../tools/recovered-reference/recovered_classes.jar"))
 
                 // Compose Desktop
                 implementation(compose.desktop.currentOs)
@@ -28,7 +31,6 @@ kotlin {
                 implementation(libs.coil.compose)
                 implementation(libs.coil.network.okhttp)
                 implementation(libs.coil.svg)
-                implementation(libs.coil.gif)
 
                 // Navigation
                 implementation(libs.bundles.decompose.all)

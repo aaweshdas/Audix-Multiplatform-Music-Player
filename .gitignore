@@ -12,3 +12,4 @@ local.properties
 .kotlin/
 *.hprof
 tools/recovered-reference/recovered_classes/
+release-artifacts/

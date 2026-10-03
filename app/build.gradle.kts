@@ -44,11 +44,13 @@ android {
         }
         create("nightly") {
             initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".nightly"
             resValue("string", "app_name", "Audix")
         }
         create("stable") {
             initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
             resValue("string", "app_name", "Audix")
         }
     }

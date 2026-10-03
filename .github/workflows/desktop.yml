@@ -1,16 +1,17 @@
-name: pr build
+name: Build Desktop App
 
 on:
-  pull_request:
-    branches: [ main ]
+  push:
+    branches:
+      - main
   workflow_dispatch: { }
 
 permissions:
   contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-desktop:
+    runs-on: windows-latest
 
     steps:
       - name: Checkout repo
@@ -25,13 +26,11 @@ jobs:
           java-version: 21
           cache: 'gradle'
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      - name: Build Desktop Distributable with Gradle
+        run: .\gradlew.bat :desktopApp:createDistributable --no-daemon
 
-      - name: Build with Gradle
-        run: ./gradlew assembleRelease
-
-      - name: Upload APK
+      - name: Upload Desktop Distributable Artifact
         uses: actions/upload-artifact@v4
         with:
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          name: Audix-Desktop-Windows
+          path: desktopApp/build/compose/binaries/main/app/

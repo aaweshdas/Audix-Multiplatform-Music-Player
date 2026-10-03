@@ -40,17 +40,22 @@ object InstallationUtils {
 
     suspend fun installFile(
         context: Context, fileIgnoreFlow: MutableSharedFlow<File?>, id: String, tempFile: File
-    ) {
+    ) = withContext(Dispatchers.IO) {
         val dir = context.getExtensionsFileDir()
         val newFile = File(dir, "$id.apk")
         dir.setWritable(true)
-        newFile.setWritable(true)
-        if (newFile.exists())
-            if (!newFile.delete())
+        if (newFile.exists()) {
+            newFile.setWritable(true)
+            if (!newFile.delete()) {
                 throw IllegalStateException("Failed to delete existing file: $newFile")
-        tempFile.renameTo(newFile)
-        newFile.setWritable(false)
-        dir.setReadOnly()
+            }
+        }
+        val renamed = tempFile.renameTo(newFile)
+        if (!renamed) {
+            tempFile.copyTo(newFile, overwrite = true)
+            tempFile.delete()
+        }
+        newFile.setReadOnly()
         fileIgnoreFlow.emit(null)
     }
 
@@ -67,7 +72,8 @@ object InstallationUtils {
     }
 
     fun Context.getTempFile(uri: Uri): File {
-        val stream = contentResolver.openInputStream(uri)!!
+        val stream = contentResolver.openInputStream(uri)
+            ?: throw IllegalStateException("Could not open stream for uri: $uri")
         val tempFile = getTempFile("dat")
         tempFile.outputStream().use { outputStream ->
             stream.copyTo(outputStream)
@@ -96,7 +102,7 @@ object InstallationUtils {
     ) = withContext(Dispatchers.IO) {
         val file = File(path)
         fileIgnoreFlow.emit(file)
-        file.parentFile!!.setWritable(true)
+        file.parentFile?.setWritable(true)
         file.setWritable(true)
         if (file.exists() && !file.delete())
             throw IllegalStateException("Failed to delete file: $file")

@@ -206,10 +206,10 @@ class OfflineExtension(
     override suspend fun loadFeed(track: Track): Feed<Shelf>? = null
 
     override suspend fun loadAlbum(album: Album) =
-        find(album)!!.toAlbum()
+        find(album)?.toAlbum() ?: album
 
     override suspend fun loadTracks(album: Album): Feed<Track> = PagedData.Single {
-        find(album)!!.songList.sortedBy { it.extras["trackNumber"]?.toLongOrNull() }.map { it }
+        find(album)?.songList?.sortedBy { it.extras["trackNumber"]?.toLongOrNull() }?.map { it }.orEmpty()
     }.toFeed()
 
     override suspend fun loadFeed(album: Album) =
@@ -229,14 +229,15 @@ class OfflineExtension(
                 more = tracks.toShelves()
             )
         }
-        listOfNotNull(artist.toArtist().toShelf(), category)
+        listOfNotNull(artist?.toArtist()?.toShelf(), category)
     }.flatten().toFeed()
 
     override suspend fun loadArtist(artist: Artist) =
-        find(artist)!!.toArtist()
+        find(artist)?.toArtist() ?: artist
 
     override suspend fun loadFeed(artist: Artist): Feed<Shelf> {
-        return find(artist)!!.run {
+        val found = find(artist) ?: return Feed(listOf()) { PagedData.Single { listOf<Shelf>() }.toFeedData() }
+        return found.run {
             val tracks = songList.ifEmpty { null }?.toList()
             val albums = albumList.map { it.toAlbum() }.ifEmpty { null }
             listOfNotNull(

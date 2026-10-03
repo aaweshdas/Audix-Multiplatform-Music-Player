@@ -50,8 +50,17 @@ class ExtensionParser(
         val packageInfo =
             context.packageManager.getPackageArchiveInfo(file.absolutePath, PACKAGE_FLAGS)
                 ?: error("Failed to get package info for ${file.absolutePath}")
-        val metadata = packageInfo.applicationInfo!!.metaData!!
-        val type = packageInfo.reqFeatures!!.toExtensionType()
+        val appInfo = packageInfo.applicationInfo
+            ?: error("applicationInfo missing for ${file.absolutePath}")
+        appInfo.sourceDir = file.absolutePath
+        appInfo.publicSourceDir = file.absolutePath
+        val metadata = appInfo.metaData
+            ?: error("metaData missing in applicationInfo for ${packageInfo.packageName}")
+        val type = packageInfo.reqFeatures?.toExtensionTypeOrNull()
+            ?: metadata.getString("type")?.let { t ->
+                ExtensionType.entries.firstOrNull { it.feature.equals(t, ignoreCase = true) }
+            }
+            ?: ExtensionType.MUSIC
         fun getOrNull(key: String) = metadata.getString(key)?.takeIf { it.isNotBlank() }
         fun get(key: String) = getOrNull(key)
             ?: error("$key not found in Metadata for ${packageInfo.packageName}")
@@ -90,10 +99,10 @@ class ExtensionParser(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES else 0
 
         const val FEATURE = "dev.brahmkshatriya.echo."
-        private fun Array<FeatureInfo>.toExtensionType(): ExtensionType {
-            val feature = first { it.name.startsWith(FEATURE) }
+        private fun Array<FeatureInfo>.toExtensionTypeOrNull(): ExtensionType? {
+            val feature = firstOrNull { it.name != null && it.name.startsWith(FEATURE) } ?: return null
             val type = feature.name.substringAfter(FEATURE)
-            return ExtensionType.entries.first { it.feature == type }
+            return ExtensionType.entries.firstOrNull { it.feature.equals(type, ignoreCase = true) }
         }
 
 

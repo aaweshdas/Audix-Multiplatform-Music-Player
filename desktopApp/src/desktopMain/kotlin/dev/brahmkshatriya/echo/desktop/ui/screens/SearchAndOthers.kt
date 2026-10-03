@@ -197,4 +197,214 @@ fun SearchScreen(
                 listOf(
                     "all" to "All Sources",
                     "Youtube_music" to "YouTube Music",
-                    "jiosaavn" to "JioSaavn HQ",
+                    "saavn_music" to "JioSaavn",
+                    "soundcloud" to "SoundCloud",
+                    "radio_browser" to "Radio Browser",
+                    "echo-offline" to "Local Files"
+                )
+            }
+        }
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(sourceOptions) { (id, name) ->
+                FilterChip(
+                    selected = selectedSourceId == id,
+                    onClick = { viewModel.setSourceFilter(id) },
+                    label = { Text(name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
+        }
+
+        // Tabs if search feed has multiple categories
+        val tabs = searchFeed?.tabs
+        if (!tabs.isNullOrEmpty()) {
+            val selectedIndex = tabs.indexOfFirst { it == selectedTab }.coerceAtLeast(0)
+            ScrollableTabRow(
+                selectedTabIndex = selectedIndex,
+                modifier = Modifier.fillMaxWidth(),
+                edgePadding = 24.dp
+            ) {
+                tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = index == selectedIndex,
+                        onClick = { viewModel.selectTab(tab) },
+                        text = { Text(tab.title) }
+                    )
+                }
+            }
+        }
+
+        Box(Modifier.fillMaxSize()) {
+            when {
+                isLoading && shelves.isEmpty() -> {
+                    CircularProgressIndicator(Modifier.align(Alignment.Center))
+                }
+                error != null && shelves.isEmpty() -> {
+                    ErrorView(
+                        error = error,
+                        onRetry = { viewModel.search(query) },
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                shelves.isNotEmpty() -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) {
+                        items(shelves) { shelf ->
+                            ShelfRow(
+                                shelf = shelf,
+                                onMediaSelected = onMediaSelected,
+                                onAddToPlaylist = { track -> trackForPlaylist = track }
+                            )
+                        }
+                    }
+                }
+                query.isBlank() -> {
+                    Column(
+                        Modifier.fillMaxSize().padding(24.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "Search for songs, artists, albums, and playlists",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LibraryScreen(
+    viewModel: LibraryViewModel = koinInject()
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Default.LibraryMusic,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Your Library",
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Saved tracks, playlists, and followed artists will appear here.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun DownloadsScreen(
+    viewModel: DownloadsViewModel = koinInject()
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Default.Download,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Downloads",
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Downloaded tracks and offline media will appear here.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun SettingsScreen(
+    viewModel: SettingsViewModel = koinInject()
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Default.Settings,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Settings",
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Audio playback, equalizer, themes, and extension preferences.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun ErrorView(
+    error: Throwable?,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Default.Close,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = error?.localizedMessage ?: "An error occurred",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRetry) {
+            Text("Retry")
+        }
+    }
+}

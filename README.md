@@ -19,6 +19,42 @@
 
 ---
 
+## ⚡ Latest Release — v1.0.0
+
+| Platform | Format | File | Size | Download |
+| :--- | :--- | :--- | :--- | :--- |
+| 📱 **Android** (SDK 24+) | **APK** | `Audix-v1.0.0-Android.apk` | ~19.4 MB | [⬇️ **Download APK**](release-artifacts/Audix-v1.0.0-Android.apk) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 💻 **Windows** (x64) | **MSI Installer** | `Audix-v1.0.0-Windows-Installer.msi` | ~164 MB | [⬇️ **Download MSI**](release-artifacts/Audix-v1.0.0-Windows-Installer.msi) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 📦 **Windows** (x64) | **Portable ZIP** | `Audix-v1.0.0-Windows-Portable.zip` | ~162.8 MB | [⬇️ **Download ZIP**](release-artifacts/Audix-v1.0.0-Windows-Portable.zip) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+
+> [!TIP]
+> **New to Audix?** Follow the quick steps below to load your music and install extensions in seconds!
+
+### 📥 How to Install & Add Extensions in Audix
+1. **Download & Install**: Install `Audix-v1.0.0-Android.apk` on your Android device (or launch `Audix.exe` on Windows).
+2. **Open Extensions**: Tap the **Extensions** icon in the navigation bar.
+3. **Tap Add (`+`)**: Tap the **Add Extension** button.
+4. **Enter Shortcode or URL**:
+   - Simply type **`extension`** (or leave it blank) and tap **Add**.
+   - Or paste the official community repository URL:
+     ```
+     https://raw.githubusercontent.com/itsmechinmoy/echo-extensions/main/echo_extensions.json
+     ```
+5. **Select Your Sources**: Check **YouTube Music**, **Saavn Music**, **SoundCloud**, **Radio Browser**, or **Lyrics** providers and tap **Add**.
+6. **Enjoy Music!** All songs, search results, charts, and radio stations will immediately load on your home feed.
+
+---
+
+### ✨ What's New in v1.0.0
+- 🚀 **Cross-Platform Audio Engine**: Support for Media3 ExoPlayer on Android and VLCJ on Windows Desktop.
+- 🔌 **Dynamic Extension Loader**: Resolved all package discovery, DEX loading, and URL shortener resolution issues.
+- 🎵 **Built-In Offline & Spotify Playback**: Instant playback of your local music library and popular Spotify charts.
+- 🔒 **Security & Network**: Fixed network security configurations to support HTTP radio streams and third-party extension endpoints.
+- 📱 **Android 14+ Ready**: Foreground service playback controls, lockscreen media session integration, and edge-to-edge support.
+- 🎨 **Modern Design**: Refined Material 3 Glassmorphic UI with vibrant artwork, dynamic gradient backgrounds, and responsive navigation.
+
+---
+
 ## 📖 Overview
 
 **Audix** is an extensible, privacy-conscious audio player. Rather than hardcoding fixed streaming services, Audix features a decoupled **Extension SPI Architecture** that dynamically loads audio sources, metadata providers, synchronized lyrics engines, and social integrations at runtime.

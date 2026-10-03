@@ -344,7 +344,11 @@ class UnifiedExtension(
         crossinline loadFeed: suspend T.() -> Feed<Shelf>,
     ): Feed<Shelf> {
         val list = extensions()
-        return if (list.size == 1) {
+        return if (list.isEmpty()) {
+            Feed(listOf()) {
+                PagedData.Single { listOf<Shelf>() }.toFeedData()
+            }
+        } else if (list.size == 1) {
             val ext = list.first()
             ext.client<T, Feed<Shelf>> { loadFeed() }.injectExtensionId(ext)
         } else Feed(
@@ -352,7 +356,8 @@ class UnifiedExtension(
         ) { tab ->
             val extensions = extensions()
             val id = tab?.extras?.extensionId ?: extensions.firstOrNull()?.id
-            extensions.get(id).getFeedData(loadFeed)
+            val targetExt = if (id != null) extensions.find { it.id == id } ?: extensions.firstOrNull() else extensions.firstOrNull()
+            targetExt?.getFeedData(loadFeed) ?: PagedData.Single { listOf<Shelf>() }.toFeedData()
         }
     }
 

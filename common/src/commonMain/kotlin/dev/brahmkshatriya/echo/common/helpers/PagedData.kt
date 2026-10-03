@@ -1,6 +1,5 @@
 package dev.brahmkshatriya.echo.common.helpers
 
-import dev.brahmkshatriya.echo.common.models.Track
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -136,17 +135,13 @@ sealed class PagedData<T : Any> {
 
         private val itemMap = mutableMapOf<String?, Page<T>>()
         override suspend fun loadListInternal(continuation: String?): Page<T> {
-            if (continuation != null && continuation.isBlank()) {
-                return Page(emptyList(), null)
-            }
+            // NOTE: an empty-string token is valid here (Concat passes "" to start the next source),
+            // so it must be forwarded to `load` unchanged.
             val page = itemMap.getOrPut(continuation) {
                 val (data, cont) = load(continuation)
-                val safeCont = if (cont.isNullOrBlank() || cont == continuation) null else cont
-                val seenTrackIds = mutableSetOf<String>()
-                val deduped = data.filter { item ->
-                    if (item is Track) seenTrackIds.add(item.id) else true
-                }
-                Page(deduped, safeCont)
+                // Guard: a source returning the same token it was given would loop forever.
+                val safeCont = if (cont != null && cont == continuation) null else cont
+                Page(data, safeCont)
             }
             return page
         }
@@ -163,16 +158,13 @@ sealed class PagedData<T : Any> {
             val (data, continuation) = loadListInternal(null)
             list.addAll(data)
             var cont = continuation
-            while (!cont.isNullOrBlank() && seenTokens.add(cont)) {
+            // seenTokens prevents infinite loops on cyclic tokens (A -> B -> A)
+            while (cont != null && seenTokens.add(cont)) {
                 val page = loadListInternal(cont)
                 list.addAll(page.data)
-                if (page.continuation == cont) break // Prevent self-referencing token loop
                 cont = page.continuation
             }
-            val seenTrackIds = mutableSetOf<String>()
-            return list.filter { item ->
-                if (item is Track) seenTrackIds.add(item.id) else true
-            }
+            return list
         }
 
         override fun <R : Any> map(block: suspend (Result<List<T>>) -> List<R>): PagedData<R> {

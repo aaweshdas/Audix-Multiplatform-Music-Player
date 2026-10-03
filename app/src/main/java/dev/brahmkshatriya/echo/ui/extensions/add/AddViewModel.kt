@@ -47,11 +47,29 @@ class AddViewModel(
         client: OkHttpClient
     ) = withContext(Dispatchers.IO) {
         runCatching {
+            var targetUrl = link
             val request = Request.Builder()
-                .addHeader("Cookie", "preview=1")
-                .url(link).build()
-            client.newCall(request).await().body.string()
-                .toData<List<ExtensionAssetResponse>>().getOrThrow()
+                .header("User-Agent", "Mozilla/5.0")
+                .url(targetUrl).build()
+            val response = client.newCall(request).await()
+            val body = response.body.string()
+
+            // If the response is HTML (e.g. from v.gd URL shortener preview page), extract the destination URL!
+            if (!body.trimStart().startsWith("[") && body.contains("href=")) {
+                val match = Regex("""class="biglink"[^>]*href="([^"]+)"""").find(body)
+                    ?: Regex("""href="(https?://[^"]+\.json)"""").find(body)
+                    ?: Regex("""href="([^"]+)"""").find(body)
+                if (match != null) {
+                    targetUrl = match.groupValues[1]
+                    val followReq = Request.Builder()
+                        .header("User-Agent", "Mozilla/5.0")
+                        .url(targetUrl).build()
+                    val followResp = client.newCall(followReq).await()
+                    return@runCatching followResp.body.string()
+                        .toData<List<ExtensionAssetResponse>>().getOrThrow()
+                }
+            }
+            body.toData<List<ExtensionAssetResponse>>().getOrThrow()
         }
     }.getOrElse {
         throw InvalidExtensionListException(link, it)
@@ -78,9 +96,12 @@ class AddViewModel(
     val addingFlow = MutableStateFlow<AddState>(AddState.Init)
     fun addFromLinkOrCode(link: String) = viewModelScope.launch {
         addingFlow.value = AddState.Loading
+        val trimmed = link.trim()
         val actualLink = when {
-            link.startsWith("http://") or link.startsWith("https://") -> link
-            else -> "https://v.gd/$link"
+            trimmed.isBlank() || trimmed.equals("extension", ignoreCase = true) || trimmed.equals("extensions", ignoreCase = true) ->
+                dev.brahmkshatriya.echo.common.config.FlavorConfig.DEFAULT_EXTENSIONS_URL
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            else -> "https://v.gd/$trimmed"
         }
 
         val list = runCatching { getExtensionList(actualLink, client) }.getOrElse {

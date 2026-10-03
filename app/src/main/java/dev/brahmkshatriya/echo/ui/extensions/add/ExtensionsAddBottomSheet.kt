@@ -52,9 +52,8 @@ class ExtensionsAddBottomSheet : BottomSheetDialogFragment() {
                 extensionViewModel.installWithPrompt(listOfNotNull(file))
                 dismissAllowingStateLoss()
             } else {
-                val link = binding.editText.text.toString()
-                if (link.isEmpty()) return@setOnClickListener
-                viewModel.addFromLinkOrCode(link)
+                val link = binding.editText.text?.toString()?.trim().orEmpty()
+                viewModel.addFromLinkOrCode(link.ifEmpty { "extension" })
             }
         }
 

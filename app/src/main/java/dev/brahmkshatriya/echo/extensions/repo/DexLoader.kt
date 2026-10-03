@@ -36,14 +36,16 @@ class DexLoader(
         private fun unloadLibraries(
             metadata: Metadata, libFolder: File
         ): File {
-            val targetAbi = Build.SUPPORTED_ABIS.first()
+            val targetAbi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
             if (!libFolder.exists()) libFolder.mkdirs()
             val libs = File(libFolder, metadata.id)
             val version = File(libs, "version.txt")
             if (version.exists() && version.readText() == metadata.version) return libs
             libs.deleteRecursively()
-            extractLibsFromApk(metadata.path, targetAbi, libs).getOrThrow()
-            version.writeText(metadata.version)
+            runCatching {
+                extractLibsFromApk(metadata.path, targetAbi, libs).getOrThrow()
+                version.writeText(metadata.version)
+            }
             return libs
         }
 
@@ -51,21 +53,21 @@ class DexLoader(
             apkPath: String, targetAbi: String, outputFolder: File
         ) = runCatching {
             outputFolder.mkdirs()
-            val apkFile = ZipFile(apkPath)
             val extractedFiles = mutableListOf<File>()
-            apkFile.entries().iterator().forEach { entry ->
-                if (entry.name.startsWith("lib/$targetAbi/") && entry.name.endsWith(".so")) {
-                    val fileName = entry.name.substringAfterLast("/")
-                    val outputFile = File(outputFolder, fileName)
-                    apkFile.getInputStream(entry).use { input ->
-                        FileOutputStream(outputFile).use { output ->
-                            input.copyTo(output)
+            ZipFile(apkPath).use { apkFile ->
+                apkFile.entries().iterator().forEach { entry ->
+                    if (entry.name.startsWith("lib/$targetAbi/") && entry.name.endsWith(".so")) {
+                        val fileName = entry.name.substringAfterLast("/")
+                        val outputFile = File(outputFolder, fileName)
+                        apkFile.getInputStream(entry).use { input ->
+                            FileOutputStream(outputFile).use { output ->
+                                input.copyTo(output)
+                            }
                         }
+                        extractedFiles.add(outputFile)
                     }
-                    extractedFiles.add(outputFile)
                 }
             }
-            apkFile.close()
             extractedFiles
         }
     }

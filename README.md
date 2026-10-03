@@ -23,7 +23,7 @@
 
 | Platform | Format | File | Size | Download |
 | :--- | :--- | :--- | :--- | :--- |
-| 📱 **Android** (SDK 24+) | **APK** | `Audix-v1.0.0-Android.apk` | ~19.4 MB | [⬇️ **Download APK**](release-artifacts/Audix-v1.0.0-Android.apk) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 📱 **Android** (SDK 24+) | **APK** | `Audix-v1.0.0-Android.apk` | ~9.5 MB | [⬇️ **Download APK**](release-artifacts/Audix-v1.0.0-Android.apk) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
 | 💻 **Windows** (x64) | **MSI Installer** | `Audix-v1.0.0-Windows-Installer.msi` | ~164 MB | [⬇️ **Download MSI**](release-artifacts/Audix-v1.0.0-Windows-Installer.msi) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
 | 📦 **Windows** (x64) | **Portable ZIP** | `Audix-v1.0.0-Windows-Portable.zip` | ~162.8 MB | [⬇️ **Download ZIP**](release-artifacts/Audix-v1.0.0-Windows-Portable.zip) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
 

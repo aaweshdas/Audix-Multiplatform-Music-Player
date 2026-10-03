@@ -134,7 +134,9 @@ class StreamableMediaSource(
 
     override fun updateMediaItem(mediaItem: MediaItem) {
         this.mediaItem = mediaItem
-        actualSource.updateMediaItem(mediaItem)
+        if (::actualSource.isInitialized) {
+            actualSource.updateMediaItem(mediaItem)
+        }
     }
 
     data class Factories(

@@ -126,11 +126,14 @@ class PlayerCallback(
         SessionResult(RESULT_SUCCESS, Bundle().apply { putParcelable("image", image) })
     }
 
-    private fun Drawable.toScaledBitmap(width: Int) = toBitmap().let { bmp ->
-        val ratio = width.toFloat() / bmp.width
-        val height = (bmp.height * ratio).toInt()
+    private fun Drawable.toScaledBitmap(width: Int) = runCatching {
+        val w = if (intrinsicWidth > 0) intrinsicWidth else width
+        val h = if (intrinsicHeight > 0) intrinsicHeight else width
+        val bmp = toBitmap(w, h)
+        val ratio = width.toFloat() / bmp.width.coerceAtLeast(1)
+        val height = (bmp.height * ratio).toInt().coerceAtLeast(1)
         bmp.scale(width, height)
-    }
+    }.getOrNull()
 
     private fun resume(player: Player, withClear: Boolean) = scope.future {
         withContext(Dispatchers.Main) {

@@ -20,16 +20,20 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
-        commonMain.dependencies {
-            api(project(":common"))
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.serialization.json)
-            implementation(libs.okhttp)
-            implementation(libs.koin.core)
-            implementation(libs.bundles.sqldelight.common)
-            implementation(libs.filekache)
-            implementation(libs.bundles.multiplatform.settings.all)
-            implementation(libs.okio)
+        commonMain {
+            kotlin.exclude("**/extensions/ExtensionManager.kt")
+            dependencies {
+                api(project(":common"))
+                api(files("../tools/recovered-reference/recovered_classes.jar"))
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.okhttp)
+                implementation(libs.koin.core)
+                implementation(libs.bundles.sqldelight.common)
+                implementation(libs.filekache)
+                implementation(libs.bundles.multiplatform.settings.all)
+                implementation(libs.okio)
+            }
         }
 
         androidMain.dependencies {
@@ -39,6 +43,7 @@ kotlin {
         }
 
         val desktopMain by getting {
+            kotlin.setSrcDirs(emptyList<String>())
             dependencies {
                 implementation(libs.sqldelight.jvm.driver)
                 implementation(libs.vlcj)

@@ -116,7 +116,7 @@ fun EchoDesktopApp() {
             val bgBitmap = remember {
                 runCatching {
                     val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/music_notes_bg.jpg")
-                        ?: File("src/desktopMain/resources/images/music_notes_bg.jpg").takeIf { it.exists() }?.inputStream()
+                        ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "music_notes_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
                     stream?.use { loadImageBitmap(it) }
                 }.getOrNull()
             }
@@ -125,8 +125,8 @@ fun EchoDesktopApp() {
                 runCatching {
                     val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_logo.png")
                         ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/spothub_logo.png")
-                        ?: File("src/desktopMain/resources/images/audix_logo.png").takeIf { it.exists() }?.inputStream()
-                        ?: File("src/desktopMain/resources/images/spothub_logo.png").takeIf { it.exists() }?.inputStream()
+                        ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "audix_logo.png").toFile().takeIf { it.exists() }?.inputStream()
+                        ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "spothub_logo.png").toFile().takeIf { it.exists() }?.inputStream()
                     stream?.use { loadImageBitmap(it) }
                 }.getOrNull()
             }

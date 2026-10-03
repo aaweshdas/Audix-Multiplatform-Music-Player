@@ -48,9 +48,9 @@ class SaveToPlaylistViewModel(
     fun saveTracks() = viewModelScope.launch(Dispatchers.IO) {
         saveFlow.value = SaveState.LoadingTracks
         val result = runCatching {
-            val extension = extensionFlow.value!!
+            val extension = extensionFlow.value ?: error("Extension not found")
             val playlists = when (val state = playlistsFlow.value) {
-                is PlaylistState.Loaded -> state.list!!.mapNotNull { if (it.second) it.first else null }
+                is PlaylistState.Loaded -> state.list?.mapNotNull { if (it.second) it.first else null } ?: emptyList()
                 else -> throw IllegalStateException("Playlists not loaded")
             }
             if (playlists.isEmpty()) return@runCatching false

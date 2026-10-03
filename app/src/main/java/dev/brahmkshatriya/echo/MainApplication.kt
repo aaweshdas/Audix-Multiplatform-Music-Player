@@ -57,7 +57,7 @@ class MainApplication : Application(), KoinStartup, SingletonImageLoader.Factory
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image-cache"))
-                    .maxSizeBytes(1024 * 1024 * 100) // 100MB
+                    .maxSizeBytes(262_144_000L) // 250MB
                     .build()
             }
             .allowHardware(false)
@@ -145,5 +145,13 @@ class MainApplication : Application(), KoinStartup, SingletonImageLoader.Factory
             "zh-rCN" to "中文 (简体)",
             "zh-rTW" to "中文 (繁體)"
         )
+
+        fun clearImageCache(context: android.content.Context) {
+            runCatching {
+                val loader = coil3.SingletonImageLoader.get(context)
+                loader.diskCache?.clear()
+                loader.memoryCache?.clear()
+            }
+        }
     }
 }

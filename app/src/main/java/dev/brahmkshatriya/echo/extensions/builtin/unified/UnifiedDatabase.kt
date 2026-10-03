@@ -331,8 +331,8 @@ abstract class UnifiedDatabase : RoomDatabase() {
 
         companion object {
             fun Track.toTrackEntity(): PlaylistTrackEntity {
-                val pId = extras["pId"]!!.toLong()
-                val eId = extras["eId"]!!.toLong()
+                val pId = extras["pId"]?.toLongOrNull() ?: 0L
+                val eId = extras["eId"]?.toLongOrNull() ?: 0L
                 return PlaylistTrackEntity(eId, pId, id, extras.extensionId, this.toJson())
             }
         }

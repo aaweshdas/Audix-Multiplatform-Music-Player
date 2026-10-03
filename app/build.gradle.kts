@@ -39,6 +39,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
             )
         }
         create("nightly") {
@@ -77,6 +78,7 @@ dependencies {
     // implementation(project(":core"))
     implementation(libs.kotlin.reflect)
     implementation(libs.bundles.androidx)
+    implementation(libs.security.crypto)
     implementation(libs.material)
     implementation(libs.bundles.paging)
     implementation(libs.filekache)
@@ -92,6 +94,9 @@ dependencies {
     implementation(libs.kenburnsview)
     implementation(libs.nestedscrollwebview)
     implementation(libs.acsbendi.webview)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 
     if (!hasGoogleServices) return@dependencies
     implementation(libs.bundles.firebase)

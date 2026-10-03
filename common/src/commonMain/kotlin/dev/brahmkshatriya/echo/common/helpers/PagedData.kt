@@ -1,5 +1,6 @@
 package dev.brahmkshatriya.echo.common.helpers
 
+import dev.brahmkshatriya.echo.common.models.Track
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -135,9 +136,17 @@ sealed class PagedData<T : Any> {
 
         private val itemMap = mutableMapOf<String?, Page<T>>()
         override suspend fun loadListInternal(continuation: String?): Page<T> {
+            if (continuation != null && continuation.isBlank()) {
+                return Page(emptyList(), null)
+            }
             val page = itemMap.getOrPut(continuation) {
                 val (data, cont) = load(continuation)
-                Page(data, cont)
+                val safeCont = if (cont.isNullOrBlank() || cont == continuation) null else cont
+                val seenTrackIds = mutableSetOf<String>()
+                val deduped = data.filter { item ->
+                    if (item is Track) seenTrackIds.add(item.id) else true
+                }
+                Page(deduped, safeCont)
             }
             return page
         }
@@ -150,15 +159,20 @@ sealed class PagedData<T : Any> {
 
         override suspend fun loadAllInternal(): List<T> {
             val list = mutableListOf<T>()
+            val seenTokens = mutableSetOf<String>()
             val (data, continuation) = loadListInternal(null)
             list.addAll(data)
             var cont = continuation
-            while (cont != null) {
+            while (!cont.isNullOrBlank() && seenTokens.add(cont)) {
                 val page = loadListInternal(cont)
                 list.addAll(page.data)
+                if (page.continuation == cont) break // Prevent self-referencing token loop
                 cont = page.continuation
             }
-            return list
+            val seenTrackIds = mutableSetOf<String>()
+            return list.filter { item ->
+                if (item is Track) seenTrackIds.add(item.id) else true
+            }
         }
 
         override fun <R : Any> map(block: suspend (Result<List<T>>) -> List<R>): PagedData<R> {

@@ -22,7 +22,7 @@ import java.util.jar.JarFile
  *   - META-INF/echo-extension.json (manifest with className, id, name, version, type)
  *   - The ExtensionClient implementation class (on the classpath)
  */
-class JarExtensionRepository(
+class JarExtensionRepository @JvmOverloads constructor(
     private val platform: AppPlatform,
     private val settings: dev.brahmkshatriya.echo.core.settings.EchoSettings? = null,
 ) : ExtensionRepository {
@@ -184,7 +184,7 @@ class JarExtensionRepository(
         val typeStr = (attrs.getValue("Extension-Type") ?: "MUSIC").uppercase()
         val version = attrs.getValue("Extension-Version-Name") ?: attrs.getValue("Extension-Version-Code") ?: "1.0.0"
         val description = attrs.getValue("Extension-Description") ?: ""
-        val author = attrs.getValue("Extension-Author") ?: "Echo Community"
+        val author = attrs.getValue("Extension-Author") ?: dev.brahmkshatriya.echo.common.config.FlavorConfig.APP_AUTHOR
         val authorUrl = attrs.getValue("Extension-Author-Url")
         val repoUrl = attrs.getValue("Extension-Repo-Url")
         val updateUrl = attrs.getValue("Extension-Update-Url")

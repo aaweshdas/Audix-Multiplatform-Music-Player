@@ -22,7 +22,7 @@ kotlin {
 
                 // Compose Desktop
                 implementation(compose.desktop.currentOs)
-                implementation(compose.material3)
+                implementation(libs.compose.material3.desktop)
                 implementation(compose.materialIconsExtended)
                 implementation(compose.components.resources)
                 implementation(compose.components.uiToolingPreview)
@@ -52,6 +52,19 @@ kotlin {
 
                 // Settings
                 implementation(libs.bundles.multiplatform.settings.all)
+
+                // Database & Storage
+                implementation(libs.bundles.sqldelight.common)
+                implementation(libs.sqldelight.jvm.driver)
+                implementation(libs.filekache)
+
+                // Networking, I/O & Reflection
+                implementation(libs.okhttp)
+                implementation(libs.okio)
+                implementation(libs.kotlin.reflect)
+
+                // Skiko native runtime matching skiko-awt 0.9.4.2
+                implementation(libs.skiko.awt.runtime.windows.x64)
             }
         }
 
@@ -99,4 +112,19 @@ compose.desktop {
         }
     }
 }
+
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.skiko" && requested.name.startsWith("skiko-awt-runtime")) {
+            useVersion("0.9.4.2")
+        }
+        if (requested.group == "org.jetbrains.compose.material3") {
+            useVersion("1.8.2")
+        }
+        if (requested.group == "org.jetbrains.compose.material" && !requested.name.contains("icons")) {
+            useVersion("1.8.2")
+        }
+    }
+}
+
 

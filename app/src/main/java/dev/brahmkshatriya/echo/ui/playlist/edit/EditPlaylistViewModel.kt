@@ -159,8 +159,8 @@ class EditPlaylistViewModel(
     val saveState = saveFlow.transformLatest {
         emit(SaveState.Saving)
         val saved = SaveState.Saved(runCatching {
-            val playlist = playlistFlow.value!!.getOrThrow()
-            val extension = extensionFlow.value!!
+            val playlist = playlistFlow.value?.getOrThrow() ?: error("Playlist not loaded")
+            val extension = extensionFlow.value ?: error("Extension not loaded")
             if (playlist.title != nameFlow.value || playlist.description != descriptionFlow.value) {
                 extension.getAs<PlaylistEditClient, Unit> {
                     editPlaylistMetadata(playlist, nameFlow.value, descriptionFlow.value)
@@ -178,10 +178,10 @@ class EditPlaylistViewModel(
                 }
             }
 
-            val newActions = newActions.value!!
+            val newActions = newActions.value.orEmpty()
             if (newActions.isEmpty()) return@runCatching
 
-            var tracks = originalList.value!!.getOrThrow()
+            var tracks = originalList.value?.getOrThrow() ?: emptyList()
             val selectedTab = selectedTabFlow.value
             extension.getIf<PlaylistEditorListenerClient, Unit> {
                 onEnterPlaylistEditor(playlist, tracks)

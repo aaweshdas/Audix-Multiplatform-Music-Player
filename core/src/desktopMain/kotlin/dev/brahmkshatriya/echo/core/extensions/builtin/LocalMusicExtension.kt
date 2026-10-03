@@ -24,7 +24,7 @@ import java.io.File
  * Automatically discovers audio and media files in the user's Music folder
  * and Echo downloads directory.
  */
-class LocalMusicExtension(
+class LocalMusicExtension @JvmOverloads constructor(
     private val platform: AppPlatform,
     private val echoSettings: dev.brahmkshatriya.echo.core.settings.EchoSettings? = null,
 ) : ExtensionClient, HomeFeedClient, TrackClient, SearchFeedClient {
@@ -40,7 +40,7 @@ class LocalMusicExtension(
             name = "Local Music",
             version = "1.0.0",
             description = "Play songs directly from your Windows Music library and custom folders",
-            author = "Echo Desktop",
+            author = dev.brahmkshatriya.echo.common.config.FlavorConfig.DESKTOP_APP_NAME,
             isEnabled = true,
         )
 

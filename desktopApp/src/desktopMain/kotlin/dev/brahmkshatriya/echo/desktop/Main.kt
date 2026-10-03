@@ -145,13 +145,13 @@ fun main() {
                 .diskCache {
                     DiskCache.Builder()
                         .directory(platform.cacheDir.resolve("images").toFile().toOkioPath())
-                        .maxSizeBytes(512L * 1024 * 1024)
+                        .maxSizeBytes(262_144_000L) // 250MB
                         .build()
                 }
                 .crossfade(true)
                 .build()
         }
-        log("Coil initialized")
+        log("Coil initialized with 250MB diskCache")
     }.onFailure {
         log("Coil initialization warning: ${it.stackTraceToString()}")
     }
@@ -197,8 +197,8 @@ fun main() {
             runCatching {
                 val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_logo.png")
                     ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/spothub_logo.png")
-                    ?: File("src/desktopMain/resources/images/audix_logo.png").takeIf { it.exists() }?.inputStream()
-                    ?: File("src/desktopMain/resources/images/spothub_logo.png").takeIf { it.exists() }?.inputStream()
+                    ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "audix_logo.png").toFile().takeIf { it.exists() }?.inputStream()
+                    ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "spothub_logo.png").toFile().takeIf { it.exists() }?.inputStream()
                 stream?.use { androidx.compose.ui.res.loadImageBitmap(it) }?.let { androidx.compose.ui.graphics.painter.BitmapPainter(it) }
             }.getOrNull() ?: EchoTrayPainter
         }

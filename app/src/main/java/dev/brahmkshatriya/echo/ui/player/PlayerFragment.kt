@@ -116,6 +116,13 @@ class PlayerFragment : Fragment() {
         configureBackgroundPlayerView()
     }
 
+    override fun onDestroyView() {
+        binding?.playerView?.player = null
+        backgroundPlayer?.release()
+        backgroundPlayer = null
+        super.onDestroyView()
+    }
+
     private val collapseHeight by lazy {
         resources.getDimension(R.dimen.collapsed_cover_size).toInt()
     }

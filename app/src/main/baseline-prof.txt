@@ -1,0 +1,33 @@
+# Baseline Profile for Echo / Audix
+# Pre-compiled AOT dex paths for critical startup path and smooth UI frame rendering
+
+Ldev/brahmkshatriya/echo/MainApplication;
+HSPLdev/brahmkshatriya/echo/MainApplication;-><init>()V
+HSPLdev/brahmkshatriya/echo/MainApplication;->onCreate()V
+HSPLdev/brahmkshatriya/echo/MainApplication;->newImageLoader(Lcoil3/PlatformContext;)Lcoil3/ImageLoader;
+
+Ldev/brahmkshatriya/echo/MainActivity;
+HSPLdev/brahmkshatriya/echo/MainActivity;-><init>()V
+HSPLdev/brahmkshatriya/echo/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLdev/brahmkshatriya/echo/MainActivity;->onStart()V
+HSPLdev/brahmkshatriya/echo/MainActivity;->onResume()V
+
+Ldev/brahmkshatriya/echo/playback/PlayerService;
+HSPLdev/brahmkshatriya/echo/playback/PlayerService;-><init>()V
+HSPLdev/brahmkshatriya/echo/playback/PlayerService;->onCreate()V
+HSPLdev/brahmkshatriya/echo/playback/PlayerService;->onGetSession(Landroidx/media3/session/MediaSession$ControllerInfo;)Landroidx/media3/session/MediaLibraryService$MediaLibrarySession;
+
+Ldev/brahmkshatriya/echo/playback/listener/PlayerEventListener;
+HSPLdev/brahmkshatriya/echo/playback/listener/PlayerEventListener;-><init>(Landroid/content/Context;Lkotlinx/coroutines/CoroutineScope;Landroidx/media3/session/MediaSession;Lkotlinx/coroutines/flow/MutableStateFlow;Ldev/brahmkshatriya/echo/extensions/ExtensionLoader;Lkotlinx/coroutines/flow/MutableSharedFlow;)V
+
+Ldev/brahmkshatriya/echo/ui/player/PlayerViewModel;
+HSPLdev/brahmkshatriya/echo/ui/player/PlayerViewModel;-><init>()V
+
+Ldev/brahmkshatriya/echo/common/models/Track;
+HSPLdev/brahmkshatriya/echo/common/models/Track;-><init>(Ljava/lang/String;Ljava/lang/String;Ldev/brahmkshatriya/echo/common/models/Track$Type;Ldev/brahmkshatriya/echo/common/models/ImageHolder;Ljava/util/List;Ldev/brahmkshatriya/echo/common/models/Album;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ldev/brahmkshatriya/echo/common/models/Date;Ljava/lang/String;)V
+
+Ldev/brahmkshatriya/echo/common/models/Date;
+HSPLdev/brahmkshatriya/echo/common/models/Date;-><init>(J)V
+HSPLdev/brahmkshatriya/echo/common/models/Date;->getYear()I
+
+Ldev/brahmkshatriya/echo/common/config/FlavorConfig;

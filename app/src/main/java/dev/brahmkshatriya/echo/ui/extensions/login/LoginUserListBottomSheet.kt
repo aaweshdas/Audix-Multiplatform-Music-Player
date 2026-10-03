@@ -65,6 +65,7 @@ class LoginUserListBottomSheet : BottomSheetDialogFragment() {
             binding.logout.setOnClickListener {
                 viewModel.logout(selectedUser?.toEntity(ext.type, ext.id))
                 viewModel.setLoginUser(CurrentUser(ext.type, ext.id, null))
+                dev.brahmkshatriya.echo.MainApplication.clearImageCache(requireContext())
             }
 
             list.forEachIndexed { index, (user, selected) ->

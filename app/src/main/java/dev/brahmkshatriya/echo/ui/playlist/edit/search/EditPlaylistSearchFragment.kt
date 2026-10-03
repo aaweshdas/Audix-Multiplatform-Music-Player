@@ -35,7 +35,7 @@ class EditPlaylistSearchFragment : Fragment() {
     private val viewModel by viewModels<EditPlaylistSearchViewModel>()
 
     private val args by lazy { requireArguments() }
-    private val extensionId by lazy { args.getString("extensionId")!! }
+    private val extensionId by lazy { args.getString("extensionId").orEmpty() }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?

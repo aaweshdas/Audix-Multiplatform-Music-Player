@@ -295,15 +295,22 @@ class PlayerCallback(
         pages: Int = 5,
     ) = runCatching {
         val list = mutableListOf<T>()
+        val seenTokens = mutableSetOf<String>()
         var page = loadPage(null)
         list.addAll(page.data)
         var count = 0
-        while (page.continuation != null && count < pages) {
-            page = loadPage(page.continuation)
+        var cont = page.continuation
+        while (!cont.isNullOrBlank() && count < pages && seenTokens.add(cont)) {
+            page = loadPage(cont)
             list.addAll(page.data)
+            if (page.continuation == cont) break // Prevent self-referencing loop
+            cont = page.continuation
             count++
         }
-        list
+        val seenTrackIds = mutableSetOf<String>()
+        list.filter { item ->
+            if (item is Track) seenTrackIds.add(item.id) else true
+        }
     }
 
     private fun addToQueue(player: Player, args: Bundle) = scope.future {

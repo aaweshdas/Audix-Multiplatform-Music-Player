@@ -41,6 +41,7 @@ class PlayerEventListener(
     private val player get() = session.player
 
     private fun updateCustomLayout() = scope.launch(Dispatchers.Main) {
+        if (player.playbackState != Player.STATE_READY) return@launch
         val item = player.currentMediaItem ?: return@launch
         val supportsLike = withContext(Dispatchers.IO) {
             extensions.music.getExtension(item.extensionId)?.isClient<LikeClient>() ?: false
@@ -53,8 +54,10 @@ class PlayerEventListener(
     }
 
     private fun updateCurrentFlow() {
-        if (player.currentMediaItem == null && player.mediaItemCount > 0)
-            throw Exception("This is possible")
+        if (player.currentMediaItem == null && player.mediaItemCount > 0) {
+            // Guard against transient state during queue transitions
+            return
+        }
         currentFlow.value = player.currentMediaItem?.let {
             val isPlaying = player.isPlaying && player.playbackState == Player.STATE_READY
             PlayerState.Current(player.currentMediaItemIndex, it, it.isLoaded, isPlaying)
@@ -63,22 +66,31 @@ class PlayerEventListener(
 
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
         updateCurrentFlow()
-        updateCustomLayout()
+        if (player.playbackState == Player.STATE_READY) {
+            updateCustomLayout()
+        }
         ResumptionUtils.saveIndex(context, player.currentMediaItemIndex)
     }
 
     override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
         updateCurrentFlow()
-        updateCustomLayout()
+        if (player.playbackState == Player.STATE_READY) {
+            updateCustomLayout()
+        }
     }
 
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
         updateCurrentFlow()
+        if (player.playbackState == Player.STATE_READY) {
+            updateCustomLayout()
+        }
         scope.launch { ResumptionUtils.saveQueue(context, player) }
     }
 
     override fun onRepeatModeChanged(repeatMode: Int) {
-        updateCustomLayout()
+        if (player.playbackState == Player.STATE_READY) {
+            updateCustomLayout()
+        }
         ResumptionUtils.saveRepeat(context, repeatMode)
     }
 
@@ -88,6 +100,9 @@ class PlayerEventListener(
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         updateCurrentFlow()
+        if (playbackState == Player.STATE_READY) {
+            updateCustomLayout()
+        }
     }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {

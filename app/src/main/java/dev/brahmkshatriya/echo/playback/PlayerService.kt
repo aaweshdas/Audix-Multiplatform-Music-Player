@@ -46,6 +46,7 @@ import dev.brahmkshatriya.echo.utils.ContextUtils.listenFuture
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -63,7 +64,8 @@ class PlayerService : MediaLibraryService() {
 
     private val app by inject<App>()
     private val state by inject<PlayerState>()
-    private val scope = CoroutineScope(Dispatchers.IO) + CoroutineName("PlayerService")
+    private val serviceJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + serviceJob) + CoroutineName("PlayerService")
 
     @OptIn(UnstableApi::class)
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
@@ -125,11 +127,14 @@ class PlayerService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        app.settings.unregisterOnSharedPreferenceChangeListener(listener)
+        serviceJob.cancel()
         mediaSession?.run {
             player.release()
             release()
             mediaSession = null
         }
+        exoPlayer.release()
         super.onDestroy()
     }
 

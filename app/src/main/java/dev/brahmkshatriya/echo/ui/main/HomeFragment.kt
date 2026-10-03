@@ -36,11 +36,11 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         val vm by viewModel<FeedViewModel>()
         val id = "home"
         vm.getFeedData(id, EMPTY, cached = {
-            val curr = current.value!!
+            val curr = current.value ?: return@getFeedData null
             val feed = Cached.getFeedShelf(app, curr.id, id).getOrThrow()
             FeedData.State(curr.id, null, feed)
         }) {
-            val curr = current.value!!
+            val curr = current.value ?: return@getFeedData null
             val feed = Cached.savingFeed(
                 app, curr, id,
                 curr.getAs<HomeFeedClient, Feed<Shelf>> { loadHomeFeed() }.getOrThrow()

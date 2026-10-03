@@ -33,7 +33,7 @@ class AppRepository(
                     val isExtension = it.reqFeatures.orEmpty().any { featureInfo ->
                         featureInfo?.name?.startsWith(FEATURE) ?: false
                     }
-                    if (isExtension) File(it.applicationInfo!!.sourceDir!!) else null
+                    if (isExtension) it.applicationInfo?.sourceDir?.let { dir -> File(dir) } else null
                 }.getOrNull()
             }
         }.getOrNull().orEmpty()
@@ -64,7 +64,7 @@ class AppRepository(
                 addDataScheme("package")
             }
             ContextCompat.registerReceiver(
-                context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED
+                context, receiver, filter, ContextCompat.RECEIVER_EXPORTED
             )
         }
     }

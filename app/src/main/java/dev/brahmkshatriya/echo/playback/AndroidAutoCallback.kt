@@ -345,7 +345,7 @@ abstract class AndroidAutoCallback(
         private fun getListsItems(
             context: Context, id: String, extId: String
         ) = run {
-            val shelf = listsMap[id]!!
+            val shelf = listsMap[id] ?: return@run emptyList()
             when (shelf) {
                 is Shelf.Lists.Categories -> shelf.list.map { it.toMediaItem(context, extId) }
                 is Shelf.Lists.Items -> shelf.list.map { it.toMediaItem(context, extId) }
@@ -386,22 +386,23 @@ abstract class AndroidAutoCallback(
         private suspend fun getShelfItems(
             context: Context, id: String, extId: String, page: Int
         ): List<MediaItem> {
-            val shelf = shelvesMap[id]!!
+            val shelf = shelvesMap[id] ?: return emptyList()
             val (list, next) = shelf.loadPage(continuations[id to page])
             continuations[id to page + 1] = next
-            return listOfNotNull(
-                *list.map { it.toMediaItem(context, extId) }.toTypedArray()
-            )
+            return list.map { it.toMediaItem(context, extId) }
         }
 
         private val feedMap = WeakHashMap<String, Feed<Shelf>>()
         private suspend fun Feed<Shelf>.toMediaItems(
             id: String, context: Context, extId: String, page: Int
         ): List<MediaItem> {
-            val id = "${id.hashCode()}"
-            feedMap[id] = this
-            //TODO
-            return listOf()
+            val hashId = "${id.hashCode()}"
+            feedMap[hashId] = this
+            val pagedData = getPagedData(tabs.firstOrNull())?.pagedData ?: return emptyList()
+            shelvesMap[hashId] = pagedData
+            val (list, next) = pagedData.loadPage(continuations[hashId to page])
+            continuations[hashId to page + 1] = next
+            return list.map { it.toMediaItem(context, extId) }
         }
 
         private suspend inline fun <reified T> Extension<*>.getFeed(
@@ -411,7 +412,8 @@ abstract class AndroidAutoCallback(
             pageNumber: Int,
             getFeed: T.() -> Feed<Shelf>
         ) = getList<T> {
-            TODO()
+            val feed = getFeed()
+            feed.toMediaItems(parentId, context, id, pageNumber)
         }
 
         private val tracksMap = WeakHashMap<String, Pair<EchoMediaItem, PagedData<Track>>>()

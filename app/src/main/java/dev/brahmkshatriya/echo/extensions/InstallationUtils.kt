@@ -35,7 +35,9 @@ object InstallationUtils {
         val it = activity.waitForResult(installIntent)
         if (it.resultCode == Activity.RESULT_OK) return
         val result = it.data?.extras?.getInt("android.intent.extra.INSTALL_RESULT")
-        throw Exception("Please uninstall the existing extension first. Error Code: $result")
+        if (result != null && result != 1) {
+            throw Exception("Installation failed. Error Code: $result")
+        }
     }
 
     suspend fun installFile(

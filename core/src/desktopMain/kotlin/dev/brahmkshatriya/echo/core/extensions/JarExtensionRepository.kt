@@ -77,7 +77,7 @@ class JarExtensionRepository @JvmOverloads constructor(
                 dev.brahmkshatriya.echo.core.extensions.builtin.SpotifyExtension(platform, settings)
             }
         )
-        var lastFingerprint = ""
+        var lastFingerprint: String? = null
         while (true) {
             val extensionsDir = platform.extensionsDir.toFile().also { it.mkdirs() }
             val jarFiles = extensionsDir.listFiles { f -> f.extension.equals("jar", ignoreCase = true) } ?: emptyArray()

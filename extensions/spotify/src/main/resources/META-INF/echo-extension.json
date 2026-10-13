@@ -1,0 +1,9 @@
+{
+  "id": "spotify_music",
+  "name": "Spotify",
+  "className": "dev.brahmkshatriya.echo.extension.SpotifyExtension",
+  "version": "1.0.0",
+  "type": "MUSIC",
+  "description": "Browse Spotify Top Charts, Today's Top Hits, Viral 50, and stream high-fidelity tracks.",
+  "author": "Audix"
+}

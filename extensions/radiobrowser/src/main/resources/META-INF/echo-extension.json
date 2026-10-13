@@ -1,0 +1,9 @@
+{
+  "id": "radio_browser",
+  "name": "Radio Browser",
+  "className": "dev.brahmkshatriya.echo.extension.RadioBrowserExtension",
+  "version": "1.0.0",
+  "type": "MUSIC",
+  "description": "Free live radio stations, music channels, genres, and top hits worldwide.",
+  "author": "Audix"
+}

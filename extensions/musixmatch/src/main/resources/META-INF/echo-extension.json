@@ -1,0 +1,9 @@
+{
+  "id": "musixmatch_lyrics",
+  "name": "Musixmatch Lyrics",
+  "className": "dev.brahmkshatriya.echo.extension.MusixmatchExtension",
+  "version": "1.0.0",
+  "type": "LYRICS",
+  "description": "Time-synced lyrics with line-by-line scrolling synchronization for Now Playing songs.",
+  "author": "Audix"
+}

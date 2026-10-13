@@ -42,9 +42,26 @@ class MainApplication : Application(), KoinStartup, SingletonImageLoader.Factory
 
     override fun onCreate() {
         super.onCreate()
+        unpackBundledExtensions()
         CoroutineUtils.setDebug()
         applyLocale(settings)
         configureAppShortcuts(extensionLoader)
+    }
+
+    private fun unpackBundledExtensions() {
+        runCatching {
+            val targetDir = dev.brahmkshatriya.echo.extensions.repo.FileRepository.run { getExtensionsFileDir() }
+            targetDir.mkdirs()
+            val assetList = assets.list("extensions") ?: return@runCatching
+            for (name in assetList) {
+                val dest = java.io.File(targetDir, name)
+                if (!dest.exists() || dest.length() == 0L) {
+                    assets.open("extensions/$name").use { input ->
+                        dest.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+            }
+        }
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {

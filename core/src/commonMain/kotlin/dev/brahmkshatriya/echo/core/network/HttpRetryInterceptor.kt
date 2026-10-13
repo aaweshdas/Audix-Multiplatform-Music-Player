@@ -17,6 +17,11 @@ class HttpRetryInterceptor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
+        val requestBody = request.body
+        if (requestBody != null && requestBody.isOneShot()) {
+            return chain.proceed(request)
+        }
+
         var response: Response? = null
         var lastException: IOException? = null
         var retryCount = 0

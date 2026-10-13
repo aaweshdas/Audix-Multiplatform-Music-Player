@@ -1,0 +1,9 @@
+{
+  "id": "discord_rpc",
+  "name": "Discord Rich Presence",
+  "className": "dev.brahmkshatriya.echo.extension.DiscordRpcExtension",
+  "version": "1.0.0",
+  "type": "TRACKER",
+  "description": "Display your Now Playing song, album art, and playback progress in your Discord profile.",
+  "author": "Audix"
+}

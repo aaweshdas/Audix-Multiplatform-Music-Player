@@ -1,0 +1,9 @@
+{
+  "id": "lastfm_tracker",
+  "name": "Last.fm Scrobbler",
+  "className": "dev.brahmkshatriya.echo.extension.LastfmExtension",
+  "version": "1.0.0",
+  "type": "TRACKER",
+  "description": "Automatic playback scrobbling and listening history tracking to Last.fm.",
+  "author": "Audix"
+}

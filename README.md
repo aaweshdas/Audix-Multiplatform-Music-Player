@@ -19,19 +19,20 @@
 
 ---
 
-## ⚡ Latest Release — v1.0.0
+## ⚡ Latest Release — v1.0.1
 
 | Platform | Format | File | Size | Download |
 | :--- | :--- | :--- | :--- | :--- |
-| 📱 **Android** (SDK 24+) | **APK** | `Audix-v1.0.0-Android.apk` | ~9.5 MB | [⬇️ **Download APK**](release-artifacts/Audix-v1.0.0-Android.apk) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
-| 💻 **Windows** (x64) | **MSI Installer** | `Audix-v1.0.0-Windows-Installer.msi` | ~164 MB | [⬇️ **Download MSI**](release-artifacts/Audix-v1.0.0-Windows-Installer.msi) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
-| 📦 **Windows** (x64) | **Portable ZIP** | `Audix-v1.0.0-Windows-Portable.zip` | ~162.8 MB | [⬇️ **Download ZIP**](release-artifacts/Audix-v1.0.0-Windows-Portable.zip) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 📱 **Android** (SDK 24+) | **APK** | `Audix-v1.0.1-Android.apk` | ~14.4 MB | [⬇️ **Download APK**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Audix-v1.0.1-Android.apk) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 💻 **Windows** (x64) | **EXE Setup** | `Audix-v1.0.1-Windows-Installer.exe` | ~166 MB | [⬇️ **Download EXE**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Audix-v1.0.1-Windows-Installer.exe) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 💻 **Windows** (x64) | **MSI Installer** | `Audix-v1.0.1-Windows-Installer.msi` | ~165 MB | [⬇️ **Download MSI**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Audix-v1.0.1-Windows-Installer.msi) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 📦 **Windows** (x64) | **Portable ZIP** | `Audix-v1.0.1-Windows-Portable.zip` | ~234 MB | [⬇️ **Download ZIP**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Audix-v1.0.1-Windows-Portable.zip) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
 
 > [!TIP]
 > **New to Audix?** Follow the quick steps below to load your music and install extensions in seconds!
 
 ### 📥 How to Install & Add Extensions in Audix
-1. **Download & Install**: Install `Audix-v1.0.0-Android.apk` on your Android device (or launch `Audix.exe` on Windows).
+1. **Download & Install**: Install `Audix-v1.0.1-Android.apk` on your Android device (or run `Audix-v1.0.1-Windows-Installer.exe` on Windows).
 2. **Open Extensions**: Tap the **Extensions** icon in the navigation bar.
 3. **Tap Add (`+`)**: Tap the **Add Extension** button.
 4. **Enter Shortcode or URL**:
@@ -45,13 +46,15 @@
 
 ---
 
-### ✨ What's New in v1.0.0
+### ✨ What's New in v1.0.1
+- 🎛️ **Flagship 3-Zone Studio Billboard**: Redesigned hero section with balanced 3-part layout (Track identity & hero playback actions, live 28-band frequency spectrum visualizer, and 3D spinning vinyl gatefold with smooth animations).
+- 🔘 **Crisp Action Matrix**: Completely redesigned high-contrast circular action buttons (Favorite, Playlist, Download, Share, Next) with zero glare obscuration.
+- ⚡ **Interactive Studio Options**: Direct access to Screensaver, Equalizer, Shuffle, Repeat modes, and Now Playing.
+- 💻 **Standalone Windows .EXE Installer**: Native Windows installer `.exe` with bundled Java 21 runtime and automatic desktop & Start Menu shortcuts.
+- 📱 **Optimized Android APK**: Fresh release APK built with R8 optimization and signing for instant installation across all Android devices.
 - 🚀 **Cross-Platform Audio Engine**: Support for Media3 ExoPlayer on Android and VLCJ on Windows Desktop.
 - 🔌 **Dynamic Extension Loader**: Resolved all package discovery, DEX loading, and URL shortener resolution issues.
 - 🎵 **Built-In Offline & Spotify Playback**: Instant playback of your local music library and popular Spotify charts.
-- 🔒 **Security & Network**: Fixed network security configurations to support HTTP radio streams and third-party extension endpoints.
-- 📱 **Android 14+ Ready**: Foreground service playback controls, lockscreen media session integration, and edge-to-edge support.
-- 🎨 **Modern Design**: Refined Material 3 Glassmorphic UI with vibrant artwork, dynamic gradient backgrounds, and responsive navigation.
 
 ---
 

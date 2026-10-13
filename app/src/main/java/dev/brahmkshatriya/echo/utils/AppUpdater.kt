@@ -83,17 +83,32 @@ object AppUpdater {
             client.newCall(request).await().use {
                 it.body.string().toData<GithubReleaseResponse>()
             }.getOrThrow()
-        }.getOrElse {
-            throw Exception("Failed to fetch latest release", it)
-        }
-        if (res.tagName != currentVersion) {
-            res.assets.sortedByDescending {
-                it.name.contains(Build.SUPPORTED_ABIS.first())
-            }.firstOrNull {
-                it.name.endsWith("apk")
-            }?.browserDownloadUrl ?: throw Exception("No EApk assets found")
+        }.getOrNull()
+
+        if (res != null) {
+            if (res.tagName != currentVersion) {
+                res.assets.sortedByDescending {
+                    it.name.contains(Build.SUPPORTED_ABIS.first())
+                }.firstOrNull {
+                    it.name.endsWith("apk", ignoreCase = true) || it.name.endsWith("eapk", ignoreCase = true)
+                }?.browserDownloadUrl ?: throw Exception("No EApk assets found")
+            } else {
+                null
+            }
         } else {
-            null
+            // Fallback for API rate-limiting: Fetch latest release HTML directly
+            val htmlUrl = "https://github.com/$user/$repo/releases/latest"
+            val htmlReq = Request.Builder().url(htmlUrl).header("User-Agent", "Mozilla/5.0").build()
+            val html = client.newCall(htmlReq).await().body.string()
+            val match = Regex("""/releases/download/([^/]+)/([^"'\s]+\.(?:eapk|apk))""").find(html)
+            if (match != null) {
+                val tag = match.groupValues[1]
+                if (tag != currentVersion) {
+                    "https://github.com" + match.value
+                } else null
+            } else {
+                throw Exception("Failed to fetch latest release from GitHub API or HTML")
+            }
         }
     }
 

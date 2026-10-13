@@ -17,6 +17,8 @@ import dev.brahmkshatriya.echo.common.models.Track
 import dev.brahmkshatriya.echo.common.settings.Setting
 import dev.brahmkshatriya.echo.common.settings.Settings
 import dev.brahmkshatriya.echo.core.platform.AppPlatform
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -72,17 +74,22 @@ class LocalMusicExtension @JvmOverloads constructor(
         return dirs.filter { it.exists() && it.isDirectory }
     }
 
-    private fun scanLocalTracks(): List<Track> {
+    private suspend fun scanLocalTracks(): List<Track> = withContext(Dispatchers.IO) {
         val files = mutableListOf<File>()
         for (dir in getMusicDirectories()) {
-            dir.walkTopDown().maxDepth(3).forEach { file ->
-                if (file.isFile && file.extension.lowercase() in AUDIO_EXTENSIONS) {
-                    files.add(file)
-                }
+            runCatching {
+                dir.walkTopDown()
+                    .maxDepth(3)
+                    .onFail { _, _ -> /* Ignore inaccessible or protected directories on Windows */ }
+                    .forEach { file ->
+                        if (file.isFile && file.extension.lowercase() in AUDIO_EXTENSIONS) {
+                            files.add(file)
+                        }
+                    }
             }
         }
 
-        return files.distinctBy { it.absolutePath }.map { file ->
+        files.distinctBy { it.absolutePath }.map { file ->
             val title = file.nameWithoutExtension
             Track(
                 id = file.absolutePath,

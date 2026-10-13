@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
@@ -27,15 +29,20 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import dev.brahmkshatriya.echo.desktop.ui.screens.LiquidGlassCard
+import dev.brahmkshatriya.echo.desktop.ui.screens.LiquidGlassBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,42 +53,48 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.brahmkshatriya.echo.common.models.EchoMediaItem
-import dev.brahmkshatriya.echo.desktop.ui.components.AudioEffectsDialog
-import dev.brahmkshatriya.echo.desktop.ui.components.SleepTimerDialog
+import dev.brahmkshatriya.echo.core.settings.EchoSettings
 import dev.brahmkshatriya.echo.desktop.ui.player.MiniPlayer
 import dev.brahmkshatriya.echo.desktop.ui.screens.DownloadsScreen
 import dev.brahmkshatriya.echo.desktop.ui.screens.ExtensionsScreen
 import dev.brahmkshatriya.echo.desktop.ui.screens.HomeScreen
+import dev.brahmkshatriya.echo.desktop.ui.screens.HeavyRotationScreen
 import dev.brahmkshatriya.echo.desktop.ui.screens.LibraryScreen
-import dev.brahmkshatriya.echo.desktop.ui.screens.MediaDetailScreen
-import dev.brahmkshatriya.echo.desktop.ui.screens.NowPlayingScreen
-import dev.brahmkshatriya.echo.desktop.ui.screens.NowPlayingTab
 import dev.brahmkshatriya.echo.desktop.ui.screens.SearchScreen
 import dev.brahmkshatriya.echo.desktop.ui.screens.SettingsScreen
 import dev.brahmkshatriya.echo.desktop.ui.screensaver.EchoScreensaver
 import dev.brahmkshatriya.echo.desktop.ui.theme.EchoTheme
-import dev.brahmkshatriya.echo.desktop.viewmodel.DownloadsViewModel
 import dev.brahmkshatriya.echo.desktop.viewmodel.PlayerViewModel
-import dev.brahmkshatriya.echo.desktop.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import java.io.File
+import java.awt.Toolkit
+import java.awt.AWTEvent
+import java.awt.event.AWTEventListener
+import java.awt.event.MouseEvent
+import java.awt.event.KeyEvent
+import java.awt.MouseInfo
+import java.awt.Window
 
 enum class Screen(
     val title: String,
     val icon: ImageVector,
 ) {
     HOME("Home", Icons.Default.Home),
+    ROTATION("Rotation", Icons.Default.Whatshot),
     SEARCH("Search", Icons.Default.Search),
     LIBRARY("Library", Icons.Default.LibraryMusic),
     DOWNLOADS("Downloads", Icons.Default.Download),
@@ -89,96 +102,210 @@ enum class Screen(
     SETTINGS("Settings", Icons.Default.Settings),
 }
 
+private var cachedBgBitmap: ImageBitmap? = null
+private var cachedAppLogoBitmap: ImageBitmap? = null
+
+object UiZoomManager {
+    var zoomScale by mutableStateOf(0.90f)
+}
+
 @Composable
 fun EchoDesktopApp() {
-    EchoTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            val playerViewModel = koinInject<PlayerViewModel>()
-            val downloadsViewModel = koinInject<DownloadsViewModel>()
-            val settingsViewModel = koinInject<SettingsViewModel>()
+    val currentDensity = LocalDensity.current
+    val scaledDensity = remember(currentDensity, UiZoomManager.zoomScale) {
+        Density(
+            density = currentDensity.density * UiZoomManager.zoomScale,
+            fontScale = currentDensity.fontScale
+        )
+    }
 
-            val screensaverTimeoutSec by settingsViewModel.screensaverTimeout.collectAsState()
+    CompositionLocalProvider(LocalDensity provides scaledDensity) {
+        EchoTheme {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF070913))
+            ) {
+            val playerViewModel = koinInject<PlayerViewModel>()
+            val settings = runCatching { koinInject<EchoSettings>() }.getOrNull()
+
             var isScreensaverActive by remember { mutableStateOf(false) }
             var lastActivityTime by remember { mutableStateOf(System.currentTimeMillis()) }
             var screensaverActivatedAt by remember { mutableStateOf(0L) }
+            var isMouseInsideApp by remember { mutableStateOf(true) }
+            var mouseExitedAt by remember { mutableStateOf(0L) }
+            var lastPointerPosition by remember { mutableStateOf(Offset.Zero) }
+            var screensaverStartPointerPosition by remember { mutableStateOf(Offset.Zero) }
 
-            var isNowPlayingExpanded by remember { mutableStateOf(false) }
-            var nowPlayingInitialTab by remember { mutableStateOf(NowPlayingTab.LYRICS) }
+            val launchScreensaver: () -> Unit = {
+                mouseExitedAt = 0L
+                screensaverActivatedAt = System.currentTimeMillis()
+                screensaverStartPointerPosition = lastPointerPosition
+                isScreensaverActive = true
+            }
 
-            val showAudioEffectsDialog by playerViewModel.showAudioEffectsDialog.collectAsState()
-            val showSleepTimerDialog by playerViewModel.showSleepTimerDialog.collectAsState()
-            val isNowPlayingVmExpanded by playerViewModel.isNowPlayingExpanded.collectAsState()
-
-            // Load 3D musical notes background and Audix logo
+            // Load custom background wallpaper image and Audix logo with in-memory caching
             val bgBitmap = remember {
-                runCatching {
-                    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/music_notes_bg.jpg")
+                cachedBgBitmap ?: runCatching {
+                    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_bg.jpg")
+                        ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/music_notes_bg.jpg")
+                        ?: java.nio.file.Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
+                        ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
                         ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "music_notes_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
                     stream?.use { loadImageBitmap(it) }
-                }.getOrNull()
+                }.getOrNull()?.also { cachedBgBitmap = it }
             }
 
             val logoBitmap = remember {
-                runCatching {
+                cachedAppLogoBitmap ?: runCatching {
                     val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_logo.png")
                         ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/spothub_logo.png")
                         ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "audix_logo.png").toFile().takeIf { it.exists() }?.inputStream()
                         ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "spothub_logo.png").toFile().takeIf { it.exists() }?.inputStream()
                     stream?.use { loadImageBitmap(it) }
-                }.getOrNull()
+                }.getOrNull()?.also { cachedAppLogoBitmap = it }
             }
 
             // Global AWT Event listener to detect any mouse movement, click, scroll or key press
             DisposableEffect(isScreensaverActive) {
-                val listener = java.awt.event.AWTEventListener { _ ->
+                val listener = AWTEventListener { event ->
                     val now = System.currentTimeMillis()
-                    if (isScreensaverActive) {
-                        // Debounce: only wake up if screensaver was active for > 400ms
-                        if (now - screensaverActivatedAt > 400L) {
-                            isScreensaverActive = false
+                    when (event.id) {
+                        MouseEvent.MOUSE_ENTERED -> {
+                            isMouseInsideApp = true
+                            mouseExitedAt = 0L
                             lastActivityTime = now
                         }
-                    } else {
-                        lastActivityTime = now
+                        MouseEvent.MOUSE_EXITED -> {
+                            isMouseInsideApp = false
+                            mouseExitedAt = now
+                        }
+                        MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_CLICKED -> {
+                            lastActivityTime = now
+                        }
+                        KeyEvent.KEY_PRESSED -> {
+                            lastActivityTime = now
+                            if (isScreensaverActive && now - screensaverActivatedAt > 400L) {
+                                isScreensaverActive = false
+                                mouseExitedAt = 0L
+                            }
+                        }
+                        MouseEvent.MOUSE_MOVED, MouseEvent.MOUSE_DRAGGED -> {
+                            if (event is MouseEvent) {
+                                val curPt = runCatching {
+                                    Offset(event.xOnScreen.toFloat(), event.yOnScreen.toFloat())
+                                }.getOrNull()
+                                if (curPt != null) {
+                                    val dx = curPt.x - lastPointerPosition.x
+                                    val dy = curPt.y - lastPointerPosition.y
+
+                                    // Ignore optical sensor micro-jitter (< 10px distance)
+                                    if (dx * dx + dy * dy > 100f) {
+                                        lastPointerPosition = curPt
+                                        lastActivityTime = now
+                                        isMouseInsideApp = true
+
+                                        // Wake from screensaver on deliberate movement (> 30px from activation)
+                                        if (isScreensaverActive && now - screensaverActivatedAt > 600L) {
+                                            val wakeDx = curPt.x - screensaverStartPointerPosition.x
+                                            val wakeDy = curPt.y - screensaverStartPointerPosition.y
+                                            if (wakeDx * wakeDx + wakeDy * wakeDy > 900f) {
+                                                isScreensaverActive = false
+                                                mouseExitedAt = 0L
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
-                val mask = java.awt.AWTEvent.MOUSE_MOTION_EVENT_MASK or
-                        java.awt.AWTEvent.MOUSE_EVENT_MASK or
-                        java.awt.AWTEvent.KEY_EVENT_MASK or
-                        java.awt.AWTEvent.MOUSE_WHEEL_EVENT_MASK
+                val mask = AWTEvent.MOUSE_MOTION_EVENT_MASK or
+                        AWTEvent.MOUSE_EVENT_MASK or
+                        AWTEvent.KEY_EVENT_MASK or
+                        AWTEvent.MOUSE_WHEEL_EVENT_MASK
 
                 runCatching {
-                    java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(listener, mask)
+                    Toolkit.getDefaultToolkit().addAWTEventListener(listener, mask)
                 }
 
                 onDispose {
                     runCatching {
-                        java.awt.Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
+                        Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
                     }
                 }
             }
 
-            // Inactivity timer loop: launches screensaver if idle >= screensaverTimeoutSec (default 10s)
-            LaunchedEffect(isScreensaverActive, screensaverTimeoutSec) {
-                if (screensaverTimeoutSec > 0 && !isScreensaverActive) {
-                    while (true) {
-                        delay(500)
-                        val idleMs = System.currentTimeMillis() - lastActivityTime
-                        if (idleMs >= screensaverTimeoutSec * 1000L) {
-                            screensaverActivatedAt = System.currentTimeMillis()
-                            isScreensaverActive = true
-                            break
+            // Hardware-polled monitor loop running continuously
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(200)
+                    val now = System.currentTimeMillis()
+
+                    // 1. Physically check if pointer is inside any visible application window
+                    val mousePt = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
+                    val isPhysicallyInside = if (mousePt != null) {
+                        runCatching {
+                            Window.getWindows().any { w -> w.isShowing && w.bounds.contains(mousePt) }
+                        }.getOrDefault(isMouseInsideApp)
+                    } else {
+                        isMouseInsideApp
+                    }
+
+                    // Sync mouse state
+                    if (isPhysicallyInside) {
+                        if (!isMouseInsideApp) {
+                            // Pointer entered the application window!
+                            isMouseInsideApp = true
+                            lastActivityTime = now
+                        }
+                    } else {
+                        if (isMouseInsideApp) {
+                            // Pointer just left the application window!
+                            isMouseInsideApp = false
+                            mouseExitedAt = now
+                        }
+                    }
+
+                    // 2. Hardware motion detection (jitter rejection > 10px)
+                    if (mousePt != null) {
+                        val curX = mousePt.x.toFloat()
+                        val curY = mousePt.y.toFloat()
+                        val dx = curX - lastPointerPosition.x
+                        val dy = curY - lastPointerPosition.y
+                        if (dx * dx + dy * dy > 100f) {
+                            lastPointerPosition = Offset(curX, curY)
+                            lastActivityTime = now
+                        }
+                    }
+
+                    // 3. Screen saver activation conditions
+                    if (!isScreensaverActive) {
+                        val mouseExitEnabled = settings?.getBoolean("screensaver_mouse_exit", true) ?: true
+                        // Condition A: Cursor is outside the app for >= 2.5s ("dont bring the mouse in the app")
+                        if (mouseExitEnabled && !isMouseInsideApp && mouseExitedAt > 0L) {
+                            val outsideDuration = now - mouseExitedAt
+                            if (outsideDuration >= 2500L) {
+                                launchScreensaver()
+                            }
+                        }
+
+                        // Condition B: User doesn't click or interact for >= timeout ("when the user dont click")
+                        val timeoutSecs = settings?.getInt("screensaver_timeout", 60) ?: 60
+                        if (timeoutSecs > 0) {
+                            val idleTimeoutMs = (timeoutSecs * 1000L).coerceAtLeast(5000L)
+                            val idleDuration = now - lastActivityTime
+                            if (idleDuration >= idleTimeoutMs) {
+                                launchScreensaver()
+                            }
                         }
                     }
                 }
             }
 
             Box(Modifier.fillMaxSize()) {
-                // 1. Music Notes Wallpaper Background
+                // 1. Sleek Gradient Noise Background Image across whole application
                 if (bgBitmap != null) {
                     Image(
                         bitmap = bgBitmap,
@@ -186,97 +313,156 @@ fun EchoDesktopApp() {
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                    // Sleek dark glass scrim overlay for contrast & readability
+                    // Ultra-subtle deep film-vignette glaze for high text readability
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFF080614).copy(alpha = 0.35f))
+                            .background(Color(0xFF04060A).copy(alpha = 0.12f))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(Color(0xFF090B12))
                     )
                 }
 
                 Column(Modifier.fillMaxSize()) {
-                    // Main content area: rail + content
-                    Row(Modifier.weight(1f).fillMaxWidth()) {
+                    // Floating Workstation Row
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 6.dp)
+                    ) {
                         var selectedScreen by remember { mutableStateOf(Screen.HOME) }
-                        var activeMediaDetail by remember { mutableStateOf<EchoMediaItem?>(null) }
 
-                        // Left navigation rail
-                        EchoNavigationRail(
-                            selectedScreen = selectedScreen,
-                            logoBitmap = logoBitmap,
-                            onScreenSelected = {
-                                selectedScreen = it
-                                activeMediaDetail = null
-                            },
-                            onLaunchScreensaver = {
-                                screensaverActivatedAt = System.currentTimeMillis()
-                                isScreensaverActive = true
-                            }
-                        )
+                        // 1. Floating Liquid-Glass Navigation Rail Island
+                        LiquidGlassCard(
+                            shape = RoundedCornerShape(22.dp),
+                            modifier = Modifier.width(82.dp).fillMaxHeight()
+                        ) {
+                            EchoNavigationRail(
+                                selectedScreen = selectedScreen,
+                                logoBitmap = logoBitmap,
+                                onScreenSelected = {
+                                    selectedScreen = it
+                                },
+                                onLaunchScreensaver = launchScreensaver
+                            )
+                        }
 
-                        // Main content
-                        Box(Modifier.weight(1f).fillMaxHeight()) {
-                            val currentMedia = activeMediaDetail
-                            if (currentMedia != null) {
-                                MediaDetailScreen(
-                                    media = currentMedia,
-                                    onBack = { activeMediaDetail = null },
-                                    onMediaSelected = { activeMediaDetail = it }
-                                )
-                            } else {
+                        Spacer(Modifier.width(10.dp))
+
+                        // 2. Floating Liquid-Glass Workstation Viewport Island
+                        LiquidGlassCard(
+                            shape = RoundedCornerShape(22.dp),
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        ) {
+                            Box(Modifier.fillMaxSize()) {
                                 when (selectedScreen) {
-                                    Screen.HOME -> HomeScreen(onMediaSelected = { activeMediaDetail = it })
-                                    Screen.SEARCH -> SearchScreen(onMediaSelected = { activeMediaDetail = it })
+                                    Screen.HOME -> HomeScreen(onLaunchScreensaver = launchScreensaver)
+                                    Screen.ROTATION -> HeavyRotationScreen(playerViewModel = playerViewModel, onLaunchScreensaver = launchScreensaver)
+                                    Screen.SEARCH -> SearchScreen()
                                     Screen.LIBRARY -> LibraryScreen()
                                     Screen.DOWNLOADS -> DownloadsScreen()
                                     Screen.EXTENSIONS -> ExtensionsScreen()
-                                    Screen.SETTINGS -> SettingsScreen()
+                                    Screen.SETTINGS -> SettingsScreen(onLaunchScreensaver = launchScreensaver)
                                 }
                             }
                         }
                     }
 
-                    // Bottom player bar — always visible
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                    MiniPlayer(
-                        viewModel = playerViewModel,
-                        onExpandNowPlaying = { tab ->
-                            nowPlayingInitialTab = tab
-                            isNowPlayingExpanded = true
-                            playerViewModel.openNowPlaying()
-                        },
-                        onDownloadTrack = { track ->
-                            downloadsViewModel.downloadTrack(track)
+                    // 3. Floating Liquid-Glass MiniPlayer Dock Island
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)
+                    ) {
+                        MiniPlayer(
+                            viewModel = playerViewModel,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                // Ambient Screensaver Overlay
+                AnimatedVisibility(
+                    visible = isScreensaverActive,
+                    enter = fadeIn(tween(400)),
+                    exit = fadeOut(tween(300))
+                ) {
+                    EchoScreensaver(
+                        playerViewModel = playerViewModel,
+                        screensaverActivatedAt = screensaverActivatedAt,
+                        settings = settings,
+                        onWakeUp = {
+                            isScreensaverActive = false
+                            mouseExitedAt = 0L
+                            lastActivityTime = System.currentTimeMillis()
                         }
                     )
                 }
+            }
+        }
+    }
+}
+}
 
-                // Full Now Playing overlay (Lyrics, Audio specs, Queue)
-                if (isNowPlayingExpanded || isNowPlayingVmExpanded) {
-                    NowPlayingScreen(
-                        onClose = {
-                            isNowPlayingExpanded = false
-                            playerViewModel.closeNowPlaying()
-                        },
-                        initialTab = nowPlayingInitialTab
-                    )
-                }
+@Composable
+fun EchoNavigationRail(
+    selectedScreen: Screen,
+    logoBitmap: ImageBitmap? = null,
+    onScreenSelected: (Screen) -> Unit,
+    onLaunchScreensaver: () -> Unit = {}
+) {
+    NavigationRail(
+        modifier = Modifier.width(80.dp).fillMaxHeight(),
+        containerColor = Color.Transparent
+    ) {
+        if (logoBitmap != null) {
+            LiquidGlassBox(
+                shape = CircleShape,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Image(
+                    bitmap = logoBitmap,
+                    contentDescription = "Logo",
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
-                // Global Audio Effects / Equalizer Modal
-                if (showAudioEffectsDialog) {
-                    AudioEffectsDialog(
-                        viewModel = playerViewModel,
-                        onDismiss = { playerViewModel.closeAudioEffectsDialog() }
-                    )
-                }
+        Screen.entries.forEach { screen ->
+            NavigationRailItem(
+                selected = selectedScreen == screen,
+                onClick = { onScreenSelected(screen) },
+                icon = { Icon(screen.icon, contentDescription = screen.title) },
+                label = { Text(screen.title, fontSize = 11.sp) },
+                colors = NavigationRailItemDefaults.colors(
+                    selectedIconColor = Color.White,
+                    selectedTextColor = Color.White,
+                    indicatorColor = Color.White.copy(alpha = 0.18f),
+                    unselectedIconColor = Color.White.copy(alpha = 0.65f),
+                    unselectedTextColor = Color.White.copy(alpha = 0.65f)
+                )
+            )
+        }
 
-                // Global Sleep Timer Modal
-                if (showSleepTimerDialog) {
-                    SleepTimerDialog(
-                        viewModel = playerViewModel,
-                        onDismiss = { playerViewModel.closeSleepTimerDialog() }
-                    )
-                }
+        Spacer(Modifier.weight(1f))
 
-                // Futuristic Acoustic Glass Screensaver Overlay
-                AnimatedVisibility(
+        LiquidGlassBox(
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.size(42.dp),
+            contentAlignment = Alignment.Center,
+            onClick = onLaunchScreensaver
+        ) {
+            Icon(
+                Icons.Default.Tv,
+                contentDescription = "Ambient Screensaver",
+                tint = Color(0xFF94A3B8),
+                modifier = Modifier.size(20.dp).align(Alignment.Center)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "saavn_music",
+  "name": "JioSaavn",
+  "className": "dev.brahmkshatriya.echo.extension.SaavnExtension",
+  "version": "1.0.0",
+  "type": "MUSIC",
+  "description": "Stream millions of Bollywood, English, and Regional hits in crystal-clear 320kbps audio.",
+  "author": "Audix"
+}

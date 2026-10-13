@@ -11,7 +11,15 @@ captures/
 local.properties
 .kotlin/
 *.hprof
+*.log
+*.tmp
+*.bak
+run_args.txt
 tools/recovered-reference/recovered_classes/
 release-artifacts/
-*.bak
-scripts/
+bin/
+**/bin/
+scratch/
+runtime/
+airplay_crop.png
+test_airplay.png

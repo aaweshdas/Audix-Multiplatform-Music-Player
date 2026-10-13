@@ -1,0 +1,9 @@
+{
+  "id": "soundcloud",
+  "name": "SoundCloud",
+  "className": "dev.brahmkshatriya.echo.extension.SoundcloudExtension",
+  "version": "1.0.0",
+  "type": "MUSIC",
+  "description": "Stream trending tracks, independent artists, podcasts, and remixes from SoundCloud.",
+  "author": "Audix"
+}

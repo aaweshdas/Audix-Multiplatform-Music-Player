@@ -35,7 +35,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -67,7 +67,7 @@ private fun loadScreensaverDefaultBitmap(): ImageBitmap? {
             ?: java.nio.file.Paths.get("desktopApp", "build", "compose", "binaries", "main", "app", "Audix", "app", "resources", "images", "screensaver_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
             ?: java.io.File("app/resources/images/screensaver_bg.jpg").takeIf { it.exists() }?.inputStream()
             ?: java.io.File("resources/images/screensaver_bg.jpg").takeIf { it.exists() }?.inputStream()
-        stream?.use { loadImageBitmap(it) }
+        stream?.use { javax.imageio.ImageIO.read(it)?.toComposeImageBitmap() }
     }.getOrNull()?.also { cachedDefaultScreensaverBitmap = it }
 }
 
@@ -82,7 +82,7 @@ private fun loadCosmicClockDialBitmap(): ImageBitmap? {
             ?: java.nio.file.Paths.get("desktopApp", "build", "compose", "binaries", "main", "app", "Audix", "app", "resources", "images", "cosmic_clock_dial.png").toFile().takeIf { it.exists() }?.inputStream()
             ?: java.io.File("app/resources/images/cosmic_clock_dial.png").takeIf { it.exists() }?.inputStream()
             ?: java.io.File("resources/images/cosmic_clock_dial.png").takeIf { it.exists() }?.inputStream()
-        stream?.use { loadImageBitmap(it) }
+        stream?.use { javax.imageio.ImageIO.read(it)?.toComposeImageBitmap() }
     }.getOrNull()?.also { cachedCosmicClockDialBitmap = it }
 }
 
@@ -120,13 +120,17 @@ fun EchoScreensaver(
     val durationMs by playerViewModel.durationMs.collectAsState()
     val volume by playerViewModel.volume.collectAsState()
 
-    // Extract cover artwork URL safely
+    // Extract cover artwork URL safely with high-res priority
     val coverUrl = remember(currentTrack) {
-        when (val cover = currentTrack?.cover) {
+        val extraCover = currentTrack?.extras?.get("cover_url")
+        val cover = currentTrack?.cover ?: currentTrack?.album?.cover
+        val directUrl = when (cover) {
             is ImageHolder.NetworkRequestImageHolder -> cover.request.url
             is ImageHolder.ResourceUriImageHolder -> cover.uri
             else -> null
         }
+        val isGenericDirect = directUrl.isNullOrBlank() || directUrl.contains("hqdefault.jpg") || directUrl.contains("120x120") || directUrl.contains("50x50")
+        if (!extraCover.isNullOrBlank() && isGenericDirect) extraCover else directUrl ?: extraCover
     }
 
     val defaultScreensaverBitmap = remember {
@@ -230,7 +234,7 @@ private fun CosmicVortexClock(
     LaunchedEffect(Unit) {
         while (true) {
             timeSnapshot = LocalDateTime.now()
-            delay(100)
+            delay(200)
         }
     }
 
@@ -280,7 +284,7 @@ private fun CosmicVortexClock(
                 cap = StrokeCap.Round
             )
             drawLine(
-                color = Color(0xFFF0F9FF),
+                color = Color.White,
                 start = Offset(cx, cy),
                 end = Offset(hrX, hrY),
                 strokeWidth = radius * 0.026f,
@@ -301,7 +305,7 @@ private fun CosmicVortexClock(
                 cap = StrokeCap.Round
             )
             drawLine(
-                color = Color(0xFFF0F9FF),
+                color = Color.White,
                 start = Offset(cx, cy),
                 end = Offset(minX, minY),
                 strokeWidth = radius * 0.020f,
@@ -339,7 +343,7 @@ private fun CosmicVortexClock(
                 center = Offset(cx, cy)
             )
             drawCircle(
-                color = Color(0xFFE0F7FF),
+                color = Color.White,
                 radius = radius * 0.038f,
                 center = Offset(cx, cy)
             )
@@ -566,11 +570,25 @@ private fun RenderMosaicCardScreensaver(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            val rawTitle = track?.title
+                            val displayTitle = if (!rawTitle.isNullOrBlank()) {
+                                rawTitle.replace(Regex("""\s*[\(\[\{].*?(?:official|music\s*video|video|audio|lyrics|lyric\s*video|feat|ft\.|hd|4k|remaster|visualizer|live|full\s*song|from\s*["']|soundtrack|ost).*?[\)\]\}]""", RegexOption.IGNORE_CASE), "").substringBefore("|").substringBefore("//").trim().ifBlank { rawTitle.trim() }
+                            } else "Audix Hi-Res Audio"
+
+                            val rawArtists = track?.artists?.map { it.name.trim() }?.filterNot {
+                                it.isBlank() || it.equals("Song", true) || it.equals("Video", true) || it.equals("Episode", true) || it.equals("Unknown Artist", true) || it.equals("YouTube Music", true) || it.equals("Audix Artist", true)
+                            }
+                            val displayArtist = if (!rawArtists.isNullOrEmpty()) {
+                                rawArtists.joinToString(", ")
+                            } else {
+                                track?.extras?.get("artist_name")?.takeIf { !it.equals("Song", true) && !it.equals("Video", true) } ?: "Audix Hi-Res Audio"
+                            }
+
                             Column(
                                 modifier = Modifier.weight(1f).padding(end = with(density) { (8f * scale).toDp() })
                             ) {
                                 Text(
-                                    text = track?.title ?: "Make Some Noise For The Desi Boyz",
+                                    text = displayTitle,
                                     color = Color.White,
                                     fontSize = (13f * scale).coerceIn(10.5f, 17f).sp,
                                     fontWeight = FontWeight.Bold,
@@ -579,8 +597,8 @@ private fun RenderMosaicCardScreensaver(
                                 )
                                 Spacer(Modifier.height(with(density) { (1.5f * scale).toDp() }))
                                 Text(
-                                    text = track?.artists?.joinToString(", ") { it.name }?.ifBlank { "Song" } ?: "Song",
-                                    color = Color(0xFF8E8E93),
+                                    text = displayArtist,
+                                    color = Color.White,
                                     fontSize = (10f * scale).coerceIn(8.5f, 13.5f).sp,
                                     fontWeight = FontWeight.Normal,
                                     maxLines = 1,
@@ -654,7 +672,7 @@ private fun RenderMosaicCardScreensaver(
 
                                     // Inactive track line (dark charcoal #38383D)
                                     drawLine(
-                                        color = Color(0xFF38383D),
+                                        color = Color.White,
                                         start = Offset(0f, cy),
                                         end = Offset(w, cy),
                                         strokeWidth = trackHeightPx,
@@ -695,13 +713,13 @@ private fun RenderMosaicCardScreensaver(
                             ) {
                                 Text(
                                     text = formatTimeMs(displayPosMs),
-                                    color = Color(0xFF8E8E93),
+                                    color = Color.White,
                                     fontSize = (9f * scale).coerceIn(7f, 12.5f).sp,
                                     fontWeight = FontWeight.Normal
                                 )
                                 Text(
                                     text = if (durationMs > 0) "-${formatTimeMs(displayRemMs)}" else "-0:00",
-                                    color = Color(0xFF8E8E93),
+                                    color = Color.White,
                                     fontSize = (9f * scale).coerceIn(7f, 12.5f).sp,
                                     fontWeight = FontWeight.Normal
                                 )
@@ -819,7 +837,7 @@ private fun RenderMosaicCardScreensaver(
                             Icon(
                                 imageVector = if (volume <= 0.01f) Icons.AutoMirrored.Filled.VolumeMute else Icons.AutoMirrored.Filled.VolumeDown,
                                 contentDescription = "Mute Toggle",
-                                tint = Color(0xFF8E8E93),
+                                tint = Color.White,
                                 modifier = Modifier
                                     .size(volIconSize)
                                     .pointerHoverIcon(PointerIcon.Hand)
@@ -886,7 +904,7 @@ private fun RenderMosaicCardScreensaver(
 
                                     // Inactive volume track (#38383D)
                                     drawLine(
-                                        color = Color(0xFF38383D),
+                                        color = Color.White,
                                         start = Offset(0f, cy),
                                         end = Offset(w, cy),
                                         strokeWidth = volTrackHeightPx,
@@ -917,7 +935,7 @@ private fun RenderMosaicCardScreensaver(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.VolumeUp,
                                 contentDescription = "Max Volume",
-                                tint = Color(0xFF8E8E93),
+                                tint = Color.White,
                                 modifier = Modifier
                                     .size(volIconSize)
                                     .pointerHoverIcon(PointerIcon.Hand)

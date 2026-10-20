@@ -62,7 +62,8 @@ data class OfflineTrackMetadata(
     val coverUrl: String? = null,
     val durationMs: Long? = null,
     val format: String = "MP3",
-    val downloadTime: Long = System.currentTimeMillis()
+    val downloadTime: Long = System.currentTimeMillis(),
+    val extensionId: String? = null
 )
 
 class DesktopDownloadManager(
@@ -77,6 +78,11 @@ class DesktopDownloadManager(
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .followRedirects(true)
+        .addNetworkInterceptor { chain ->
+            val req = chain.request()
+            validateStreamUrl(req.url.toString())
+            chain.proceed(req)
+        }
         .build()
 
     private val _activeDownloads = MutableStateFlow<List<DownloadTask>>(emptyList())
@@ -154,6 +160,13 @@ class DesktopDownloadManager(
                 if (metaFile.exists()) {
                     try {
                         val meta = json.decodeFromString<OfflineTrackMetadata>(metaFile.readText())
+                        val resolvedExtId = meta.extensionId?.takeIf { it.isNotBlank() } ?: when {
+                            meta.id.matches(Regex("""^[a-zA-Z0-9_-]{11}$""")) -> "youtube_music"
+                            meta.id.matches(Regex("""^\d{6,12}$""")) -> "saavn_music"
+                            meta.id.startsWith("sc_") -> "soundcloud"
+                            meta.id.contains("spotify:track:") -> "spotify_music"
+                            else -> "local_music"
+                        }
                         val track = Track(
                             id = meta.id,
                             title = meta.title,
@@ -163,7 +176,10 @@ class DesktopDownloadManager(
                                 ImageHolder.NetworkRequestImageHolder(NetworkRequest(url = it), crop = false)
                             },
                             duration = meta.durationMs,
-                            extras = mapOf("local_file" to file.absolutePath)
+                            extras = mapOf(
+                                "local_file" to file.absolutePath,
+                                "extension_id" to resolvedExtId
+                            )
                         )
                         list.add(DownloadedTrack(meta.id, track, file, file.length(), meta.format, meta.downloadTime))
                     } catch (e: Throwable) {
@@ -171,7 +187,10 @@ class DesktopDownloadManager(
                             id = file.absolutePath,
                             title = file.nameWithoutExtension,
                             artists = listOf(Artist("Local Artist", "Local Artist")),
-                            extras = mapOf("local_file" to file.absolutePath)
+                            extras = mapOf(
+                                "local_file" to file.absolutePath,
+                                "extension_id" to "local_music"
+                            )
                         )
                         list.add(DownloadedTrack(file.absolutePath, fallbackTrack, file, file.length(), file.extension.uppercase(), file.lastModified()))
                     }
@@ -180,7 +199,10 @@ class DesktopDownloadManager(
                         id = file.absolutePath,
                         title = file.nameWithoutExtension,
                         artists = listOf(Artist("Offline Audio", "Offline Audio")),
-                        extras = mapOf("local_file" to file.absolutePath)
+                        extras = mapOf(
+                            "local_file" to file.absolutePath,
+                            "extension_id" to "local_music"
+                        )
                     )
                     list.add(DownloadedTrack(file.absolutePath, fallbackTrack, file, file.length(), file.extension.uppercase(), file.lastModified()))
                 }
@@ -343,6 +365,14 @@ class DesktopDownloadManager(
                     is ImageHolder.ResourceUriImageHolder -> c.uri
                     else -> null
                 }
+                val extId = track.extras["extension_id"]?.takeIf { it.isNotBlank() } ?: when {
+                    track.extras.containsKey("local_file") -> "local_music"
+                    track.id.matches(Regex("""^[a-zA-Z0-9_-]{11}$""")) -> "youtube_music"
+                    track.id.matches(Regex("""^\d{6,12}$""")) -> "saavn_music"
+                    track.id.startsWith("sc_") -> "soundcloud"
+                    track.id.contains("spotify:track:") -> "spotify_music"
+                    else -> "youtube_music"
+                }
                 val meta = OfflineTrackMetadata(
                     id = track.id,
                     title = track.title,
@@ -350,7 +380,8 @@ class DesktopDownloadManager(
                     album = track.album?.title,
                     coverUrl = coverUrl,
                     durationMs = track.duration,
-                    format = format
+                    format = format,
+                    extensionId = extId
                 )
                 File(finalFile.absolutePath + ".echo.json").writeText(json.encodeToString(meta))
 
@@ -413,8 +444,15 @@ class DesktopDownloadManager(
                 if (playerViewModel.currentTrack.value?.id == item.id) {
                     playerViewModel.stop()
                 }
-                if (item.file.exists()) item.file.delete()
-                val meta = File(item.file.absolutePath + ".echo.json")
+                val dir = getDownloadDir().canonicalFile
+                val target = item.file.canonicalFile
+                // Ensure target file is strictly within download directory boundary
+                if (!target.toPath().startsWith(dir.toPath())) {
+                    System.err.println("[DesktopDownloadManager] Security violation: Refusing to delete file outside download directory: $target")
+                    return@runCatching
+                }
+                if (target.exists()) target.delete()
+                val meta = File(target.absolutePath + ".echo.json")
                 if (meta.exists()) meta.delete()
             }
             refreshCompleted()
@@ -422,8 +460,12 @@ class DesktopDownloadManager(
     }
 
     fun playOffline(item: DownloadedTrack) {
+        val resolvedExtId = item.track.extras["extension_id"]?.takeIf { it.isNotBlank() } ?: "local_music"
         val offlineTrack = item.track.copy(
-            extras = item.track.extras + ("local_file" to item.file.absolutePath)
+            extras = item.track.extras + mapOf(
+                "local_file" to item.file.absolutePath,
+                "extension_id" to resolvedExtId
+            )
         )
         playerViewModel.play(offlineTrack)
     }
@@ -431,10 +473,21 @@ class DesktopDownloadManager(
     fun openInExplorer(file: File) {
         scope.launch(Dispatchers.IO) {
             runCatching {
+                val canonical = file.canonicalFile
+                if (!canonical.exists()) return@runCatching
+
+                val downloadDir = getDownloadDir().canonicalFile.toPath()
+                val userHome = (System.getProperty("user.home")?.let { File(it).canonicalFile } ?: return@runCatching).toPath()
+                val targetPath = canonical.toPath()
+                if (!targetPath.startsWith(downloadDir) && !targetPath.startsWith(userHome)) {
+                    System.err.println("[DesktopDownloadManager] Security violation: Blocked explorer access outside allowed directory boundaries: $canonical")
+                    return@runCatching
+                }
+
                 if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("win")) {
-                    ProcessBuilder("explorer.exe", "/select,${file.canonicalPath}").start()
+                    ProcessBuilder("explorer.exe", "/select,", canonical.absolutePath).start()
                 } else if (Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().open(file.parentFile ?: file)
+                    Desktop.getDesktop().open(canonical.parentFile ?: canonical)
                 }
             }
         }
@@ -443,11 +496,17 @@ class DesktopDownloadManager(
     fun openDownloadsFolder() {
         scope.launch(Dispatchers.IO) {
             runCatching {
-                val dir = getDownloadDir()
-                if (Desktop.isDesktopSupported()) {
+                val dir = getDownloadDir().canonicalFile
+                if (!dir.exists()) dir.mkdirs()
+                val userHome = (System.getProperty("user.home")?.let { File(it).canonicalFile } ?: return@runCatching).toPath()
+                if (!dir.toPath().startsWith(userHome)) {
+                    System.err.println("[DesktopDownloadManager] Security violation: Blocked opening directory outside user profile: $dir")
+                    return@runCatching
+                }
+                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
                     Desktop.getDesktop().open(dir)
-                } else {
-                    Runtime.getRuntime().exec(arrayOf("explorer.exe", dir.absolutePath))
+                } else if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("win")) {
+                    ProcessBuilder("explorer.exe", dir.absolutePath).start()
                 }
             }
         }

@@ -44,15 +44,21 @@ subprocess.run(["cmd.exe", "/c", bat_path], cwd=os.path.dirname(bat_path))
 # Wait 4 seconds to let it initialize
 time.sleep(4)
 
-# Check if Audix javaw is running
+# Check if Audix is running
 found = False
 try:
-    for p in psutil.process_iter(['pid', 'name', 'cmdline']):
-        cmdline = ' '.join(p.info.get('cmdline') or [])
-        if 'dev.brahmkshatriya.echo.desktop.MainKt' in cmdline:
-            print(f"SUCCESS: Audix is actively running (PID {p.info['pid']}, {p.info.get('name')})!")
-            found = True
-            break
+    for p in psutil.process_iter(['pid', 'name']):
+        try:
+            name = (p.info.get('name') or '').lower()
+            if name in ('javaw.exe', 'java.exe', 'audix.exe'):
+                cmdline = ' '.join(p.cmdline() or [])
+                if 'dev.brahmkshatriya.echo.desktop.MainKt' in cmdline or name == 'audix.exe':
+                    mem_mb = p.memory_info().rss / (1024 * 1024)
+                    print(f"SUCCESS: Audix is actively running (PID {p.info['pid']}, {name}, Memory: {mem_mb:.1f} MB)!")
+                    found = True
+                    break
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
 except Exception as e:
     print(f"Error checking processes: {e}")
 

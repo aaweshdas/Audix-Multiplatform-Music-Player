@@ -115,35 +115,45 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val title = obj["title"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: return null
             val trackUri = obj["uri"]?.jsonPrimitive?.content ?: ""
             val id = trackUri.substringAfterLast(":").ifBlank { title.hashCode().toString() }
-            val subtitle = obj["subtitle"]?.jsonPrimitive?.content ?: "Spotify Artist"
+            val subtitle = obj["subtitle"]?.jsonPrimitive?.content?.replace('\u00a0', ' ')?.trim() ?: "Spotify Artist"
 
             val durationMs = obj["duration"]?.jsonPrimitive?.content?.toLongOrNull()
+
+            val isGenericChartCover = defaultCover?.contains("charts-images.scdn.co") == true ||
+                                      defaultCover?.contains("region_global_default") == true
+            val validCover = if (!isGenericChartCover) defaultCover else null
 
             val streamable = Streamable.server(
                 id = id,
                 quality = 320,
                 title = "Spotify Stream",
-                extras = mapOf(
-                    "extension_id" to ID,
-                    "spotify_uri" to trackUri,
-                    "track_title" to title,
-                    "artist_name" to subtitle
-                )
+                extras = buildMap {
+                    put("extension_id", ID)
+                    put("spotify_uri", trackUri)
+                    put("track_title", title)
+                    put("artist_name", subtitle)
+                    if (validCover != null) put("cover_url", validCover)
+                }
             )
+
+            val artistList = if (subtitle.contains(",") || subtitle.contains("&")) {
+                subtitle.split(Regex("""[,&]""")).map { it.trim() }.filter { it.isNotBlank() }.map { Artist(id = it, name = it) }
+            } else listOf(Artist(id = subtitle, name = subtitle))
 
             Track(
                 id = id,
                 title = title,
-                artists = listOf(Artist(id = subtitle, name = subtitle)),
-                cover = defaultCover?.toImageHolder(),
+                artists = if (artistList.isNotEmpty()) artistList else listOf(Artist(id = subtitle, name = subtitle)),
+                cover = validCover?.toImageHolder(),
                 duration = durationMs,
                 streamables = listOf(streamable),
-                extras = mapOf(
-                    "extension_id" to ID,
-                    "spotify_uri" to trackUri,
-                    "track_title" to title,
-                    "artist_name" to subtitle
-                )
+                extras = buildMap {
+                    put("extension_id", ID)
+                    put("spotify_uri", trackUri)
+                    put("track_title", title)
+                    put("artist_name", subtitle)
+                    if (validCover != null) put("cover_url", validCover)
+                }
             )
         }.getOrNull()
     }
@@ -177,12 +187,13 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
                         id = trackId,
                         quality = 320,
                         title = "Spotify Stream",
-                        extras = mapOf(
-                            "extension_id" to ID,
-                            "spotify_uri" to "spotify:track:$trackId",
-                            "track_title" to trackName,
-                            "artist_name" to artistName
-                        )
+                        extras = buildMap {
+                            put("extension_id", ID)
+                            put("spotify_uri", "spotify:track:$trackId")
+                            put("track_title", trackName)
+                            put("artist_name", artistName)
+                            if (artworkHighRes != null) put("cover_url", artworkHighRes)
+                        }
                     )
 
                     Track(
@@ -193,12 +204,13 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
                         cover = artworkHighRes?.toImageHolder(),
                         duration = durationMs,
                         streamables = listOf(streamable),
-                        extras = mapOf(
-                            "extension_id" to ID,
-                            "spotify_uri" to "spotify:track:$trackId",
-                            "track_title" to trackName,
-                            "artist_name" to artistName
-                        )
+                        extras = buildMap {
+                            put("extension_id", ID)
+                            put("spotify_uri", "spotify:track:$trackId")
+                            put("track_title", trackName)
+                            put("artist_name", artistName)
+                            if (artworkHighRes != null) put("cover_url", artworkHighRes)
+                        }
                     )
                 }.getOrNull()
             }
@@ -424,25 +436,154 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         return track.copy(streamables = listOf(s))
     }
 
+    private fun unescapeHtml(text: String): String {
+        return text
+            .replace("&quot;", "\"")
+            .replace("&amp;", "&")
+            .replace("&#039;", "'")
+            .replace("&apos;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .trim()
+    }
+
+    private fun cleanTrackTitle(title: String, artist: String): String {
+        var t = unescapeHtml(title)
+        if (t.contains("|")) {
+            val beforePipe = t.substringBefore("|").trim()
+            if (beforePipe.isNotBlank()) {
+                t = beforePipe
+            }
+        }
+        if (t.contains("//")) {
+            val beforeSlash = t.substringBefore("//").trim()
+            if (beforeSlash.isNotBlank()) {
+                t = beforeSlash
+            }
+        }
+        t = t.replace(Regex("""\s*[\(\[\{].*?(?:official|music\s*video|video|audio|lyrics|lyric\s*video|feat|ft\.|hd|4k|remaster|visualizer|live|full\s*song|from\s*["']|soundtrack|ost).*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s*[\(\[\{]\s*from\s+.*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+        if (artist.isNotBlank() && !artist.equals("Unknown Artist", ignoreCase = true) && !artist.equals("Spotify Artist", ignoreCase = true)) {
+            val esc = Regex.escape(artist)
+            t = t.replace(Regex("""^$esc\s*[-–:]\s*""", RegexOption.IGNORE_CASE), "")
+            t = t.replace(Regex("""\s*[-–:]\s*$esc$""", RegexOption.IGNORE_CASE), "")
+        } else if (t.contains(" - ") || t.contains(" – ")) {
+            val parts = t.split(Regex("""\s+[-–]\s+"""))
+            if (parts.size >= 2 && parts[1].isNotBlank()) {
+                t = parts[1].trim()
+            }
+        }
+        t = t.replace(Regex("""\s*[-–:]\s*(?:official\s*video|official\s*audio|lyrics|lyric\s*video|from\s+["'].*?|soundtrack|ost)\s*$""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s+(?:feat|ft)\.?\s+.*$""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s*[\(\[\{]\s*[\)\]\}]"""), "")
+        t = t.replace(Regex("""\s+"""), " ").trim()
+        return if (t.isNotBlank()) t else title.trim()
+    }
+
+    private fun scoreTrackCandidate(candidateTitle: String, candidateArtist: String, targetTitle: String, targetArtist: String): Int {
+        val cTitle = unescapeHtml(candidateTitle).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val cArtist = unescapeHtml(candidateArtist).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val tTitle = unescapeHtml(targetTitle).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val tArtist = unescapeHtml(targetArtist).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+
+        val normCTitle = cTitle.replace(Regex("""\s+"""), " ").trim()
+        val normTTitle = tTitle.replace(Regex("""\s+"""), " ").trim()
+        if (normCTitle.isBlank() || normTTitle.isBlank()) return 0
+
+        var score = 0
+        val cleanC = cleanTrackTitle(candidateTitle, "").lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+        val cleanT = cleanTrackTitle(targetTitle, "").lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+
+        val baseC = cleanC.substringBefore("-").trim()
+        val baseT = cleanT.substringBefore("-").trim()
+
+        if (normCTitle == normTTitle) {
+            score += 70
+        } else if (cleanC.isNotBlank() && cleanC == cleanT) {
+            score += 65
+        } else if ((baseC.isNotBlank() && baseC == cleanT) || (baseT.isNotBlank() && cleanC == baseT) || (baseC.isNotBlank() && baseT.isNotBlank() && baseC == baseT)) {
+            score += 60
+        } else if (normCTitle.startsWith(normTTitle) || normTTitle.startsWith(normCTitle) || (cleanC.isNotBlank() && cleanT.isNotBlank() && (cleanC.startsWith(cleanT) || cleanT.startsWith(cleanC)))) {
+            score += 55
+        } else if (normCTitle.contains(normTTitle) || normTTitle.contains(normCTitle)) {
+            score += 35
+        }
+
+        // Check Dash / Colon separation: "Artist - Title" or "Title - Artist"
+        if (targetTitle.contains("-") || targetTitle.contains("–") || targetTitle.contains(":")) {
+            val parts = targetTitle.split(Regex("""[-–:]""")).map { it.trim() }.filter { it.isNotBlank() }
+            if (parts.size >= 2) {
+                val pArt = parts[0].lowercase().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+                val pTit = parts.drop(1).joinToString(" ").lowercase().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+                // Artist - Title
+                if (normCTitle == pTit || cleanC == pTit || pTit.contains(normCTitle) || normCTitle.contains(pTit)) {
+                    if (cArtist.isNotBlank() && (cArtist.contains(pArt) || pArt.contains(cArtist))) {
+                        score = maxOf(score, 85)
+                    } else {
+                        score = maxOf(score, 65)
+                    }
+                }
+                // Title - Artist
+                if (normCTitle == pArt || cleanC == pArt || pArt.contains(normCTitle) || normCTitle.contains(pArt)) {
+                    if (cArtist.isNotBlank() && (cArtist.contains(pTit) || pTit.contains(cArtist))) {
+                        score = maxOf(score, 85)
+                    } else {
+                        score = maxOf(score, 65)
+                    }
+                }
+            }
+        }
+
+        if (score == 0) {
+            val tWords = normTTitle.split(" ").filter { it.length > 2 }
+            if (tWords.isNotEmpty()) {
+                val matches = tWords.count { normCTitle.contains(it) }
+                val ratio = matches.toFloat() / tWords.size
+                if (ratio >= 0.75f) score += (30 * ratio).toInt() else return 0
+            } else return 0
+        }
+
+        // Penalize remix/cover if target is not remix/cover
+        val isTargetRemix = normTTitle.contains("remix") || normTTitle.contains("cover") || normTTitle.contains("live")
+        val isCandRemix = normCTitle.contains("remix") || normCTitle.contains("cover") || normCTitle.contains("live") || normCTitle.contains("karaoke")
+        if (isCandRemix && !isTargetRemix) {
+            score -= 40
+        }
+
+        if (tArtist.isNotBlank() && !tArtist.equals("unknown artist", ignoreCase = true) && !tArtist.equals("spotify artist", ignoreCase = true)) {
+            val normCArtist = cArtist.replace(Regex("""\s+"""), " ").trim()
+            val normTArtist = tArtist.replace(Regex("""\s+"""), " ").trim()
+            if (normCArtist.contains(normTArtist) || normTArtist.contains(normCArtist)) {
+                score += 40
+            } else {
+                val firstWord = normTArtist.split(" ").firstOrNull { it.length > 2 }
+                if (firstWord != null && normCArtist.contains(firstWord)) {
+                    score += 25
+                } else {
+                    return 0
+                }
+            }
+        }
+        return score.coerceAtLeast(0)
+    }
+
     override suspend fun loadStreamableMedia(streamable: Streamable, isDownload: Boolean): Streamable.Media = withContext(Dispatchers.IO) {
         val rawTitle = streamable.extras["track_title"] ?: streamable.title ?: ""
         val trackTitle = if (rawTitle.equals("Spotify Stream", ignoreCase = true)) "" else rawTitle
         val rawArtist = streamable.extras["artist_name"] ?: ""
         val artistName = if (rawArtist.equals("Spotify Artist", ignoreCase = true)) "" else rawArtist
-        val query = if (artistName.isNotBlank()) {
-            "$trackTitle $artistName"
-        } else {
-            trackTitle
-        }
 
-        // 1. Resolve multi-bitrate high fidelity stream via JioSaavn
-        val saavnSources = tryMatchSaavnStream(query)
+        val cleanArtist = if (artistName.equals("Spotify Artist", ignoreCase = true) || artistName.equals("Unknown Artist", ignoreCase = true)) "" else artistName
+        val cleanTitle = cleanTrackTitle(trackTitle, cleanArtist)
+
+        // 1. Resolve multi-bitrate high fidelity stream via JioSaavn with candidate scoring
+        val saavnSources = tryMatchSaavnStream(cleanTitle, cleanArtist)
         if (!saavnSources.isNullOrEmpty()) {
             return@withContext Streamable.Media.Server(saavnSources, merged = false)
         }
 
-        // 2. Fallback to SoundCloud progressive stream
-        val scStream = tryMatchSoundCloudStream(query)
+        // 2. Fallback to SoundCloud progressive stream with candidate scoring
+        val scStream = tryMatchSoundCloudStream(cleanTitle, cleanArtist)
         if (!scStream.isNullOrBlank()) {
             val source = Streamable.Source.Http(
                 request = scStream.toGetRequest(),
@@ -453,7 +594,7 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             return@withContext Streamable.Media.Server(listOf(source), merged = false)
         }
 
-        error("Unable to resolve audio stream for Spotify track: $trackTitle")
+        error("Unable to resolve audio stream for Spotify track: $cleanTitle by $cleanArtist")
     }
 
     private fun decryptSaavnRawMediaUrl(encUrl: String): String? {
@@ -483,10 +624,13 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         )
     }
 
-    private fun tryMatchSaavnStream(query: String): List<Streamable.Source.Http>? {
+    private fun tryMatchSaavnStream(targetTitle: String, targetArtist: String): List<Streamable.Source.Http>? {
         return runCatching {
+            val cleanArtist = if (targetArtist.equals("Spotify Artist", ignoreCase = true) || targetArtist.equals("Unknown Artist", ignoreCase = true)) "" else targetArtist
+            val cleanTitle = cleanTrackTitle(targetTitle, cleanArtist)
+            val query = if (cleanArtist.isNotBlank()) "$cleanTitle $cleanArtist" else cleanTitle
             val encoded = URLEncoder.encode(query, "UTF-8")
-            val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=5&q=$encoded"
+            val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=8&q=$encoded"
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
@@ -497,9 +641,26 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val results = root["results"]?.jsonArray ?: return@runCatching null
             if (results.isEmpty()) return@runCatching null
 
-            val first = results[0].jsonObject
-            val enc = first["encrypted_media_url"]?.jsonPrimitive?.content
-            val preview = first["media_preview_url"]?.jsonPrimitive?.content
+            var bestScore = -1
+            var bestObj: JsonObject? = null
+            for (elem in results) {
+                val obj = elem.jsonObject
+                val cTitle = obj["song"]?.jsonPrimitive?.content ?: ""
+                val cArtist = obj["primary_artists"]?.jsonPrimitive?.content ?: ""
+                val score = scoreTrackCandidate(cTitle, cArtist, cleanTitle, targetArtist)
+                if (score > bestScore) {
+                    bestScore = score
+                    bestObj = obj
+                }
+            }
+
+            // Strictly require bestScore >= 50
+            if (bestScore < 50 || bestObj == null) {
+                return@runCatching null
+            }
+
+            val enc = bestObj["encrypted_media_url"]?.jsonPrimitive?.content
+            val preview = bestObj["media_preview_url"]?.jsonPrimitive?.content
 
             val rawUrl = enc?.let { decryptSaavnRawMediaUrl(it) } ?: preview
             if (!rawUrl.isNullOrBlank()) {
@@ -508,10 +669,13 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         }.getOrNull()
     }
 
-    private fun tryMatchSoundCloudStream(query: String): String? {
+    private fun tryMatchSoundCloudStream(targetTitle: String, targetArtist: String): String? {
         return runCatching {
+            val cleanArtist = if (targetArtist.equals("Spotify Artist", ignoreCase = true) || targetArtist.equals("Unknown Artist", ignoreCase = true)) "" else targetArtist
+            val cleanTitle = cleanTrackTitle(targetTitle, cleanArtist)
+            val query = if (cleanArtist.isNotBlank()) "$cleanTitle $cleanArtist" else cleanTitle
             val encoded = URLEncoder.encode(query, "UTF-8")
-            val url = "https://api-v2.soundcloud.com/search/tracks?q=$encoded&client_id=$soundCloudClientId&limit=3"
+            val url = "https://api-v2.soundcloud.com/search/tracks?q=$encoded&client_id=$soundCloudClientId&limit=5"
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", USER_AGENT)
@@ -522,8 +686,24 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val collection = root["collection"]?.jsonArray ?: return@runCatching null
             if (collection.isEmpty()) return@runCatching null
 
-            val trackObj = collection[0].jsonObject
-            val mediaObj = trackObj["media"]?.jsonObject
+            var bestScore = -1
+            var bestObj: JsonObject? = null
+            for (elem in collection) {
+                val obj = elem.jsonObject
+                val cTitle = obj["title"]?.jsonPrimitive?.content ?: ""
+                val cArtist = obj["user"]?.jsonObject?.get("username")?.jsonPrimitive?.content ?: ""
+                val score = scoreTrackCandidate(cTitle, cArtist, cleanTitle, targetArtist)
+                if (score > bestScore) {
+                    bestScore = score
+                    bestObj = obj
+                }
+            }
+
+            if (bestScore < 45 || bestObj == null) {
+                return@runCatching null
+            }
+
+            val mediaObj = bestObj["media"]?.jsonObject
             val transArray = mediaObj?.get("transcodings")?.jsonArray ?: return@runCatching null
 
             for (elem in transArray) {

@@ -142,11 +142,15 @@ class SaavnExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, TrackC
                         cover = highResImage.toImageHolder(),
                         streamables = listOf(streamable),
                         duration = durationMs,
-                        extras = mapOf(
-                            "stream_url" to streamUrl,
-                            "extension_id" to "saavn_music",
-                            "source" to "JioSaavn"
-                        )
+                        extras = buildMap {
+                            put("stream_url", streamUrl)
+                            put("extension_id", "saavn_music")
+                            put("source", "JioSaavn")
+                            put("track_title", title)
+                            put("artist_name", artistsRaw)
+                            if (highResImage.isNotBlank()) put("cover_url", highResImage)
+                            if (albumRaw != null) put("album_name", albumRaw)
+                        }
                     )
                 }.getOrNull()
             }
@@ -344,6 +348,125 @@ class SaavnExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, TrackC
         shelves.toFeed()
     }
 
+    private fun cleanTrackTitle(title: String, artist: String): String {
+        var t = cleanHtml(title)
+        if (t.contains("|")) {
+            val beforePipe = t.substringBefore("|").trim()
+            if (beforePipe.isNotBlank()) {
+                t = beforePipe
+            }
+        }
+        if (t.contains("//")) {
+            val beforeSlash = t.substringBefore("//").trim()
+            if (beforeSlash.isNotBlank()) {
+                t = beforeSlash
+            }
+        }
+        t = t.replace(Regex("""\s*[\(\[\{].*?(?:official|music\s*video|video|audio|lyrics|lyric\s*video|feat|ft\.|hd|4k|remaster|visualizer|live|full\s*song|from\s*["']|soundtrack|ost).*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s*[\(\[\{]\s*from\s+.*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+        if (artist.isNotBlank() && !artist.equals("Unknown Artist", ignoreCase = true) && !artist.equals("JioSaavn Artist", ignoreCase = true)) {
+            val esc = Regex.escape(artist)
+            t = t.replace(Regex("""^$esc\s*[-–:]\s*""", RegexOption.IGNORE_CASE), "")
+            t = t.replace(Regex("""\s*[-–:]\s*$esc$""", RegexOption.IGNORE_CASE), "")
+        } else if (t.contains(" - ") || t.contains(" – ")) {
+            val parts = t.split(Regex("""\s+[-–]\s+"""))
+            if (parts.size >= 2 && parts[1].isNotBlank()) {
+                t = parts[1].trim()
+            }
+        }
+        t = t.replace(Regex("""\s*[-–:]\s*(?:official\s*video|official\s*audio|lyrics|lyric\s*video|from\s+["'].*?|soundtrack|ost)\s*$""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s+(?:feat|ft)\.?\s+.*$""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s*[\(\[\{]\s*[\)\]\}]"""), "")
+        t = t.replace(Regex("""\s+"""), " ").trim()
+        return if (t.isNotBlank()) t else title.trim()
+    }
+
+    private fun scoreTrackCandidate(candidateTitle: String, candidateArtist: String, targetTitle: String, targetArtist: String): Int {
+        val cTitle = cleanHtml(candidateTitle).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val cArtist = cleanHtml(candidateArtist).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val tTitle = cleanHtml(targetTitle).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val tArtist = cleanHtml(targetArtist).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+
+        val normCTitle = cTitle.replace(Regex("""\s+"""), " ").trim()
+        val normTTitle = tTitle.replace(Regex("""\s+"""), " ").trim()
+        if (normCTitle.isBlank() || normTTitle.isBlank()) return 0
+
+        var score = 0
+        val cleanC = cleanTrackTitle(candidateTitle, "").lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+        val cleanT = cleanTrackTitle(targetTitle, "").lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+
+        val baseC = cleanC.substringBefore("-").trim()
+        val baseT = cleanT.substringBefore("-").trim()
+
+        if (normCTitle == normTTitle) {
+            score += 70
+        } else if (cleanC.isNotBlank() && cleanC == cleanT) {
+            score += 65
+        } else if ((baseC.isNotBlank() && baseC == cleanT) || (baseT.isNotBlank() && cleanC == baseT) || (baseC.isNotBlank() && baseT.isNotBlank() && baseC == baseT)) {
+            score += 60
+        } else if (normCTitle.startsWith(normTTitle) || normTTitle.startsWith(normCTitle) || (cleanC.isNotBlank() && cleanT.isNotBlank() && (cleanC.startsWith(cleanT) || cleanT.startsWith(cleanC)))) {
+            score += 55
+        } else if (normCTitle.contains(normTTitle) || normTTitle.contains(normCTitle)) {
+            score += 35
+        }
+
+        // Check Dash / Colon separation: "Artist - Title" or "Title - Artist"
+        if (targetTitle.contains("-") || targetTitle.contains("–") || targetTitle.contains(":")) {
+            val parts = targetTitle.split(Regex("""[-–:]""")).map { it.trim() }.filter { it.isNotBlank() }
+            if (parts.size >= 2) {
+                val pArt = parts[0].lowercase().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+                val pTit = parts.drop(1).joinToString(" ").lowercase().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+                // Artist - Title
+                if (normCTitle == pTit || cleanC == pTit || pTit.contains(normCTitle) || normCTitle.contains(pTit)) {
+                    if (cArtist.isNotBlank() && (cArtist.contains(pArt) || pArt.contains(cArtist))) {
+                        score = maxOf(score, 85)
+                    } else {
+                        score = maxOf(score, 65)
+                    }
+                }
+                // Title - Artist
+                if (normCTitle == pArt || cleanC == pArt || pArt.contains(normCTitle) || normCTitle.contains(pArt)) {
+                    if (cArtist.isNotBlank() && (cArtist.contains(pTit) || pTit.contains(cArtist))) {
+                        score = maxOf(score, 85)
+                    } else {
+                        score = maxOf(score, 65)
+                    }
+                }
+            }
+        }
+
+        if (score == 0) {
+            val tWords = normTTitle.split(" ").filter { it.length > 2 }
+            if (tWords.isNotEmpty()) {
+                val matches = tWords.count { normCTitle.contains(it) }
+                val ratio = matches.toFloat() / tWords.size
+                if (ratio >= 0.75f) score += (30 * ratio).toInt() else return 0
+            } else return 0
+        }
+
+        val isTargetRemix = normTTitle.contains("remix") || normTTitle.contains("cover") || normTTitle.contains("live")
+        val isCandRemix = normCTitle.contains("remix") || normCTitle.contains("cover") || normCTitle.contains("live") || normCTitle.contains("karaoke")
+        if (isCandRemix && !isTargetRemix) {
+            score -= 40
+        }
+
+        if (tArtist.isNotBlank() && !tArtist.equals("unknown artist", ignoreCase = true)) {
+            val normCArtist = cArtist.replace(Regex("""\s+"""), " ").trim()
+            val normTArtist = tArtist.replace(Regex("""\s+"""), " ").trim()
+            if (normCArtist.contains(normTArtist) || normTArtist.contains(normCArtist)) {
+                score += 40
+            } else {
+                val firstWord = normTArtist.split(" ").firstOrNull { it.length > 2 }
+                if (firstWord != null && normCArtist.contains(firstWord)) {
+                    score += 25
+                } else {
+                    return 0
+                }
+            }
+        }
+        return score.coerceAtLeast(0)
+    }
+
     override suspend fun loadTrack(track: Track, isDownload: Boolean): Track {
         if (track.servers.isNotEmpty() && track.servers.first().extras.containsKey("stream_url")) {
             return track
@@ -363,11 +486,64 @@ class SaavnExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, TrackC
             )
             return track.copy(streamables = listOf(streamable))
         }
-        val query = "${track.title} ${track.artists.firstOrNull()?.name ?: ""}".trim()
+
+        // Direct fetch by numeric JioSaavn song ID
+        val songId = track.extras["song_id"] ?: track.id
+        if (songId.length >= 6 && songId.all { it.isDigit() }) {
+            val directTrack = runCatching {
+                val url = "https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=$songId"
+                val req = Request.Builder().url(url).build()
+                client.newCall(req).execute().use { resp ->
+                    val root = json.parseToJsonElement(resp.body.string()).jsonObject
+                    val songObj = root[songId]?.jsonObject ?: root.values.firstOrNull()?.jsonObject ?: return@use null
+                    val encUrl = songObj["encrypted_media_url"]?.jsonPrimitive?.content
+                    val previewUrl = songObj["media_preview_url"]?.jsonPrimitive?.content
+                    val streamUrl = encUrl?.let { decryptRawMediaUrl(it) } ?: previewUrl ?: ""
+                    if (streamUrl.isNotBlank()) {
+                        val streamable = Streamable.server(
+                            id = songId,
+                            quality = 320,
+                            title = "320 kbps (JioSaavn HQ)",
+                            extras = track.extras + mapOf(
+                                "stream_url" to streamUrl,
+                                "extension_id" to "saavn_music",
+                                "track_title" to track.title,
+                                "artist_name" to track.artists.joinToString(", ") { it.name }
+                            )
+                        )
+                        track.copy(
+                            streamables = listOf(streamable),
+                            extras = track.extras + ("stream_url" to streamUrl) + ("song_id" to songId)
+                        )
+                    } else null
+                }
+            }.getOrNull()
+            if (directTrack != null) return directTrack
+        }
+
+        val targetArtist = track.artists.firstOrNull()?.name ?: ""
+        val cleanArtist = if (targetArtist.equals("Unknown Artist", ignoreCase = true)) "" else targetArtist
+        val cleanTitle = cleanTrackTitle(track.title, cleanArtist)
+        val query = if (cleanArtist.isNotBlank()) "$cleanTitle $cleanArtist" else cleanTitle
         if (query.isNotBlank()) {
-            val matches = searchSongs(query, 1)
-            if (matches.isNotEmpty()) {
-                return matches.first()
+            val matches = searchSongs(query, 6)
+            var bestMatch: Track? = null
+            var bestScore = -1
+            for (m in matches) {
+                val cArtist = m.artists.firstOrNull()?.name ?: ""
+                val score = scoreTrackCandidate(m.title, cArtist, cleanTitle, targetArtist)
+                if (score > bestScore) {
+                    bestScore = score
+                    bestMatch = m
+                }
+            }
+            if (bestScore >= 50 && bestMatch != null) {
+                return track.copy(
+                    cover = track.cover ?: bestMatch.cover,
+                    duration = if ((track.duration ?: 0L) > 0L) track.duration else bestMatch.duration,
+                    streamables = bestMatch.streamables,
+                    extras = track.extras + bestMatch.extras
+                )
             }
         }
         return track

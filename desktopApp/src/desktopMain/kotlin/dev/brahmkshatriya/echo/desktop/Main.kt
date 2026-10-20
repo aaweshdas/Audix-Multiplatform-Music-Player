@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
@@ -29,6 +30,7 @@ import androidx.compose.ui.window.rememberWindowState
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
+import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.svg.SvgDecoder
@@ -139,7 +141,13 @@ fun main() {
     }
 
     val sessionSecret = java.util.UUID.randomUUID().toString()
-    runCatching { tokenFile.writeText(sessionSecret) }
+    runCatching {
+        tokenFile.writeText(sessionSecret)
+        tokenFile.setReadable(false, false)
+        tokenFile.setReadable(true, true)
+        tokenFile.setWritable(false, false)
+        tokenFile.setWritable(true, true)
+    }
 
     val instanceServer = runCatching {
         java.net.ServerSocket(singleInstancePort, 10, java.net.InetAddress.getLoopbackAddress())
@@ -196,11 +204,23 @@ fun main() {
 
     log("Initializing Coil...")
     runCatching {
+        val sharedImageClient = OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .connectionPool(okhttp3.ConnectionPool(24, 5, java.util.concurrent.TimeUnit.MINUTES))
+            .followRedirects(true)
+            .build()
+
         SingletonImageLoader.setSafe {
             ImageLoader.Builder(it)
                 .components {
-                    add(OkHttpNetworkFetcherFactory(OkHttpClient()))
+                    add(OkHttpNetworkFetcherFactory(sharedImageClient))
                     add(SvgDecoder.Factory())
+                }
+                .memoryCache {
+                    MemoryCache.Builder()
+                        .maxSizeBytes(134_217_728L) // 128MB
+                        .build()
                 }
                 .diskCache {
                     DiskCache.Builder()
@@ -211,7 +231,7 @@ fun main() {
                 .crossfade(true)
                 .build()
         }
-        log("Coil initialized with 250MB diskCache")
+        log("Coil initialized with 25% RAM memoryCache and 250MB diskCache")
     }.onFailure {
         log("Coil initialization warning: ${it.stackTraceToString()}")
     }
@@ -267,7 +287,9 @@ fun main() {
                                     client.soTimeout = 1000
                                     val reader = client.getInputStream().bufferedReader()
                                     val writer = java.io.PrintWriter(client.getOutputStream(), true)
-                                    val line = reader.readLine()?.trim() ?: ""
+                                    val charBuf = CharArray(512)
+                                    val charsRead = reader.read(charBuf, 0, 512)
+                                    val line = if (charsRead > 0) String(charBuf, 0, charsRead).lineSequence().firstOrNull()?.trim() ?: "" else ""
                                     val incomingSecret = line.removePrefix("SHOW ").trim()
                                     val isSecretMatch = java.security.MessageDigest.isEqual(
                                         incomingSecret.toByteArray(Charsets.UTF_8),
@@ -335,7 +357,7 @@ fun main() {
                     ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/spothub_logo.png")
                     ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "audix_logo.png").toFile().takeIf { it.exists() }?.inputStream()
                     ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "spothub_logo.png").toFile().takeIf { it.exists() }?.inputStream()
-                stream?.use { androidx.compose.ui.res.loadImageBitmap(it) }?.let { androidx.compose.ui.graphics.painter.BitmapPainter(it) }
+                stream?.use { javax.imageio.ImageIO.read(it)?.toComposeImageBitmap() }?.let { androidx.compose.ui.graphics.painter.BitmapPainter(it) }
             }.getOrNull()?.also { cachedLogoPainter = it } ?: EchoTrayPainter
         }
 
@@ -414,7 +436,7 @@ fun main() {
                     kotlin.system.exitProcess(0)
                 }
             },
-            title = "Audix",
+            title = "Audix v1.0.2-UNIFIED",
             icon = logoPainter,
             state = windowState,
             resizable = false,

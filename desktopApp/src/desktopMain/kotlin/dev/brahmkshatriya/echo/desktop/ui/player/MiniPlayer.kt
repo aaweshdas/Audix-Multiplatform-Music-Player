@@ -2,6 +2,7 @@ package dev.brahmkshatriya.echo.desktop.ui.player
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +26,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
@@ -57,7 +60,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.Popup
@@ -102,6 +108,93 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+
+internal fun isGarbageAlbum(title: String?): Boolean {
+    if (title.isNullOrBlank()) return true
+    val t = title.lowercase().trim()
+    if (t in setOf("single", "album", "audio", "video", "song", "episode", "podcast", "youtube music", "soundcloud", "soundcloud single")) return true
+    if (t.contains("views") || t.contains("view") || t.contains("subscribers") || t.contains("watching") || t.contains("streamed")) return true
+    if (t.contains("ago") || t.contains("uploaded")) return true
+    if (t.matches(Regex("""^[\d\s\.,kmb]+views?$""", RegexOption.IGNORE_CASE))) return true
+    return false
+}
+
+internal fun cleanDisplayAlbum(album: String?, fallback: String = ""): String {
+    if (album.isNullOrBlank()) return fallback
+    val a = album.trim()
+    return if (isGarbageAlbum(a)) fallback else a
+}
+
+internal fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Audix Hi-Res Audio", extraArtist: String? = null): String {
+    val filtered = artists?.map { it.name.trim() }?.filterNot { name ->
+        name.isBlank() ||
+        name.equals("Song", true) ||
+        name.equals("Video", true) ||
+        name.equals("Episode", true) ||
+        name.equals("Podcast", true) ||
+        name.equals("Unknown Artist", true) ||
+        name.equals("Unknown", true) ||
+        name.equals("YouTube Music", true) ||
+        name.equals("Spotify Artist", true) ||
+        name.equals("Various Artists", true) ||
+        name.equals("Audix Artist", true) ||
+        name.equals("Audix Music", true) ||
+        name.equals("Audix Hi-Res Audio", true) ||
+        name.equals("Music Video", true) ||
+        name.equals("T-Series", true) ||
+        name.equals("SonyMusicIndiaVEVO", true) ||
+        name.equals("Zee Music Company", true) ||
+        name.equals("Tips Official", true) ||
+        name.startsWith("user-", true)
+    }?.map { name ->
+        if (name.endsWith(" - Topic", ignoreCase = true)) name.substring(0, name.length - 8).trim() else name
+    }
+    if (!filtered.isNullOrEmpty()) return filtered.joinToString(", ")
+    if (!extraArtist.isNullOrBlank() && !extraArtist.equals("Song", true) && !extraArtist.equals("Video", true)) {
+        return extraArtist.trim()
+    }
+    return fallback
+}
+
+internal fun cleanDisplayTitle(title: String?): String {
+    if (title.isNullOrBlank()) return "Untitled Track"
+    var t = title.trim()
+    if (t.contains("|")) t = t.substringBefore("|").trim()
+    if (t.contains("//")) t = t.substringBefore("//").trim()
+    t = t.replace(Regex("""\s*[\(\[\{].*?(?:official|music\s*video|video|audio|lyrics|lyric\s*video|feat|ft\.|hd|4k|remaster|visualizer|live|full\s*song|from\s*["']|soundtrack|ost).*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+    t = t.replace(Regex("""\s*[\(\[\{]\s*from\s+.*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+    t = t.replace(Regex("""\s*[-–:]\s*(?:official\s*video|official\s*audio|lyrics|lyric\s*video|from\s+["'].*?|soundtrack|ost)\s*$""", RegexOption.IGNORE_CASE), "")
+    t = t.replace(Regex("""\s+(?:feat|ft)\.?\s+.*$""", RegexOption.IGNORE_CASE), "")
+    t = t.replace(Regex("""\s*[\(\[\{]\s*[\)\]\}]"""), "")
+    t = t.replace(Regex("""\s+"""), " ").trim()
+    return if (t.isNotBlank()) t else title.trim()
+}
+
+internal fun extractTrackCoverUrl(track: Track?): String? {
+    if (track == null) return null
+    val cover = track.cover ?: track.album?.cover
+    val directUrl = when (cover) {
+        is ImageHolder.NetworkRequestImageHolder -> cover.request.url
+        is ImageHolder.ResourceUriImageHolder -> cover.uri
+        else -> null
+    }
+    val extraCover = track.extras["cover_url"]
+    if (!extraCover.isNullOrBlank()) {
+        val isGeneric = directUrl.isNullOrBlank() ||
+            directUrl.contains("charts-images.scdn.co") ||
+            directUrl.contains("hqdefault.jpg") ||
+            directUrl.contains("mqdefault.jpg") ||
+            directUrl.contains("default.jpg") ||
+            directUrl.contains("sddefault.jpg") ||
+            directUrl.contains("120x120") ||
+            directUrl.contains("50x50") ||
+            directUrl.contains("150x150") ||
+            directUrl.contains("100x100bb") ||
+            directUrl.contains("avatar")
+        if (isGeneric) return extraCover
+    }
+    return directUrl ?: extraCover
+}
 
 enum class PlayerModalTab(val title: String, val subtitle: String) {
     OVERVIEW("Now Playing", "Master track stage & live synchronized lyrics"),
@@ -262,10 +355,14 @@ private object StudioStorage {
     fun clearStreamCache(): Long {
         return try {
             var freedBytes = 0L
-            if (streamCacheDir.exists()) {
-                streamCacheDir.listFiles()?.forEach { file ->
-                    freedBytes += file.length()
-                    runCatching { file.delete() }
+            val canonicalCache = streamCacheDir.canonicalFile
+            if (canonicalCache.exists()) {
+                canonicalCache.listFiles()?.forEach { file ->
+                    val canonical = file.canonicalFile
+                    if (canonical.toPath().startsWith(canonicalCache.toPath()) && canonical.isFile) {
+                        freedBytes += canonical.length()
+                        runCatching { canonical.delete() }
+                    }
                 }
             }
             freedBytes / (1024 * 1024)
@@ -300,12 +397,22 @@ private object StudioStorage {
             if (host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "169.254.169.254" || host == "0.0.0.0") {
                 return null
             }
+            val inet = runCatching { java.net.InetAddress.getByName(host) }.getOrNull()
+            if (inet != null && (inet.isLoopbackAddress || inet.isSiteLocalAddress || inet.isLinkLocalAddress || inet.isAnyLocalAddress)) {
+                return null
+            }
+
+            val canonicalTargetDir = targetDir.canonicalFile
+            if (!canonicalTargetDir.exists()) canonicalTargetDir.mkdirs()
 
             val artist = track.artists.firstOrNull()?.name ?: "Unknown Artist"
             val title = track.title
             val safeFileName = sanitizeFileName(artist, title, track.id)
             val ext = if (cleanUrl.contains(".mp4") || cleanUrl.contains(".m4a")) "m4a" else "mp3"
-            val targetFile = File(targetDir, "$safeFileName.$ext")
+            val targetFile = File(canonicalTargetDir, "$safeFileName.$ext").canonicalFile
+            if (!targetFile.toPath().startsWith(canonicalTargetDir.toPath())) {
+                return null
+            }
 
             val conn = parsedHttpUrl.toUrl().openConnection() as HttpURLConnection
             connection = conn
@@ -360,7 +467,7 @@ private fun loadStudioBackground(): ImageBitmap? {
             ?: java.nio.file.Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", "images", "music_notes_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
             ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
             ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "music_notes_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
-        stream?.use { loadImageBitmap(it) }
+        stream?.use { javax.imageio.ImageIO.read(it)?.toComposeImageBitmap() }
     }.getOrNull()?.also { cachedStudioBgBitmap = it }
 }
 
@@ -369,10 +476,10 @@ private fun loadStudioBackground(): ImageBitmap? {
 // =========================================================================
 private object StudioTheme {
     // Liquid Glass Studio Canvas Palette
-    val CanvasBg = Color(0xFF07090E)
-    val SurfaceCard = Color(0x990C101F)
-    val SurfaceElevated = Color(0xB3161E34)
-    val SurfaceSubtle = Color(0x660C101F)
+    val CanvasBg = Color(0xFF0A0C10)
+    val SurfaceCard = Color(0xFF0A0C10).copy(alpha = 0.35f)
+    val SurfaceElevated = Color(0xFF0E1116).copy(alpha = 0.45f)
+    val SurfaceSubtle = Color(0xFF0A0C10).copy(alpha = 0.20f)
 
     // Precision Specular Hairline Borders
     val BorderSubtle = Color(0x28FFFFFF)
@@ -380,8 +487,8 @@ private object StudioTheme {
 
     // High-Contrast Pure Monochrome Typography
     val TextPrimary = Color(0xFFFFFFFF)
-    val TextSecondary = Color(0xFFA0A0A0)
-    val TextMuted = Color(0xFF707070)
+    val TextSecondary = Color(0xFFFFFFFF)
+    val TextMuted = Color(0xFFFFFFFF)
 
     // Monochrome Functional Highlight (Pure Stark White)
     val AccentPrimary = Color(0xFFFFFFFF)
@@ -397,6 +504,142 @@ private object StudioTheme {
     val StatusError = Color(0xFFD4D4D4)
 }
 
+@Composable
+private fun FidelityEqualizerBadge(
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    LiquidGlassBox(
+        modifier = modifier,
+        shape = RoundedCornerShape(4.dp),
+        backgroundColor = Color.White.copy(alpha = 0.08f),
+        borderColor = Color.White.copy(alpha = 0.16f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (!isPlaying) {
+                Row(
+                    modifier = Modifier
+                        .height(8.dp)
+                        .padding(end = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(1.5.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(0.3f).background(Color.White, RoundedCornerShape(1.dp)))
+                    Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(0.5f).background(Color(0xFFE4E4E7), RoundedCornerShape(1.dp)))
+                    Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(0.2f).background(Color(0xFFA1A1AA), RoundedCornerShape(1.dp)))
+                    Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(0.6f).background(Color.White, RoundedCornerShape(1.dp)))
+                }
+            } else {
+                val transition = rememberInfiniteTransition(label = "badge_eq")
+                val b1 by transition.animateFloat(0.25f, 0.95f, infiniteRepeatable(tween(420, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "b1")
+                val b2 by transition.animateFloat(0.85f, 0.30f, infiniteRepeatable(tween(360, easing = LinearOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "b2")
+                val b3 by transition.animateFloat(0.40f, 1.0f, infiniteRepeatable(tween(510, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "b3")
+                val b4 by transition.animateFloat(0.75f, 0.35f, infiniteRepeatable(tween(460, easing = LinearOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "b4")
+
+                Row(
+                    modifier = Modifier
+                        .height(8.dp)
+                        .padding(end = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(1.5.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(b1).background(Color.White, RoundedCornerShape(1.dp)))
+                    Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(b2).background(Color(0xFFE4E4E7), RoundedCornerShape(1.dp)))
+                    Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(b3).background(Color(0xFFA1A1AA), RoundedCornerShape(1.dp)))
+                    Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(b4).background(Color.White, RoundedCornerShape(1.dp)))
+                }
+            }
+
+            Text(
+                "320K",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFE4E4E7),
+                letterSpacing = 0.3.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun FullscreenModalAudioVisualizer(
+    isPlaying: Boolean,
+    volume: Float,
+    visualizerTheme: String,
+    modifier: Modifier = Modifier
+) {
+    val barColor = when (visualizerTheme) {
+        "Silver Slate" -> Color(0xFFB4B4B4)
+        "Mono Wire" -> Color(0xFFE0E0E0)
+        "Graphite Dark" -> Color(0xFF707070)
+        else -> Color(0xFFFFFFFF)
+    }
+
+    val liveBands by dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.visualizerBands.collectAsState()
+    val isAudioActive = dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.isAudioActive
+    val miniBands = remember(liveBands) {
+        dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.getBands(18)
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "modal_visualizer_wave")
+    val animPhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.28f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, easing = LinearEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+        ),
+        label = "modal_wave_phase"
+    )
+
+    LiquidGlassBox(
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            if (size.width <= 0f || size.height <= 0f) return@Canvas
+            val barCount = 18
+            val barWidthPx = 20.dp.toPx()
+            val totalBarWidth = barWidthPx * barCount
+            val spacingPx = if (size.width > totalBarWidth && barCount > 1) {
+                (size.width - totalBarWidth) / (barCount - 1)
+            } else 4.dp.toPx()
+
+            for (i in 0 until barCount) {
+                val barFraction = if (isPlaying) {
+                    val realEnergy = miniBands.getOrElse(i) { 0f }
+                    if (isAudioActive && realEnergy > 0.015f) {
+                        ((realEnergy * 44f + 5f) / 54f).coerceIn(0.08f, 1f)
+                    } else {
+                        val wave = (kotlin.math.sin(animPhase + i * 0.45f) + 1f) / 2f
+                        val volFactor = volume.coerceIn(0.2f, 1f)
+                        ((wave * 18f * volFactor + 5f) / 54f).coerceIn(0.08f, 0.5f)
+                    }
+                } else {
+                    0.08f
+                }
+
+                val bHeight = (size.height * barFraction).coerceIn(4.dp.toPx(), size.height)
+                val x = i * (barWidthPx + spacingPx)
+                val y = size.height - bHeight
+
+                drawRoundRect(
+                    color = barColor,
+                    topLeft = Offset(x, y),
+                    size = Size(barWidthPx, bHeight),
+                    cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun RedesignedMiniPlayerDock(
@@ -419,10 +662,6 @@ private fun RedesignedMiniPlayerDock(
     onToggleFavorite: (Track) -> Unit,
     onOpenModal: (PlayerModalTab) -> Unit,
     lyricsUiState: LyricsUiState,
-    eqBar1: Float,
-    eqBar2: Float,
-    eqBar3: Float,
-    eqBar4: Float,
     eqEnabled: Boolean = false,
     onToggleEq: (Boolean) -> Unit = {},
     selectedEqPreset: String = "Flat",
@@ -519,12 +758,7 @@ private fun RedesignedMiniPlayerDock(
                 val leftInteractionSource = remember { MutableInteractionSource() }
                 val isLeftHovered by leftInteractionSource.collectIsHoveredAsState()
 
-                val cover = currentTrack?.cover
-                val coverUrl = when (cover) {
-                    is ImageHolder.NetworkRequestImageHolder -> cover.request.url
-                    is ImageHolder.ResourceUriImageHolder -> cover.uri
-                    else -> null
-                }
+                val coverUrl = extractTrackCoverUrl(currentTrack)
 
                 Row(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -538,8 +772,8 @@ private fun RedesignedMiniPlayerDock(
                             .hoverable(leftInteractionSource)
                             .pointerHoverIcon(PointerIcon.Hand),
                         contentAlignment = Alignment.Center,
-                        backgroundColor = Color(0xFF141926).copy(alpha = 0.85f),
-                        borderColor = if (isLeftHovered) Color(0xFF38BDF8).copy(alpha = 0.75f) else Color.White.copy(alpha = 0.18f),
+                        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.50f),
+                        borderColor = if (isLeftHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.18f),
                         onClick = { onOpenModal(PlayerModalTab.OVERVIEW) }
                     ) {
                         if (!coverUrl.isNullOrBlank()) {
@@ -581,7 +815,7 @@ private fun RedesignedMiniPlayerDock(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = currentTrack?.title ?: "No track playing",
+                            text = cleanDisplayTitle(currentTrack?.title).ifBlank { "No track playing" },
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
@@ -592,11 +826,11 @@ private fun RedesignedMiniPlayerDock(
                         Spacer(Modifier.height(3.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val artists = currentTrack?.artists?.joinToString(", ") { it.name }
+                            val artists = formatArtistsForDisplay(currentTrack?.artists, "Audix Hi-Res Audio", currentTrack?.extras?.get("artist_name"))
                             Text(
-                                text = if (!artists.isNullOrBlank()) artists else "Audix Hi-Res Audio",
+                                text = artists,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFFA1A1AA),
+                                color = Color.White,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
@@ -605,42 +839,7 @@ private fun RedesignedMiniPlayerDock(
                             Spacer(Modifier.width(6.dp))
 
                             // Monochromatic 320K Fidelity Badge
-                            LiquidGlassBox(
-                                shape = RoundedCornerShape(4.dp),
-                                backgroundColor = Color.White.copy(alpha = 0.08f),
-                                borderColor = Color.White.copy(alpha = 0.16f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .height(8.dp)
-                                            .padding(end = 3.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(1.5.dp),
-                                        verticalAlignment = Alignment.Bottom
-                                    ) {
-                                        val b1 = if (isPlaying) eqBar1 else 0.3f
-                                        val b2 = if (isPlaying) eqBar2 else 0.5f
-                                        val b3 = if (isPlaying) eqBar3 else 0.2f
-                                        val b4 = if (isPlaying) eqBar4 else 0.6f
-
-                                        Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(b1).background(Color.White, RoundedCornerShape(1.dp)))
-                                        Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(b2).background(Color(0xFFE4E4E7), RoundedCornerShape(1.dp)))
-                                        Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(b3).background(Color(0xFFA1A1AA), RoundedCornerShape(1.dp)))
-                                        Box(modifier = Modifier.width(1.5.dp).fillMaxHeight(b4).background(Color.White, RoundedCornerShape(1.dp)))
-                                    }
-
-                                    Text(
-                                        "320K",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFE4E4E7),
-                                        letterSpacing = 0.3.sp
-                                    )
-                                }
-                            }
+                            FidelityEqualizerBadge(isPlaying = isPlaying)
                         }
                     }
 
@@ -841,7 +1040,7 @@ private fun RedesignedMiniPlayerDock(
                             text = formatDuration(positionMs),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFFA1A1AA),
+                            color = Color.White,
                             modifier = Modifier.width(36.dp),
                             textAlign = TextAlign.Start
                         )
@@ -994,7 +1193,7 @@ private fun RedesignedMiniPlayerDock(
                             },
                             fontSize = 11.sp,
                             fontWeight = if (showRemainingTime) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (showRemainingTime) Color.White else Color(0xFFA1A1AA),
+                            color = Color.White,
                             modifier = Modifier
                                 .width(40.dp)
                                 .clip(RoundedCornerShape(4.dp))
@@ -1050,7 +1249,7 @@ private fun RedesignedMiniPlayerDock(
                                 .pointerInput(Unit) {
                                     detectTapGestures { offset ->
                                         if (size.width > 0) {
-                                            val newVol = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                            val newVol = (offset.x / size.width.toFloat()).coerceIn(0.05f, 1f)
                                             viewModel.setVolume(newVol)
                                         }
                                     }
@@ -1058,7 +1257,7 @@ private fun RedesignedMiniPlayerDock(
                                 .pointerInput(Unit) {
                                     detectHorizontalDragGestures { change, _ ->
                                         if (size.width > 0) {
-                                            val newVol = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                            val newVol = (change.position.x / size.width.toFloat()).coerceIn(0.05f, 1f)
                                             viewModel.setVolume(newVol)
                                         }
                                     }
@@ -1071,7 +1270,7 @@ private fun RedesignedMiniPlayerDock(
                                                 val delta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
                                                 if (delta != 0f) {
                                                     val change = if (delta < 0) 0.05f else -0.05f
-                                                    val newVol = (effectiveVolume + change).coerceIn(0f, 1f)
+                                                    val newVol = (effectiveVolume + change).coerceIn(0.05f, 1f)
                                                     viewModel.setVolume(newVol)
                                                 }
                                             }
@@ -1176,7 +1375,7 @@ private fun RedesignedMiniPlayerDock(
                                             Text(
                                                 "Current Rate: ${playbackSpeed}x",
                                                 fontSize = 11.sp,
-                                                color = Color(0xFFA1A1AA)
+                                                color = Color.White
                                             )
 
                                             Spacer(Modifier.height(10.dp))
@@ -1340,7 +1539,7 @@ private fun RedesignedMiniPlayerDock(
                                                 Text(
                                                     text = "${queue.size} songs",
                                                     fontSize = 11.sp,
-                                                    color = Color(0xFFA1A1AA)
+                                                    color = Color.White
                                                 )
                                             }
 
@@ -1350,7 +1549,7 @@ private fun RedesignedMiniPlayerDock(
                                                 Text(
                                                     "Queue is empty",
                                                     fontSize = 12.sp,
-                                                    color = Color(0xFF71717A),
+                                                    color = Color.White,
                                                     modifier = Modifier.padding(vertical = 12.dp)
                                                 )
                                             } else {
@@ -1369,7 +1568,7 @@ private fun RedesignedMiniPlayerDock(
                                                         Text(
                                                             "${idx + 1}.",
                                                             fontSize = 11.sp,
-                                                            color = Color(0xFF71717A),
+                                                            color = Color.White,
                                                             modifier = Modifier.width(20.dp)
                                                         )
                                                         Column(Modifier.weight(1f)) {
@@ -1384,7 +1583,7 @@ private fun RedesignedMiniPlayerDock(
                                                             Text(
                                                                 track.artists.joinToString(", ") { it.name },
                                                                 fontSize = 10.sp,
-                                                                color = Color(0xFFA1A1AA),
+                                                                color = Color.White,
                                                                 maxLines = 1,
                                                                 overflow = TextOverflow.Ellipsis
                                                             )
@@ -1596,8 +1795,10 @@ fun MiniPlayer(
             }
         }
         isFetchingOnlineLyrics = true
+        val lyricsTitle = cleanDisplayTitle(track.title)
+        val lyricsArtist = formatArtistsForDisplay(track.artists, "")
         val fetched = withContext(Dispatchers.IO) {
-            UniversalLyricsSyncEngine.fetchLrcLib(track.title, track.artists.firstOrNull()?.name ?: "", durationMs)
+            UniversalLyricsSyncEngine.fetchLrcLib(lyricsTitle, lyricsArtist, durationMs)
         }
         isFetchingOnlineLyrics = false
         if (fetched != null && fetched.first.isNotEmpty()) {
@@ -1634,8 +1835,8 @@ fun MiniPlayer(
             }
             else -> {
                 val track = currentTrack
-                val title = track?.title ?: "Current Track"
-                val artist = track?.artists?.firstOrNull()?.name ?: ""
+                val title = cleanDisplayTitle(track?.title ?: "Current Track")
+                val artist = formatArtistsForDisplay(track?.artists, "")
                 if (title.contains("Love Me Like You Do", ignoreCase = true)) {
                     loveMeLikeYouDoLyrics
                 } else {
@@ -1669,8 +1870,10 @@ fun MiniPlayer(
         coroutineScope.launch {
             val track = currentTrack ?: return@launch
             isFetchingOnlineLyrics = true
+            val lTitle = cleanDisplayTitle(track.title)
+            val lArtist = formatArtistsForDisplay(track.artists, "")
             val fetched = withContext(Dispatchers.IO) {
-                UniversalLyricsSyncEngine.fetchLrcLib(track.title, track.artists.firstOrNull()?.name ?: "", durationMs, forceRefresh = true)
+                UniversalLyricsSyncEngine.fetchLrcLib(lTitle, lArtist, durationMs, forceRefresh = true)
             }
             isFetchingOnlineLyrics = false
             if (fetched != null && fetched.first.isNotEmpty()) {
@@ -1713,9 +1916,9 @@ fun MiniPlayer(
     var volumeBoostEnabled by remember { mutableStateOf(false) }
 
     // 6. Metadata ID3 Tags State
-    var editTitle by remember(currentTrack) { mutableStateOf(currentTrack?.title ?: "Starboy (Audix Studio Remaster)") }
-    var editArtist by remember(currentTrack) { mutableStateOf(currentTrack?.artists?.joinToString(", ") { it.name } ?: "The Weeknd, Daft Punk") }
-    var editAlbum by remember(currentTrack) { mutableStateOf(currentTrack?.album?.title ?: "Starboy (Deluxe Edition)") }
+    var editTitle by remember(currentTrack) { mutableStateOf(currentTrack?.title ?: "") }
+    var editArtist by remember(currentTrack) { mutableStateOf(currentTrack?.artists?.joinToString(", ") { it.name } ?: "") }
+    var editAlbum by remember(currentTrack) { mutableStateOf(currentTrack?.album?.title ?: "") }
     var editYear by remember { mutableStateOf("2024") }
     var editGenre by remember { mutableStateOf("Synthwave / R&B") }
     var editTrackNo by remember { mutableStateOf("01 / 18") }
@@ -1734,6 +1937,10 @@ fun MiniPlayer(
                 editAlbum = override.album
                 editYear = override.year
                 editGenre = override.genre
+            } else {
+                editTitle = currentTrack?.title ?: ""
+                editArtist = currentTrack?.artists?.joinToString(", ") { it.name } ?: ""
+                editAlbum = currentTrack?.album?.title ?: ""
             }
             isFavorite = StudioStorage.isTrackFavorite(tid)
         }
@@ -1836,29 +2043,6 @@ fun MiniPlayer(
     val isScrubHovered by scrubInteractionSource.collectIsHoveredAsState()
     val scrubBarHeight by animateDpAsState(if (isScrubHovered) 6.dp else 3.5.dp, animationSpec = tween(180))
 
-    // Mini Equalizer dance animation for track fidelity badge
-    val miniEqTransition = rememberInfiniteTransition()
-    val eqBar1 by miniEqTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.95f,
-        animationSpec = infiniteRepeatable(tween(420, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse)
-    )
-    val eqBar2 by miniEqTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(tween(360, easing = LinearOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse)
-    )
-    val eqBar3 by miniEqTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(510, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse)
-    )
-    val eqBar4 by miniEqTransition.animateFloat(
-        initialValue = 0.75f,
-        targetValue = 0.35f,
-        animationSpec = infiniteRepeatable(tween(460, easing = LinearOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse)
-    )
-
     RedesignedMiniPlayerDock(
         viewModel = viewModel,
         modifier = modifier,
@@ -1897,10 +2081,6 @@ fun MiniPlayer(
             showDetailsModal = true
         },
         lyricsUiState = lyricsUiState,
-        eqBar1 = eqBar1,
-        eqBar2 = eqBar2,
-        eqBar3 = eqBar3,
-        eqBar4 = eqBar4,
         eqEnabled = eqEnabled,
         onToggleEq = { enabled ->
             eqEnabled = enabled
@@ -1986,25 +2166,8 @@ fun MiniPlayer(
     // AUDIX PRO STUDIO & AUDIO MASTER HUB (80+ FEATURES & OPTIONS MODAL)
     // =========================================================================
     if (showDetailsModal) {
-        val cover = currentTrack?.cover
-        val originalCoverUrl = when (cover) {
-            is ImageHolder.NetworkRequestImageHolder -> cover.request.url
-            is ImageHolder.ResourceUriImageHolder -> cover.uri
-            else -> null
-        }
+        val originalCoverUrl = extractTrackCoverUrl(currentTrack)
         val coverUrl = customCoverUrl ?: originalCoverUrl
-
-
-        // Live visualizer phase animation
-        val infiniteTransition = rememberInfiniteTransition()
-        val animPhase by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 6.28f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2400, easing = LinearEasing),
-                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
-            )
-        )
 
         var winWidthPx by remember {
             mutableStateOf(
@@ -2202,7 +2365,7 @@ fun MiniPlayer(
                                 .padding(4.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            items(PlayerModalTab.values()) { tab ->
+                            items(PlayerModalTab.values(), key = { it.name }) { tab ->
                                 val isTabSelected = selectedModalTab == tab
                                 val tabIcon: ImageVector = when (tab) {
                                     PlayerModalTab.OVERVIEW -> Icons.Default.Album
@@ -2391,13 +2554,12 @@ fun MiniPlayer(
                                             }
 
                                             // 2. TRACK METADATA (Bold, elegant typography)
-                                            val displayTitle = editTitle.ifBlank { currentTrack?.title ?: "No track selected" }
-                                            val displayArtists = editArtist.ifBlank {
-                                                currentTrack?.artists?.joinToString(", ") { it.name } ?: "Unknown Artist"
-                                            }
-                                            val displayAlbum = editAlbum.ifBlank {
-                                                currentTrack?.album?.title ?: "Audix Studio Collection"
-                                            }
+                                            val rawTitle = (currentTrack?.title ?: editTitle).ifBlank { "No track selected" }
+                                            val displayTitle = cleanDisplayTitle(rawTitle)
+                                            val trackArtists = formatArtistsForDisplay(currentTrack?.artists, "", currentTrack?.extras?.get("artist_name"))
+                                            val displayArtists = (trackArtists.ifBlank { editArtist }).ifBlank { "Audix Hi-Res Audio" }
+                                            val trackAlbum = currentTrack?.album?.title ?: ""
+                                            val displayAlbum = cleanDisplayAlbum(trackAlbum.ifBlank { editAlbum }, "Audix Studio Collection").ifBlank { "Audix Studio Collection" }
 
                                             Column(
                                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -2440,7 +2602,7 @@ fun MiniPlayer(
                                                     text = displayArtists,
                                                     fontSize = 14.sp,
                                                     fontWeight = FontWeight.Medium,
-                                                    color = Color(0xFF94A3B8),
+                                                    color = Color.White,
                                                     textAlign = TextAlign.Center,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
@@ -2451,7 +2613,7 @@ fun MiniPlayer(
                                                 Text(
                                                     text = "$displayAlbum • 2024 • Stereo Master",
                                                     fontSize = 11.sp,
-                                                    color = Color(0xFF64748B),
+                                                    color = Color.White,
                                                     textAlign = TextAlign.Center,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
@@ -2709,6 +2871,376 @@ fun MiniPlayer(
                                                     }
                                                 }
                                             }
+
+                                            // 7. INTEGRATED UP NEXT & PLAYBACK QUEUE LIST (Filling the empty space accordingly)
+                                            val effectiveQueue = remember(queue, currentTrack) {
+                                                if (currentTrack != null && queue.none { it.id == currentTrack?.id }) {
+                                                    listOf(currentTrack!!) + queue
+                                                } else {
+                                                    queue
+                                                }
+                                            }
+
+                                            LiquidGlassCard(
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(14.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                                ) {
+                                                    // Header
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                     ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            Icon(
+                                                                Icons.AutoMirrored.Filled.QueueMusic,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF38BDF8),
+                                                                modifier = Modifier.size(17.dp)
+                                                            )
+                                                            Text(
+                                                                "PLAYBACK QUEUE",
+                                                                fontSize = 12.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = StudioTheme.TextPrimary,
+                                                                letterSpacing = 0.6.sp
+                                                            )
+                                                            LiquidGlassBox(shape = RoundedCornerShape(5.dp)) {
+                                                                Text(
+                                                                    "${effectiveQueue.size} TRACKS",
+                                                                    fontSize = 9.5.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = Color(0xFF38BDF8),
+                                                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                                                )
+                                                            }
+                                                        }
+
+                                                        // Actions (Shuffle, Clear, Open Full Tab)
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                        ) {
+                                                            IconButton(
+                                                                onClick = { viewModel.setShuffle(!shuffleEnabled) },
+                                                                modifier = Modifier.size(28.dp)
+                                                            ) {
+                                                                Icon(
+                                                                    Icons.Default.Shuffle,
+                                                                    contentDescription = "Shuffle",
+                                                                    tint = if (shuffleEnabled) Color(0xFF38BDF8) else StudioTheme.TextMuted,
+                                                                    modifier = Modifier.size(14.dp)
+                                                                )
+                                                            }
+                                                            if (queue.isNotEmpty()) {
+                                                                IconButton(
+                                                                    onClick = { viewModel.clearQueue() },
+                                                                    modifier = Modifier.size(28.dp)
+                                                                ) {
+                                                                    Icon(
+                                                                        Icons.Default.Clear,
+                                                                        contentDescription = "Clear Queue",
+                                                                        tint = StudioTheme.TextMuted,
+                                                                        modifier = Modifier.size(14.dp)
+                                                                    )
+                                                                }
+                                                            }
+                                                            IconButton(
+                                                                onClick = { selectedModalTab = PlayerModalTab.QUEUE },
+                                                                modifier = Modifier.size(28.dp)
+                                                            ) {
+                                                                Icon(
+                                                                    Icons.AutoMirrored.Filled.OpenInNew,
+                                                                    contentDescription = "Open Full Queue View",
+                                                                    tint = StudioTheme.TextMuted,
+                                                                    modifier = Modifier.size(14.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (effectiveQueue.isEmpty()) {
+                                                        // Clean empty state with smart radio generator
+                                                        Column(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 16.dp, horizontal = 10.dp),
+                                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                        ) {
+                                                            Icon(
+                                                                Icons.AutoMirrored.Filled.QueueMusic,
+                                                                contentDescription = null,
+                                                                tint = StudioTheme.TextMuted.copy(alpha = 0.45f),
+                                                                modifier = Modifier.size(34.dp)
+                                                            )
+                                                            Text(
+                                                                "Queue is Empty",
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = StudioTheme.TextSecondary
+                                                            )
+                                                            Text(
+                                                                "Add tracks from Search or Home, or launch Smart Flow Radio",
+                                                                fontSize = 11.sp,
+                                                                color = StudioTheme.TextMuted,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                            Spacer(Modifier.height(4.dp))
+                                                            Button(
+                                                                onClick = {
+                                                                    val vibeTracks = when (smartFlowVibe) {
+                                                                        "Chill Flow" -> listOf(
+                                                                            Track(id = "vibe_chill_1", title = "Weightless (Audix Ambient Edit)", artists = listOf(Artist("vibe_a1", "Marconi Union")), album = Album("v_alb_1", "Ambient Master")),
+                                                                            Track(id = "vibe_chill_2", title = "Sunset Lover (Chill Vibe)", artists = listOf(Artist("vibe_a2", "Petit Biscuit")), album = Album("v_alb_2", "Sunset Edition")),
+                                                                            Track(id = "vibe_chill_3", title = "Intro (Chill Remaster)", artists = listOf(Artist("vibe_a3", "The xx")), album = Album("v_alb_3", "Coexist Master"))
+                                                                        )
+                                                                        "High Energy" -> listOf(
+                                                                            Track(id = "vibe_eng_1", title = "Blinding Lights (Club Mix)", artists = listOf(Artist("vibe_a4", "The Weeknd")), album = Album("v_alb_4", "After Hours")),
+                                                                            Track(id = "vibe_eng_2", title = "Titanium (Festival Beat)", artists = listOf(Artist("vibe_a5", "David Guetta & Sia")), album = Album("v_alb_5", "Dance Master")),
+                                                                            Track(id = "vibe_eng_3", title = "One More Time (Club Remaster)", artists = listOf(Artist("vibe_a6", "Daft Punk")), album = Album("v_alb_6", "Discovery"))
+                                                                        )
+                                                                        "Deep Focus" -> listOf(
+                                                                            Track(id = "vibe_foc_1", title = "Deep Focus Alpha Waves", artists = listOf(Artist("vibe_a7", "Audix Binaural")), album = Album("v_alb_7", "Cognitive Flow")),
+                                                                            Track(id = "vibe_foc_2", title = "Time (Acoustic Minimal)", artists = listOf(Artist("vibe_a8", "Hans Zimmer")), album = Album("v_alb_8", "Inception Score")),
+                                                                            Track(id = "vibe_foc_3", title = "Day One (Piano Resonance)", artists = listOf(Artist("vibe_a9", "Hans Zimmer")), album = Album("v_alb_9", "Interstellar Flow"))
+                                                                        )
+                                                                        else -> listOf(
+                                                                            Track(id = "vibe_drv_1", title = "Midnight City (Synth Edition)", artists = listOf(Artist("vibe_a10", "M83")), album = Album("v_alb_10", "Hurry Up")),
+                                                                            Track(id = "vibe_drv_2", title = "Nightcall (Drive Master)", artists = listOf(Artist("vibe_a11", "Kavinsky")), album = Album("v_alb_11", "OutRun")),
+                                                                            Track(id = "vibe_drv_3", title = "Resonance (Neon Synth)", artists = listOf(Artist("vibe_a12", "HOME")), album = Album("v_alb_12", "Odyssey"))
+                                                                        )
+                                                                    }
+                                                                    viewModel.addToQueue(vibeTracks)
+                                                                },
+                                                                shape = RoundedCornerShape(8.dp),
+                                                                colors = ButtonDefaults.buttonColors(
+                                                                    containerColor = Color(0xFF38BDF8),
+                                                                    contentColor = Color.Black
+                                                                ),
+                                                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
+                                                            ) {
+                                                                Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(13.dp))
+                                                                Spacer(Modifier.width(6.dp))
+                                                                Text("Start Smart Radio ($smartFlowVibe)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                                            }
+                                                        }
+                                                    } else {
+                                                        val currentIdx = if (currentTrack != null) effectiveQueue.indexOfFirst { it.id == currentTrack?.id } else -1
+                                                        val displayQueue = if (effectiveQueue.size > 25) effectiveQueue.take(25) else effectiveQueue
+
+                                                        Column(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                        ) {
+                                                            displayQueue.forEachIndexed { idx, item ->
+                                                                val isItemCurrent = currentTrack?.id == item.id
+                                                                val isItemPast = currentIdx != -1 && idx < currentIdx
+
+                                                                val itemCover = extractTrackCoverUrl(item)
+                                                                val rawItemTitle = item.title.ifBlank { "Untitled Track" }
+                                                                val displayItemTitle = cleanDisplayTitle(rawItemTitle)
+                                                                val itemArtists = item.artists.joinToString(", ") { it.name }.ifBlank { "Audix Hi-Res" }
+                                                                val itemAlbum = item.album?.title ?: ""
+                                                                val subtitle = if (itemAlbum.isNotBlank()) "$itemArtists • $itemAlbum" else itemArtists
+
+                                                                Row(
+                                                                    modifier = Modifier
+                                                                        .fillMaxWidth()
+                                                                        .clip(RoundedCornerShape(8.dp))
+                                                                        .background(
+                                                                            when {
+                                                                                isItemCurrent -> Color(0xFF38BDF8).copy(alpha = 0.12f)
+                                                                                isItemPast -> Color.White.copy(alpha = 0.02f)
+                                                                                else -> StudioTheme.SurfaceElevated.copy(alpha = 0.6f)
+                                                                            }
+                                                                        )
+                                                                        .border(
+                                                                            1.dp,
+                                                                            when {
+                                                                                isItemCurrent -> Color(0xFF38BDF8).copy(alpha = 0.45f)
+                                                                                else -> StudioTheme.BorderSubtle
+                                                                            },
+                                                                            RoundedCornerShape(8.dp)
+                                                                        )
+                                                                        .pointerHoverIcon(PointerIcon.Hand)
+                                                                        .clickable { viewModel.play(item) }
+                                                                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                ) {
+                                                                    // Track Index / Status Indicator
+                                                                    Text(
+                                                                        "${idx + 1}".padStart(2, '0'),
+                                                                        fontSize = 11.sp,
+                                                                        fontWeight = if (isItemCurrent) FontWeight.Bold else FontWeight.Medium,
+                                                                        color = if (isItemCurrent) Color(0xFF38BDF8) else StudioTheme.TextMuted,
+                                                                        modifier = Modifier.width(22.dp)
+                                                                    )
+
+                                                                    // Artwork Thumbnail
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .size(34.dp)
+                                                                            .clip(RoundedCornerShape(6.dp))
+                                                                            .background(Color.Black.copy(alpha = 0.5f)),
+                                                                        contentAlignment = Alignment.Center
+                                                                    ) {
+                                                                        if (!itemCover.isNullOrBlank()) {
+                                                                            AsyncImage(
+                                                                                model = itemCover,
+                                                                                contentDescription = null,
+                                                                                modifier = Modifier.fillMaxSize(),
+                                                                                contentScale = ContentScale.Crop
+                                                                            )
+                                                                        } else {
+                                                                            Icon(
+                                                                                Icons.Default.MusicNote,
+                                                                                contentDescription = null,
+                                                                                tint = StudioTheme.TextMuted,
+                                                                                modifier = Modifier.size(16.dp)
+                                                                            )
+                                                                        }
+
+                                                                        if (isItemCurrent && isPlaying) {
+                                                                            Box(
+                                                                                modifier = Modifier
+                                                                                    .fillMaxSize()
+                                                                                    .background(Color.Black.copy(alpha = 0.45f)),
+                                                                                contentAlignment = Alignment.Center
+                                                                            ) {
+                                                                                Icon(
+                                                                                    Icons.Default.GraphicEq,
+                                                                                    contentDescription = "Playing",
+                                                                                    tint = Color(0xFF38BDF8),
+                                                                                    modifier = Modifier.size(16.dp)
+                                                                                )
+                                                                            }
+                                                                        }
+                                                                    }
+
+                                                                    Spacer(Modifier.width(10.dp))
+
+                                                                    // Metadata Column
+                                                                    Column(modifier = Modifier.weight(1f)) {
+                                                                        Row(
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                                        ) {
+                                                                            Text(
+                                                                                text = displayItemTitle,
+                                                                                fontSize = 12.5.sp,
+                                                                                fontWeight = if (isItemCurrent) FontWeight.Bold else FontWeight.Medium,
+                                                                                color = when {
+                                                                                    isItemCurrent -> Color.White
+                                                                                    isItemPast -> StudioTheme.TextMuted
+                                                                                    else -> StudioTheme.TextPrimary
+                                                                                },
+                                                                                maxLines = 1,
+                                                                                overflow = TextOverflow.Ellipsis,
+                                                                                modifier = Modifier.weight(1f, fill = false)
+                                                                            )
+
+                                                                            if (isItemCurrent) {
+                                                                                LiquidGlassBox(
+                                                                                    shape = RoundedCornerShape(4.dp),
+                                                                                    backgroundColor = Color(0xFF38BDF8).copy(alpha = 0.18f),
+                                                                                    borderColor = Color(0xFF38BDF8).copy(alpha = 0.45f)
+                                                                                ) {
+                                                                                    Text(
+                                                                                        if (isPlaying) "NOW PLAYING" else "PAUSED",
+                                                                                        fontSize = 8.5.sp,
+                                                                                        fontWeight = FontWeight.Bold,
+                                                                                        color = Color(0xFF38BDF8),
+                                                                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                                                    )
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        Spacer(Modifier.height(1.dp))
+
+                                                                        Text(
+                                                                            text = subtitle,
+                                                                            fontSize = 10.5.sp,
+                                                                            color = if (isItemCurrent) Color(0xFF94A3B8) else StudioTheme.TextMuted,
+                                                                            maxLines = 1,
+                                                                            overflow = TextOverflow.Ellipsis
+                                                                        )
+                                                                    }
+
+                                                                    Spacer(Modifier.width(8.dp))
+
+                                                                    // Duration
+                                                                    val itemDur = item.duration
+                                                                    if (itemDur != null && itemDur > 0L) {
+                                                                        Text(
+                                                                            text = formatDuration(itemDur),
+                                                                            fontSize = 10.5.sp,
+                                                                            fontWeight = FontWeight.Medium,
+                                                                            color = StudioTheme.TextMuted,
+                                                                            modifier = Modifier.padding(end = 4.dp)
+                                                                        )
+                                                                    }
+
+                                                                    // Remove Action Button (available for all except currently playing)
+                                                                    if (!isItemCurrent) {
+                                                                        val qIdx = queue.indexOfFirst { it.id == item.id }
+                                                                        if (qIdx >= 0) {
+                                                                            IconButton(
+                                                                                onClick = { viewModel.removeFromQueue(qIdx) },
+                                                                                modifier = Modifier.size(24.dp)
+                                                                            ) {
+                                                                                Icon(
+                                                                                    Icons.Default.Close,
+                                                                                    contentDescription = "Remove",
+                                                                                    tint = StudioTheme.TextMuted,
+                                                                                    modifier = Modifier.size(13.dp)
+                                                                                )
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            if (effectiveQueue.size > 25) {
+                                                                LiquidGlassBox(
+                                                                    shape = RoundedCornerShape(8.dp),
+                                                                    modifier = Modifier
+                                                                        .fillMaxWidth()
+                                                                        .pointerHoverIcon(PointerIcon.Hand)
+                                                                        .clickable { selectedModalTab = PlayerModalTab.QUEUE },
+                                                                    backgroundColor = StudioTheme.SurfaceElevated,
+                                                                    borderColor = StudioTheme.BorderSubtle
+                                                                ) {
+                                                                    Row(
+                                                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        horizontalArrangement = Arrangement.Center
+                                                                    ) {
+                                                                        Icon(Icons.AutoMirrored.Filled.List, null, tint = Color(0xFF38BDF8), modifier = Modifier.size(14.dp))
+                                                                        Spacer(Modifier.width(6.dp))
+                                                                        Text(
+                                                                            "View all ${effectiveQueue.size} tracks in Full Queue Tab",
+                                                                            fontSize = 11.5.sp,
+                                                                            fontWeight = FontWeight.SemiBold,
+                                                                            color = Color(0xFF38BDF8)
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
 
@@ -2887,14 +3419,16 @@ fun MiniPlayer(
                                             // =========================================================
                                             // TIER 2: TOOLBAR (LANGUAGE SCRIPTS, VIEW MODE & FONT SIZE)
                                             // =========================================================
-                                            LiquidGlassCard(
-                                                shape = RoundedCornerShape(10.dp),
-                                                modifier = Modifier.fillMaxWidth()
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(14.dp))
+                                                    .background(Color(0xFF0F172A).copy(alpha = 0.45f))
+                                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                                                    .padding(horizontal = 16.dp, vertical = 10.dp)
                                             ) {
                                                 Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                                    modifier = Modifier.fillMaxWidth(),
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
@@ -2902,160 +3436,149 @@ fun MiniPlayer(
                                                     if (isHindiTrack) {
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                                                         ) {
                                                             Text(
-                                                                "Script:",
-                                                                fontSize = 11.sp,
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                color = StudioTheme.TextMuted
+                                                                "SCRIPT",
+                                                                fontSize = 10.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = StudioTheme.TextMuted.copy(alpha = 0.7f),
+                                                                letterSpacing = 0.8.sp
                                                             )
 
-                                                            // Segmented capsule
-                                                            LiquidGlassBox(
-                                                                shape = RoundedCornerShape(8.dp)
+                                                            // Clean segmented control
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(10.dp))
+                                                                    .background(Color.Black.copy(alpha = 0.35f))
+                                                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                                                    .padding(3.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
                                                             ) {
-                                                                Row(modifier = Modifier.padding(2.dp)) {
-                                                                    listOf(
-                                                                        "Dual" to "Dual (हिंदी + En)",
-                                                                        "Hindi" to "हिंदी",
-                                                                        "English" to "English"
-                                                                    ).forEach { (langMode, displayLabel) ->
-                                                                        val isSel = lyricsLanguageMode == langMode
-                                                                        Box(
-                                                                            modifier = Modifier
-                                                                                .clip(RoundedCornerShape(6.dp))
-                                                                                .background(if (isSel) Color(0xFF1E293B) else Color.Transparent)
-                                                                                .border(
-                                                                                    1.dp,
-                                                                                    if (isSel) Color(0xFF38BDF8).copy(alpha = 0.6f) else Color.Transparent,
-                                                                                    RoundedCornerShape(6.dp)
-                                                                                )
-                                                                                .pointerHoverIcon(PointerIcon.Hand)
-                                                                                .clickable { lyricsLanguageMode = langMode }
-                                                                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                                                                            contentAlignment = Alignment.Center
-                                                                        ) {
-                                                                            Text(
-                                                                                displayLabel,
-                                                                                fontSize = 10.5.sp,
-                                                                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
-                                                                                color = if (isSel) Color(0xFF38BDF8) else StudioTheme.TextMuted
-                                                                            )
-                                                                        }
+                                                                listOf(
+                                                                    "Dual" to "Dual (हिंदी + En)",
+                                                                    "Hindi" to "हिंदी",
+                                                                    "English" to "English"
+                                                                ).forEach { (langMode, displayLabel) ->
+                                                                    val isSel = lyricsLanguageMode == langMode
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .clip(RoundedCornerShape(7.dp))
+                                                                            .background(if (isSel) Color(0xFF38BDF8).copy(alpha = 0.18f) else Color.Transparent)
+                                                                            .pointerHoverIcon(PointerIcon.Hand)
+                                                                            .clickable { lyricsLanguageMode = langMode }
+                                                                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                                                                        contentAlignment = Alignment.Center
+                                                                    ) {
+                                                                        Text(
+                                                                            displayLabel,
+                                                                            fontSize = 11.sp,
+                                                                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                                            color = if (isSel) Color(0xFF38BDF8) else StudioTheme.TextMuted
+                                                                        )
                                                                     }
                                                                 }
                                                             }
                                                         }
                                                     } else {
-                                                        LiquidGlassBox(
-                                                            shape = RoundedCornerShape(6.dp)
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
                                                         ) {
-                                                            Row(
-                                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                                verticalAlignment = Alignment.CenterVertically,
-                                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                            ) {
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .size(5.dp)
-                                                                        .clip(CircleShape)
-                                                                        .background(Color(0xFF38BDF8))
-                                                                )
-                                                                Text(
-                                                                    "ENGLISH LYRICS",
-                                                                    fontSize = 10.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    color = StudioTheme.TextSecondary,
-                                                                    letterSpacing = 0.4.sp
-                                                                )
-                                                            }
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(7.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(Color(0xFF38BDF8))
+                                                            )
+                                                            Text(
+                                                                "ORIGINAL LYRICS",
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = Color(0xFF94A3B8),
+                                                                letterSpacing = 0.8.sp
+                                                            )
                                                         }
                                                     }
 
                                                     // Right: Mode (Synced / Plain) & Font Size (S / M / L)
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                                                     ) {
-                                                        // Mode Segmented Capsule
-                                                        LiquidGlassBox(
-                                                            shape = RoundedCornerShape(8.dp)
+                                                        // Mode Segmented Capsule (Synced vs Plain)
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(10.dp))
+                                                                .background(Color.Black.copy(alpha = 0.35f))
+                                                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                                                .padding(3.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
                                                         ) {
-                                                            Row(modifier = Modifier.padding(2.dp)) {
-                                                                // Synced
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .clip(RoundedCornerShape(6.dp))
-                                                                        .background(if (lyricsModeTimed) Color(0xFF1E293B) else Color.Transparent)
-                                                                        .border(
-                                                                            1.dp,
-                                                                            if (lyricsModeTimed) StudioTheme.BorderStrong else Color.Transparent,
-                                                                            RoundedCornerShape(6.dp)
-                                                                        )
-                                                                        .pointerHoverIcon(PointerIcon.Hand)
-                                                                        .clickable { lyricsModeTimed = true }
-                                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                                ) {
-                                                                    Text(
-                                                                        "Synced",
-                                                                        fontSize = 10.5.sp,
-                                                                        fontWeight = if (lyricsModeTimed) FontWeight.Bold else FontWeight.Normal,
-                                                                        color = if (lyricsModeTimed) StudioTheme.TextPrimary else StudioTheme.TextMuted
-                                                                    )
-                                                                }
+                                                            // Synced
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(7.dp))
+                                                                    .background(if (lyricsModeTimed) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+                                                                    .pointerHoverIcon(PointerIcon.Hand)
+                                                                    .clickable { lyricsModeTimed = true }
+                                                                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Text(
+                                                                    "Synced",
+                                                                    fontSize = 11.5.sp,
+                                                                    fontWeight = if (lyricsModeTimed) FontWeight.SemiBold else FontWeight.Normal,
+                                                                    color = if (lyricsModeTimed) Color.White else Color(0xFF94A3B8)
+                                                                )
+                                                            }
 
-                                                                // Plain
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .clip(RoundedCornerShape(6.dp))
-                                                                        .background(if (!lyricsModeTimed) Color(0xFF1E293B) else Color.Transparent)
-                                                                        .border(
-                                                                            1.dp,
-                                                                            if (!lyricsModeTimed) StudioTheme.BorderStrong else Color.Transparent,
-                                                                            RoundedCornerShape(6.dp)
-                                                                        )
-                                                                        .pointerHoverIcon(PointerIcon.Hand)
-                                                                        .clickable { lyricsModeTimed = false }
-                                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                                ) {
-                                                                    Text(
-                                                                        "Plain",
-                                                                        fontSize = 10.5.sp,
-                                                                        fontWeight = if (!lyricsModeTimed) FontWeight.Bold else FontWeight.Normal,
-                                                                        color = if (!lyricsModeTimed) StudioTheme.TextPrimary else StudioTheme.TextMuted
-                                                                    )
-                                                                }
+                                                            // Plain
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(7.dp))
+                                                                    .background(if (!lyricsModeTimed) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+                                                                    .pointerHoverIcon(PointerIcon.Hand)
+                                                                    .clickable { lyricsModeTimed = false }
+                                                                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Text(
+                                                                    "Plain",
+                                                                    fontSize = 11.5.sp,
+                                                                    fontWeight = if (!lyricsModeTimed) FontWeight.SemiBold else FontWeight.Normal,
+                                                                    color = if (!lyricsModeTimed) Color.White else Color(0xFF94A3B8)
+                                                                )
                                                             }
                                                         }
 
-                                                        // Size Segmented Capsule
-                                                        LiquidGlassBox(
-                                                            shape = RoundedCornerShape(8.dp)
+                                                        // Size Segmented Capsule (S / M / L)
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(10.dp))
+                                                                .background(Color.Black.copy(alpha = 0.35f))
+                                                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                                                .padding(3.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
                                                         ) {
-                                                            Row(modifier = Modifier.padding(2.dp)) {
-                                                                listOf("S" to "Small", "M" to "Medium", "L" to "Large").forEach { (label, name) ->
-                                                                    val isSelected = lyricsFontSize == name
-                                                                    Box(
-                                                                        modifier = Modifier
-                                                                            .clip(RoundedCornerShape(6.dp))
-                                                                            .background(if (isSelected) Color(0xFF1E293B) else Color.Transparent)
-                                                                            .border(
-                                                                                1.dp,
-                                                                                if (isSelected) StudioTheme.BorderStrong else Color.Transparent,
-                                                                                RoundedCornerShape(6.dp)
-                                                                            )
-                                                                            .pointerHoverIcon(PointerIcon.Hand)
-                                                                            .clickable { lyricsFontSize = name }
-                                                                            .padding(horizontal = 7.dp, vertical = 4.dp)
-                                                                    ) {
-                                                                        Text(
-                                                                            label,
-                                                                            fontSize = 10.5.sp,
-                                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                                            color = if (isSelected) StudioTheme.TextPrimary else StudioTheme.TextMuted
-                                                                        )
-                                                                    }
+                                                            listOf("S" to "Small", "M" to "Medium", "L" to "Large").forEach { (label, name) ->
+                                                                val isSelected = lyricsFontSize == name
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(RoundedCornerShape(7.dp))
+                                                                        .background(if (isSelected) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+                                                                        .pointerHoverIcon(PointerIcon.Hand)
+                                                                        .clickable { lyricsFontSize = name }
+                                                                        .padding(horizontal = 11.dp, vertical = 5.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Text(
+                                                                        label,
+                                                                        fontSize = 11.5.sp,
+                                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                                        color = if (isSelected) Color.White else Color(0xFF94A3B8)
+                                                                    )
                                                                 }
                                                             }
                                                         }
@@ -3084,7 +3607,7 @@ fun MiniPlayer(
                                                         contentPadding = PaddingValues(vertical = 16.dp),
                                                         verticalArrangement = Arrangement.spacedBy(14.dp)
                                                     ) {
-                                                         itemsIndexed(resolvedLyrics) { _, item ->
+                                                         itemsIndexed(resolvedLyrics, key = { idx, _ -> "$idx" }) { _, item ->
                                                             val dual = HindiLyricsProcessor.formatDualLine(item.text, isHindiTrack)
                                                             Column(
                                                                 modifier = Modifier
@@ -3171,7 +3694,7 @@ fun MiniPlayer(
                                                             contentPadding = PaddingValues(vertical = 28.dp, horizontal = 6.dp),
                                                             verticalArrangement = Arrangement.spacedBy(8.dp)
                                                         ) {
-                                                            itemsIndexed(resolvedLyrics) { idx, item ->
+                                                            itemsIndexed(resolvedLyrics, key = { idx, _ -> "$idx" }) { idx, item ->
                                                                 val isCurrent = idx == effectiveActiveIndex
                                                                 val dual = HindiLyricsProcessor.formatDualLine(item.text, isHindiTrack)
 
@@ -3375,7 +3898,7 @@ fun MiniPlayer(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        items(eqPresets) { preset ->
+                                        items(eqPresets, key = { it }) { preset ->
                                             val isSelected = selectedEqPreset == preset
                                             LiquidGlassBox(
                                                 shape = RoundedCornerShape(8.dp),
@@ -3640,186 +4163,262 @@ fun MiniPlayer(
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     // Toolbar (Mode, Font Size, Alignment, Offset Tuner, Copy, Provider)
-                                    LiquidGlassCard(
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.fillMaxWidth()
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(Color(0xFF0F172A).copy(alpha = 0.45f))
+                                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                                            .padding(horizontal = 16.dp, vertical = 10.dp)
                                     ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            // Mode toggle & Language Badge
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                LiquidGlassBox(
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    borderColor = if (lyricsModeTimed) StudioTheme.BorderStrong else StudioTheme.BorderSubtle,
-                                                    modifier = Modifier.clickable { lyricsModeTimed = true }
+                                            // Top Row: Mode & Scripts on Left, Action buttons on Right
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Left: Mode & Scripts
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                                 ) {
-                                                    Text("Karaoke Synced", fontSize = 11.sp, color = if (lyricsModeTimed) StudioTheme.TextPrimary else StudioTheme.TextSecondary, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
-                                                }
-                                                Spacer(Modifier.width(6.dp))
-                                                LiquidGlassBox(
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    borderColor = if (!lyricsModeTimed) StudioTheme.BorderStrong else StudioTheme.BorderSubtle,
-                                                    modifier = Modifier.clickable { lyricsModeTimed = false }
-                                                ) {
-                                                    Text("Plain Text", fontSize = 11.sp, color = if (!lyricsModeTimed) StudioTheme.TextPrimary else StudioTheme.TextSecondary, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
-                                                }
-
-                                                Spacer(Modifier.width(10.dp))
-
-                                                // Language indicator badge
-                                                LiquidGlassBox(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    borderColor = if (isHindiTrack) Color(0xFF38BDF8).copy(alpha = 0.5f) else StudioTheme.BorderSubtle
-                                                ) {
-                                                    Text(
-                                                        text = if (isHindiTrack) "HINDI + ENGLISH" else "ENGLISH LYRICS",
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = if (isHindiTrack) Color(0xFF38BDF8) else StudioTheme.TextSecondary,
-                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                                                        letterSpacing = 0.4.sp
-                                                    )
-                                                }
-
-                                                // Language Mode Selector for Hindi tracks
-                                                if (isHindiTrack) {
-                                                    Spacer(Modifier.width(8.dp))
-                                                    listOf("Dual", "Hindi", "English").forEach { langMode ->
-                                                        val isSel = lyricsLanguageMode == langMode
-                                                        LiquidGlassBox(
-                                                            shape = RoundedCornerShape(5.dp),
-                                                            borderColor = if (isSel) Color(0xFF38BDF8).copy(alpha = 0.6f) else StudioTheme.BorderSubtle,
+                                                    // Segmented Mode Capsule
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(10.dp))
+                                                            .background(Color.Black.copy(alpha = 0.35f))
+                                                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                                            .padding(3.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Box(
                                                             modifier = Modifier
+                                                                .clip(RoundedCornerShape(7.dp))
+                                                                .background(if (lyricsModeTimed) Color.White.copy(alpha = 0.14f) else Color.Transparent)
                                                                 .pointerHoverIcon(PointerIcon.Hand)
-                                                                .clickable { lyricsLanguageMode = langMode }
-                                                                .padding(horizontal = 2.dp)
+                                                                .clickable { lyricsModeTimed = true }
+                                                                .padding(horizontal = 12.dp, vertical = 5.dp),
+                                                            contentAlignment = Alignment.Center
                                                         ) {
+                                                            Text("Karaoke Synced", fontSize = 11.5.sp, color = if (lyricsModeTimed) Color.White else Color(0xFF94A3B8), fontWeight = if (lyricsModeTimed) FontWeight.SemiBold else FontWeight.Normal)
+                                                        }
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(7.dp))
+                                                                .background(if (!lyricsModeTimed) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+                                                                .pointerHoverIcon(PointerIcon.Hand)
+                                                                .clickable { lyricsModeTimed = false }
+                                                                .padding(horizontal = 12.dp, vertical = 5.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text("Plain Text", fontSize = 11.5.sp, color = if (!lyricsModeTimed) Color.White else Color(0xFF94A3B8), fontWeight = if (!lyricsModeTimed) FontWeight.SemiBold else FontWeight.Normal)
+                                                        }
+                                                    }
+
+                                                    // Language Mode Selector for Hindi tracks
+                                                    if (isHindiTrack) {
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(10.dp))
+                                                                .background(Color.Black.copy(alpha = 0.35f))
+                                                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                                                .padding(3.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            listOf(
+                                                                "Dual" to "Dual (हिंदी + En)",
+                                                                "Hindi" to "हिंदी",
+                                                                "English" to "English"
+                                                            ).forEach { (langMode, displayLabel) ->
+                                                                val isSel = lyricsLanguageMode == langMode
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(RoundedCornerShape(7.dp))
+                                                                        .background(if (isSel) Color(0xFF38BDF8).copy(alpha = 0.18f) else Color.Transparent)
+                                                                        .pointerHoverIcon(PointerIcon.Hand)
+                                                                        .clickable { lyricsLanguageMode = langMode }
+                                                                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Text(
+                                                                        displayLabel,
+                                                                        fontSize = 11.sp,
+                                                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                                        color = if (isSel) Color(0xFF38BDF8) else StudioTheme.TextMuted
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                            modifier = Modifier.padding(horizontal = 6.dp)
+                                                        ) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(6.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(Color(0xFF38BDF8))
+                                                            )
                                                             Text(
-                                                                langMode,
-                                                                fontSize = 10.sp,
-                                                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
-                                                                color = if (isSel) Color(0xFF38BDF8) else StudioTheme.TextMuted,
-                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                                                "ORIGINAL LYRICS",
+                                                                fontSize = 10.5.sp,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = Color(0xFF94A3B8),
+                                                                letterSpacing = 0.6.sp
                                                             )
                                                         }
                                                     }
                                                 }
-                                            }
 
-                                            // Font size zoom
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text("Size:", fontSize = 11.sp, color = StudioTheme.TextMuted)
-                                                Spacer(Modifier.width(6.dp))
-                                                listOf("Small", "Medium", "Large").forEach { sz ->
-                                                    val isSzSelected = lyricsFontSize == sz
-                                                    LiquidGlassBox(
-                                                        shape = RoundedCornerShape(6.dp),
-                                                        borderColor = if (isSzSelected) StudioTheme.BorderStrong else StudioTheme.BorderSubtle,
-                                                        modifier = Modifier.clickable { lyricsFontSize = sz }.padding(horizontal = 2.dp)
+                                                // Right: Actions (Re-sync, Copy All)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    // Re-sync Button
+                                                    OutlinedButton(
+                                                        onClick = { triggerReloadLyrics() },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
+                                                        colors = ButtonDefaults.outlinedButtonColors(
+                                                            containerColor = StudioTheme.SurfaceElevated,
+                                                            contentColor = StudioTheme.TextSecondary
+                                                        ),
+                                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                                     ) {
-                                                        Text(sz, fontSize = 10.sp, color = if (isSzSelected) StudioTheme.TextPrimary else StudioTheme.TextSecondary, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp))
+                                                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(13.dp), tint = if (isFetchingOnlineLyrics) StudioTheme.AccentPrimary else StudioTheme.TextSecondary)
+                                                        Spacer(Modifier.width(5.dp))
+                                                        Text(if (isFetchingOnlineLyrics) "Syncing..." else "Re-sync", fontSize = 11.sp)
+                                                    }
+
+                                                    // Copy All Lyrics Button
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            val textToCopy = resolvedLyrics.joinToString("\n\n") { item ->
+                                                                val dual = HindiLyricsProcessor.formatDualLine(item.text, isHindiTrack)
+                                                                if (isHindiTrack) {
+                                                                    when (lyricsLanguageMode) {
+                                                                        "Hindi" -> dual.hindiText.ifBlank { dual.englishText }
+                                                                        "English" -> dual.englishText.ifBlank { dual.hindiText }
+                                                                        else -> "${dual.hindiText}\n${dual.englishText}".trim()
+                                                                    }
+                                                                } else {
+                                                                    dual.englishText.ifBlank { item.text }
+                                                                }
+                                                            }
+                                                            StudioStorage.copyToClipboard(textToCopy)
+                                                            copyLyricsFeedback = true
+                                                        },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
+                                                        colors = ButtonDefaults.outlinedButtonColors(
+                                                            containerColor = StudioTheme.SurfaceElevated,
+                                                            contentColor = StudioTheme.TextSecondary
+                                                        ),
+                                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                                    ) {
+                                                        Icon(if (copyLyricsFeedback) Icons.Default.Check else Icons.Default.ContentCopy, null, modifier = Modifier.size(13.dp), tint = if (copyLyricsFeedback) StudioTheme.AccentPrimary else StudioTheme.TextSecondary)
+                                                        Spacer(Modifier.width(5.dp))
+                                                        Text(if (copyLyricsFeedback) "Copied!" else "Copy All", fontSize = 11.sp)
                                                     }
                                                 }
                                             }
 
-                                            // Micro-Tuner Offset
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text("Sync Offset:", fontSize = 11.sp, color = StudioTheme.TextMuted)
-                                                Spacer(Modifier.width(6.dp))
-                                                OutlinedButton(
-                                                    onClick = { lyricsOffsetMs -= 100L },
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                                    border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
-                                                    colors = ButtonDefaults.outlinedButtonColors(
-                                                        containerColor = StudioTheme.SurfaceElevated,
-                                                        contentColor = StudioTheme.TextSecondary
-                                                    )
+                                            // Bottom Row: Sync Micro-Tuner on Left, Size on Right
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Left: Micro-Tuner Offset
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                 ) {
-                                                    Text("-100ms", fontSize = 10.sp, color = StudioTheme.TextSecondary)
-                                                }
-                                                Spacer(Modifier.width(6.dp))
-                                                Text("${lyricsOffsetMs}ms", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = StudioTheme.AccentPrimary)
-                                                Spacer(Modifier.width(6.dp))
-                                                OutlinedButton(
-                                                    onClick = { lyricsOffsetMs += 100L },
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                                    border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
-                                                    colors = ButtonDefaults.outlinedButtonColors(
-                                                        containerColor = StudioTheme.SurfaceElevated,
-                                                        contentColor = StudioTheme.TextSecondary
-                                                    )
-                                                ) {
-                                                    Text("+100ms", fontSize = 10.sp, color = StudioTheme.TextSecondary)
-                                                }
-                                                if (lyricsOffsetMs != 0L) {
-                                                    Spacer(Modifier.width(6.dp))
+                                                    Text("Sync Offset:", fontSize = 11.sp, color = StudioTheme.TextMuted)
                                                     OutlinedButton(
-                                                        onClick = { lyricsOffsetMs = 0L },
+                                                        onClick = { lyricsOffsetMs -= 100L },
                                                         shape = RoundedCornerShape(6.dp),
-                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                                         border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
                                                         colors = ButtonDefaults.outlinedButtonColors(
                                                             containerColor = StudioTheme.SurfaceElevated,
                                                             contentColor = StudioTheme.TextSecondary
                                                         )
                                                     ) {
-                                                        Text("0ms", fontSize = 10.sp, color = StudioTheme.TextSecondary)
+                                                        Text("-100ms", fontSize = 10.5.sp, color = StudioTheme.TextSecondary)
                                                     }
-                                                }
-                                            }
-
-                                            // Re-sync Button
-                                            OutlinedButton(
-                                                onClick = { triggerReloadLyrics() },
-                                                shape = RoundedCornerShape(6.dp),
-                                                border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
-                                                colors = ButtonDefaults.outlinedButtonColors(
-                                                    containerColor = StudioTheme.SurfaceElevated,
-                                                    contentColor = StudioTheme.TextSecondary
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                                            ) {
-                                                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(12.dp), tint = if (isFetchingOnlineLyrics) StudioTheme.AccentPrimary else StudioTheme.TextSecondary)
-                                                Spacer(Modifier.width(5.dp))
-                                                Text(if (isFetchingOnlineLyrics) "Syncing..." else "Re-sync", fontSize = 11.sp)
-                                            }
-
-                                            // Copy All Lyrics Button
-                                            OutlinedButton(
-                                                onClick = {
-                                                    val textToCopy = resolvedLyrics.joinToString("\n\n") { item ->
-                                                        val dual = HindiLyricsProcessor.formatDualLine(item.text, isHindiTrack)
-                                                        if (isHindiTrack) {
-                                                            when (lyricsLanguageMode) {
-                                                                "Hindi" -> dual.hindiText.ifBlank { dual.englishText }
-                                                                "English" -> dual.englishText.ifBlank { dual.hindiText }
-                                                                else -> "${dual.hindiText}\n${dual.englishText}".trim()
-                                                            }
-                                                        } else {
-                                                            dual.englishText.ifBlank { item.text }
+                                                    Text(
+                                                        "${lyricsOffsetMs}ms",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (lyricsOffsetMs != 0L) StudioTheme.AccentPrimary else StudioTheme.TextMuted,
+                                                        modifier = Modifier.padding(horizontal = 4.dp)
+                                                    )
+                                                    OutlinedButton(
+                                                        onClick = { lyricsOffsetMs += 100L },
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                        border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
+                                                        colors = ButtonDefaults.outlinedButtonColors(
+                                                            containerColor = StudioTheme.SurfaceElevated,
+                                                            contentColor = StudioTheme.TextSecondary
+                                                        )
+                                                    ) {
+                                                        Text("+100ms", fontSize = 10.5.sp, color = StudioTheme.TextSecondary)
+                                                    }
+                                                    if (lyricsOffsetMs != 0L) {
+                                                        OutlinedButton(
+                                                            onClick = { lyricsOffsetMs = 0L },
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                            border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
+                                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                                containerColor = StudioTheme.SurfaceElevated,
+                                                                contentColor = StudioTheme.TextSecondary
+                                                            )
+                                                        ) {
+                                                            Text("Reset", fontSize = 10.5.sp, color = StudioTheme.TextSecondary)
                                                         }
                                                     }
-                                                    StudioStorage.copyToClipboard(textToCopy)
-                                                    copyLyricsFeedback = true
-                                                },
-                                                shape = RoundedCornerShape(6.dp),
-                                                border = BorderStroke(1.dp, StudioTheme.BorderSubtle),
-                                                colors = ButtonDefaults.outlinedButtonColors(
-                                                    containerColor = StudioTheme.SurfaceElevated,
-                                                    contentColor = StudioTheme.TextSecondary
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                                            ) {
-                                                Icon(if (copyLyricsFeedback) Icons.Default.Check else Icons.Default.ContentCopy, null, modifier = Modifier.size(12.dp), tint = if (copyLyricsFeedback) StudioTheme.AccentPrimary else StudioTheme.TextSecondary)
-                                                Spacer(Modifier.width(5.dp))
-                                                Text(if (copyLyricsFeedback) "Copied!" else "Copy All", fontSize = 11.sp)
+                                                }
+
+                                                // Right: Font size zoom
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Text("Size:", fontSize = 11.sp, color = StudioTheme.TextMuted)
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(Color.Black.copy(alpha = 0.35f))
+                                                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                                            .padding(3.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        listOf("Small", "Medium", "Large").forEach { sz ->
+                                                            val isSzSelected = lyricsFontSize == sz
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(6.dp))
+                                                                    .background(if (isSzSelected) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+                                                                    .pointerHoverIcon(PointerIcon.Hand)
+                                                                    .clickable { lyricsFontSize = sz }
+                                                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Text(sz, fontSize = 10.5.sp, color = if (isSzSelected) Color.White else Color(0xFF94A3B8), fontWeight = if (isSzSelected) FontWeight.Bold else FontWeight.Normal)
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -4242,7 +4841,7 @@ fun MiniPlayer(
                                                 modifier = Modifier.fillMaxSize().padding(8.dp),
                                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                                             ) {
-                                                itemsIndexed(queue) { idx, item ->
+                                                itemsIndexed(queue, key = { idx, item -> "${item.id}_$idx" }) { idx, item ->
                                                     val isItemCurrent = currentTrack?.id == item.id
                                                     Row(
                                                         modifier = Modifier
@@ -4447,7 +5046,7 @@ fun MiniPlayer(
                                             )
                                             Spacer(Modifier.height(8.dp))
                                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                items(savedPlaylists) { pl ->
+                                                items(savedPlaylists, key = { it }) { pl ->
                                                     val isSelected = selectedPlaylist == pl
                                                     LiquidGlassBox(
                                                         shape = RoundedCornerShape(6.dp),
@@ -4514,8 +5113,10 @@ fun MiniPlayer(
                                                     Button(
                                                         onClick = {
                                                             try {
-                                                                if (Desktop.isDesktopSupported()) {
-                                                                    Desktop.getDesktop().open(StudioStorage.downloadsDir)
+                                                                val dir = StudioStorage.downloadsDir.canonicalFile
+                                                                if (!dir.exists()) dir.mkdirs()
+                                                                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+                                                                    Desktop.getDesktop().open(dir)
                                                                 }
                                                             } catch (e: Throwable) { e.printStackTrace() }
                                                         },
@@ -4884,44 +5485,14 @@ fun MiniPlayer(
 
                                             // 18-Bar Spectrum animation (Volume & Play-state responsive)
                                             if (visualizerEnabled) {
-                                                LiquidGlassBox(
-                                                    shape = RoundedCornerShape(8.dp),
+                                                FullscreenModalAudioVisualizer(
+                                                    isPlaying = isPlaying,
+                                                    volume = volume,
+                                                    visualizerTheme = visualizerTheme,
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .height(72.dp)
-                                                ) {
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxSize()
-                                                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.Bottom
-                                                    ) {
-                                                        val barColor = when (visualizerTheme) {
-                                                            "Silver Slate" -> Color(0xFFB4B4B4)
-                                                            "Mono Wire" -> Color(0xFFE0E0E0)
-                                                            "Graphite Dark" -> Color(0xFF707070)
-                                                            else -> Color(0xFFFFFFFF)
-                                                        }
-
-                                                        for (i in 0 until 18) {
-                                                            val barHeight = if (isPlaying) {
-                                                                val wave = (kotlin.math.sin(animPhase + i * 0.45f) + 1f) / 2f
-                                                                val volFactor = volume.coerceIn(0.2f, 1f)
-                                                                (wave * 42f * volFactor + 5f).dp
-                                                            } else {
-                                                                4.dp
-                                                            }
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .width(20.dp)
-                                                                    .height(barHeight)
-                                                                    .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                                                                    .background(barColor)
-                                                            )
-                                                        }
-                                                    }
-                                                }
+                                                )
                                             }
                                         }
                                     }

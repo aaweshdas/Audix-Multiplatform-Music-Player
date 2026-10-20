@@ -572,13 +572,13 @@ fun ExtensionsScreen(
                                 Icon(
                                     tab.icon,
                                     contentDescription = null,
-                                    tint = if (isSelected) Color.Black else Color.White.copy(alpha = 0.6f),
+                                    tint = Color.White,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = tab.title,
-                                    color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.6f),
+                                    color = Color.White,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 13.sp
                                 )
@@ -593,7 +593,7 @@ fun ExtensionsScreen(
                                             text = allInstalledList.size.toString(),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) Color.Black else Color.White,
+                                            color = Color.White,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                                         )
                                     }
@@ -651,7 +651,7 @@ fun ExtensionsScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(ExtensionCategoryFilter.entries) { cat ->
+            items(ExtensionCategoryFilter.entries, key = { it.name }) { cat ->
                 val isSelected = selectedCategory == cat
                 LiquidGlassBox(
                     shape = RoundedCornerShape(8.dp),

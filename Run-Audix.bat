@@ -1,4 +1,4 @@
 @echo off
-setlocal
-call "%~dp0Run.bat" --flavor=audix %*
+title Audix Desktop
+call "%~dp0Run-Audix-Desktop.bat" %*
 exit /b %ERRORLEVEL%

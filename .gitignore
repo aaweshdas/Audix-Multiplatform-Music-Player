@@ -23,3 +23,7 @@ scratch/
 runtime/
 airplay_crop.png
 test_airplay.png
+audix_live.png
+__pycache__/
+*.pyc
+Background Image/

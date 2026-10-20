@@ -11,12 +11,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
+import uk.co.caprica.vlcj.player.base.callback.AudioCallback
 import uk.co.caprica.vlcj.player.component.AudioPlayerComponent
+import com.sun.jna.Pointer
+import javax.sound.sampled.AudioFormat
+import javax.sound.sampled.AudioSystem
+import javax.sound.sampled.DataLine
+import javax.sound.sampled.SourceDataLine
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * AudioPlayer implementation backed by vlcj / libVLC.
@@ -49,7 +58,11 @@ class VlcAudioPlayer(
     private val _isPlaying = MutableStateFlow(false)
     override val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
-    private val _volume = MutableStateFlow(1.0f)
+    private val initialVol = runCatching {
+        val v = (settings?.getInt("user_volume_percent", 85) ?: 85)
+        if (v <= 5) 85 else v
+    }.getOrDefault(85).coerceIn(10, 100) / 100f
+    private val _volume = MutableStateFlow(initialVol)
     override val volume: StateFlow<Float> = _volume.asStateFlow()
 
     private val _repeatMode = MutableStateFlow(RepeatMode.NONE)
@@ -64,7 +77,34 @@ class VlcAudioPlayer(
     private var currentEqualizer: uk.co.caprica.vlcj.player.base.Equalizer? = null
 
     private var activeSources: List<Streamable.Source.Http> = emptyList()
-    private var activeSourceIndex: Int = 0
+    private val activeSourceIndex = java.util.concurrent.atomic.AtomicInteger(0)
+    private val failoverMutex = kotlinx.coroutines.sync.Mutex()
+
+    private fun failoverToNextSource(reason: String, resumePosMs: Long = 0L) {
+        scope.launch(Dispatchers.IO) {
+            if (failoverMutex.tryLock()) {
+                try {
+                    val currentIdx = activeSourceIndex.get()
+                    val nextIdx = currentIdx + 1
+                    val sources = activeSources
+                    if (nextIdx < sources.size && activeSourceIndex.compareAndSet(currentIdx, nextIdx)) {
+                        val nextSource = sources[nextIdx]
+                        println("[VlcAudioPlayer] Auto-failing over to alternative source #$nextIdx ($reason): ${nextSource.title} (${nextSource.quality} kbps)")
+                        playHttpSource(nextSource)
+                        if (resumePosMs > 0L) {
+                            delay(200L)
+                            seekTo(resumePosMs)
+                        }
+                    } else if (nextIdx >= sources.size) {
+                        _state.value = PlayerState.error(Exception("VLC playback error on all available stream sources ($reason)"))
+                        _isPlaying.value = false
+                    }
+                } finally {
+                    failoverMutex.unlock()
+                }
+            }
+        }
+    }
 
     // VLC player — lazily initialized to avoid crashing if VLC isn't installed
     private val vlcAvailable: Boolean by lazy {
@@ -76,7 +116,27 @@ class VlcAudioPlayer(
 
             val candidateDirs = mutableListOf<java.io.File>()
 
-            // 1. Highest Priority: Official System VideoLAN installation paths
+            // 1. Highest Priority: Application-bundled runtime VLC directories (portable & installed priority)
+            if (codeSourceDir != null) {
+                candidateDirs.add(java.io.File(codeSourceDir, "runtime/vlc"))
+                candidateDirs.add(java.io.File(codeSourceDir, "../runtime/vlc"))
+                candidateDirs.add(java.io.File(codeSourceDir, "../../runtime/vlc"))
+                candidateDirs.add(java.io.File(codeSourceDir, "vlc"))
+            }
+            val appBaseDir = java.io.File(userDir).canonicalFile
+            candidateDirs.add(java.io.File(appBaseDir, "runtime/vlc"))
+            candidateDirs.add(java.io.File(appBaseDir, "release-artifacts/Audix-Windows-Portable/runtime/vlc"))
+            candidateDirs.add(java.io.File(appBaseDir, "desktopApp/build/compose/binaries/main/app/Audix/runtime/vlc"))
+            candidateDirs.add(java.io.File(appBaseDir, "app/runtime/vlc"))
+
+            // Installed application locations
+            System.getenv("ProgramFiles")?.let { candidateDirs.add(java.io.File(it, "Audix/runtime/vlc")) }
+            System.getenv("ProgramFiles(x86)")?.let { candidateDirs.add(java.io.File(it, "Audix/runtime/vlc")) }
+            System.getenv("LOCALAPPDATA")?.let { candidateDirs.add(java.io.File(it, "Programs/Audix/runtime/vlc")) }
+            candidateDirs.add(java.io.File("C:\\Program Files\\Audix\\runtime\\vlc"))
+            candidateDirs.add(java.io.File("C:\\Program Files (x86)\\Audix\\runtime\\vlc"))
+
+            // 2. Fallback: Official System VideoLAN installation paths
             candidateDirs.add(java.io.File("C:\\Program Files\\VideoLAN\\VLC"))
             candidateDirs.add(java.io.File("C:\\Program Files (x86)\\VideoLAN\\VLC"))
             System.getenv("PROGRAMFILES")?.let { candidateDirs.add(java.io.File("$it\\VideoLAN\\VLC")) }
@@ -85,16 +145,6 @@ class VlcAudioPlayer(
                 val p = java.io.File(it)
                 candidateDirs.add(p.parentFile ?: p)
             }
-
-            // 2. Application-bundled runtime VLC directories (canonical check)
-            if (codeSourceDir != null) {
-                candidateDirs.add(java.io.File(codeSourceDir, "runtime/vlc"))
-                candidateDirs.add(java.io.File(codeSourceDir, "../runtime/vlc"))
-                candidateDirs.add(java.io.File(codeSourceDir, "../../runtime/vlc"))
-            }
-            val appBaseDir = java.io.File(userDir).canonicalFile
-            candidateDirs.add(java.io.File(appBaseDir, "runtime/vlc"))
-            candidateDirs.add(java.io.File(appBaseDir, "release-artifacts/Audix-Windows-Portable/runtime/vlc"))
 
             var foundDirect = false
             for (dir in candidateDirs) {
@@ -128,7 +178,27 @@ class VlcAudioPlayer(
             println("[VlcAudioPlayer] Event: PLAYING for ${_currentTrack.value?.title}")
             _state.value = PlayerState.PLAYING
             _isPlaying.value = true
+            runCatching { sourceDataLine?.start() }
             scope.launch(Dispatchers.IO) {
+                val targetVol = (_volume.value * 100).toInt().coerceIn(1, 100)
+                // Immediate enforcement upon device open
+                runCatching {
+                    player?.audio()?.setVolume(targetVol)
+                    player?.audio()?.setMute(false)
+                }
+                // Delay 80ms for WASAPI audio device initialization handshake
+                delay(80L)
+                runCatching {
+                    player?.audio()?.setVolume(targetVol)
+                    player?.audio()?.setMute(false)
+                }
+                // Delay 220ms reinforcement
+                delay(140L)
+                runCatching {
+                    player?.audio()?.setVolume(targetVol)
+                    player?.audio()?.setMute(false)
+                }
+
                 if (currentPlaybackRate != 1.0f) {
                     runCatching { player?.controls()?.setRate(currentPlaybackRate) }
                 }
@@ -142,6 +212,10 @@ class VlcAudioPlayer(
             println("[VlcAudioPlayer] Event: PAUSED")
             _state.value = PlayerState.PAUSED
             _isPlaying.value = false
+            runCatching {
+                sourceDataLine?.stop()
+                AudioVisualizerManager.onPlaybackPaused()
+            }
         }
 
         override fun stopped(mp: MediaPlayer) {
@@ -150,12 +224,34 @@ class VlcAudioPlayer(
                 _state.value = PlayerState.IDLE
             }
             _isPlaying.value = false
+            runCatching {
+                sourceDataLine?.stop()
+                sourceDataLine?.flush()
+                AudioVisualizerManager.clear()
+            }
         }
 
         override fun finished(mp: MediaPlayer) {
             println("[VlcAudioPlayer] Event: FINISHED for ${_currentTrack.value?.title}")
+            val curPos = _positionMs.value
+            val curDur = _durationMs.value
+            // If the track is longer than 15s and stopped more than 5s before the actual end,
+            // this is a premature HTTP buffer underrun/EOF rather than genuine completion!
+            if (curDur > 15_000L && curPos < (curDur - 5_000L)) {
+                val sources = activeSources
+                if (activeSourceIndex.get() + 1 < sources.size) {
+                    println("[VlcAudioPlayer] Warning: Stream EOF reached prematurely at ${curPos}ms of ${curDur}ms. Guarding against false track skip.")
+                    failoverToNextSource("Premature EOF", resumePosMs = curPos)
+                    return
+                }
+            }
             _state.value = PlayerState.ENDED
             _isPlaying.value = false
+            runCatching {
+                sourceDataLine?.stop()
+                sourceDataLine?.flush()
+                AudioVisualizerManager.clear()
+            }
         }
 
         override fun buffering(mp: MediaPlayer, newCache: Float) {
@@ -167,19 +263,8 @@ class VlcAudioPlayer(
         }
 
         override fun error(mp: MediaPlayer) {
-            System.err.println("[VlcAudioPlayer] Event: ERROR playing ${_currentTrack.value?.title} (source $activeSourceIndex of ${activeSources.size})")
-            val nextIdx = activeSourceIndex + 1
-            if (nextIdx < activeSources.size) {
-                activeSourceIndex = nextIdx
-                val nextSource = activeSources[nextIdx]
-                println("[VlcAudioPlayer] Auto-failing over to alternative source #$nextIdx: ${nextSource.title} (${nextSource.quality} kbps)")
-                scope.launch(Dispatchers.IO) {
-                    playHttpSource(nextSource)
-                }
-            } else {
-                _state.value = PlayerState.error(Exception("VLC playback error on all available stream sources"))
-                _isPlaying.value = false
-            }
+            System.err.println("[VlcAudioPlayer] Event: ERROR playing ${_currentTrack.value?.title} (source ${activeSourceIndex.get()} of ${activeSources.size})")
+            failoverToNextSource("Native libVLC error event")
         }
 
         override fun timeChanged(mp: MediaPlayer, newTime: Long) {
@@ -191,11 +276,117 @@ class VlcAudioPlayer(
         }
     }
 
+    @Volatile
+    private var sourceDataLine: SourceDataLine? = null
+    @Volatile
+    private var isUsingAudioCallback: Boolean = false
+
+    private val audioCallback = object : AudioCallback {
+        private var pcmBuffer = ByteArray(16384)
+        private var outputBuffer = ByteArray(16384)
+
+        override fun play(mediaPlayer: MediaPlayer, samples: Pointer, sampleCount: Int, pts: Long) {
+            val line = sourceDataLine
+            val byteCount = sampleCount * 4
+            if (byteCount <= 0) return
+
+            if (pcmBuffer.size < byteCount) {
+                pcmBuffer = ByteArray(byteCount)
+                outputBuffer = ByteArray(byteCount)
+            }
+
+            samples.read(0, pcmBuffer, 0, byteCount)
+
+            // Feed raw 16-bit stereo PCM audio to AudioVisualizerManager for real-time FFT spectrum analysis
+            AudioVisualizerManager.processPcmSamples(pcmBuffer, sampleCount)
+
+            // Forward to Java Sound SourceDataLine for crystal-clear playback on Windows speakers
+            if (line != null && line.isOpen) {
+                val vol = _volume.value.coerceIn(0f, 1f)
+                if (vol >= 0.99f) {
+                    line.write(pcmBuffer, 0, byteCount)
+                } else if (vol <= 0.001f) {
+                    java.util.Arrays.fill(outputBuffer, 0, byteCount, 0.toByte())
+                    line.write(outputBuffer, 0, byteCount)
+                } else {
+                    // Precise software volume scaling for 16-bit little-endian stereo PCM
+                    var i = 0
+                    while (i < byteCount) {
+                        val low = pcmBuffer[i].toInt() and 0xFF
+                        val high = pcmBuffer[i + 1].toInt()
+                        val sample = (high shl 8) or low
+                        val scaled = (sample * vol).toInt().coerceIn(-32768, 32767)
+                        outputBuffer[i] = (scaled and 0xFF).toByte()
+                        outputBuffer[i + 1] = ((scaled shr 8) and 0xFF).toByte()
+                        i += 2
+                    }
+                    line.write(outputBuffer, 0, byteCount)
+                }
+            }
+        }
+
+        override fun pause(mediaPlayer: MediaPlayer, pts: Long) {
+            runCatching { sourceDataLine?.stop() }
+            AudioVisualizerManager.onPlaybackPaused()
+        }
+
+        override fun resume(mediaPlayer: MediaPlayer, pts: Long) {
+            runCatching { sourceDataLine?.start() }
+            AudioVisualizerManager.onPlaybackResumed()
+        }
+
+        override fun flush(mediaPlayer: MediaPlayer, pts: Long) {
+            runCatching { sourceDataLine?.flush() }
+            AudioVisualizerManager.clear()
+        }
+
+        override fun drain(mediaPlayer: MediaPlayer) {
+            runCatching { sourceDataLine?.drain() }
+        }
+
+        override fun setVolume(volume: Float, mute: Boolean) {
+        }
+    }
+
+    private fun setupAudioVisualizerCallback(mp: MediaPlayer) {
+        try {
+            val format = AudioFormat(44100f, 16, 2, true, false)
+            val info = DataLine.Info(SourceDataLine::class.java, format)
+            val line = AudioSystem.getLine(info) as SourceDataLine
+            line.open(format, 44100 * 4 / 5) // 200ms buffer for seamless jitter-free audio
+            line.start()
+            sourceDataLine = line
+            mp.audio().callback("S16N", 44100, 2, audioCallback)
+            isUsingAudioCallback = true
+            println("[VlcAudioPlayer] Audio visualizer callback and SourceDataLine initialized successfully.")
+        } catch (t: Throwable) {
+            println("[VlcAudioPlayer] Warning: Failed initializing SourceDataLine audio callback: ${t.message}. Falling back to native VLC audio output.")
+            sourceDataLine = null
+            isUsingAudioCallback = false
+        }
+    }
+
     private val audioComponent: AudioPlayerComponent? by lazy {
         if (vlcAvailable) {
             try {
-                AudioPlayerComponent().apply {
+                val factoryArgs = mutableListOf<String>()
+                factoryArgs.add("--no-video")
+                if (settings?.getBoolean("audio_normalization", true) != false) {
+                    factoryArgs.add("--audio-filter=normvol")
+                }
+                val factory = runCatching {
+                    uk.co.caprica.vlcj.factory.MediaPlayerFactory(factoryArgs)
+                }.getOrNull()
+
+                val component = if (factory != null) {
+                    AudioPlayerComponent(factory)
+                } else {
+                    AudioPlayerComponent()
+                }
+
+                component.apply {
                     mediaPlayer().events().addMediaPlayerEventListener(vlcEventListener)
+                    setupAudioVisualizerCallback(mediaPlayer())
                 }
             } catch (t: Throwable) {
                 System.err.println("[VlcAudioPlayer] Failed creating AudioPlayerComponent: ${t.message}")
@@ -232,14 +423,25 @@ class VlcAudioPlayer(
     override fun prepareTrack(track: Track) {
         // Immediately halt current audio output so old song stops playing in 0ms
         runCatching { player?.controls()?.stop() }
+        runCatching {
+            sourceDataLine?.stop()
+            sourceDataLine?.flush()
+            AudioVisualizerManager.clear()
+        }
         _isPlaying.value = false
         _currentTrack.value = track
         _state.value = PlayerState.LOADING
         _positionMs.value = 0L
         _durationMs.value = 0L
-        val foundIdx = _queue.value.indexOfFirst { it.id == track.id }
+        val currentQ = _queue.value
+        val foundIdx = currentQ.indexOfFirst { it.id == track.id }
         if (foundIdx >= 0) {
             queueIndex = foundIdx
+        } else {
+            val updated = currentQ.toMutableList().apply { add(track) }
+            _queue.value = updated
+            originalQueue = updated
+            queueIndex = updated.size - 1
         }
     }
 
@@ -248,9 +450,15 @@ class VlcAudioPlayer(
         _currentTrack.value = track
         _positionMs.value = 0L
         _durationMs.value = 0L
-        val foundIdx = _queue.value.indexOfFirst { it.id == track.id }
+        val currentQ = _queue.value
+        val foundIdx = currentQ.indexOfFirst { it.id == track.id }
         if (foundIdx >= 0) {
             queueIndex = foundIdx
+        } else {
+            val updated = currentQ.toMutableList().apply { add(track) }
+            _queue.value = updated
+            originalQueue = updated
+            queueIndex = updated.size - 1
         }
 
         val p = player ?: run {
@@ -267,7 +475,7 @@ class VlcAudioPlayer(
         }
 
         activeSources = httpSources
-        activeSourceIndex = 0
+        activeSourceIndex.set(0)
         playHttpSource(httpSources[0])
     }
 
@@ -281,6 +489,9 @@ class VlcAudioPlayer(
             runCatching {
                 val ok = p.media().play(cleanUrl, ":no-video", ":audio-replay-gain-mode=none")
                 println("[VlcAudioPlayer] Local playback p.media().play() returned: $ok")
+                if (!ok) {
+                    _state.value = PlayerState.error(Exception("Local media playback failed for: $cleanUrl"))
+                }
             }.onFailure { err ->
                 _state.value = PlayerState.error(err)
             }
@@ -288,7 +499,7 @@ class VlcAudioPlayer(
         }
 
         val latency = settings?.getInt("buffer_latency", 400)?.coerceAtLeast(150) ?: 400
-        val skipSilence = settings?.getBoolean("skip_silence", true) ?: true
+        val audioNorm = settings?.getBoolean("audio_normalization", true) ?: true
 
         fun cleanOpt(v: String) = v.replace(Regex("[\\r\\n\\u0000]"), "").trim()
 
@@ -300,10 +511,6 @@ class VlcAudioPlayer(
             add(":clock-jitter=0")
             add(":drop-late-frames=true")
             add(":no-video")
-            add(":audio-replay-gain-mode=none")
-            if (skipSilence) {
-                add(":audio-filter=normvol")
-            }
             val ua = source.request.headers["User-Agent"]
                 ?: "Audix/1.0.0 (Windows; OpenJDK 21)"
             add(":http-user-agent=${cleanOpt(ua)}")
@@ -311,32 +518,34 @@ class VlcAudioPlayer(
             source.request.headers["Origin"]?.let { if (it.isNotBlank()) add(":http-origin=${cleanOpt(it)}") }
         }
 
+        runCatching { p.controls().stop() }
+        delay(25L)
+
         runCatching {
             val ok = p.media().play(cleanUrl, *options.toTypedArray())
             println("[VlcAudioPlayer] p.media().play() returned: $ok")
             if (!ok) {
-                // If play returned false immediately, trigger failover
-                val nextIdx = activeSourceIndex + 1
-                if (nextIdx < activeSources.size) {
-                    activeSourceIndex = nextIdx
-                    val nextSource = activeSources[nextIdx]
-                    println("[VlcAudioPlayer] play() returned false, immediately trying source #$nextIdx")
-                    playHttpSource(nextSource)
-                } else {
-                    _state.value = PlayerState.error(Exception("Unable to play stream"))
-                }
+                failoverToNextSource("Immediate play() failure")
             }
         }.onFailure { err ->
             System.err.println("[VlcAudioPlayer] Error calling p.media().play(): ${err.message}")
-            _state.value = PlayerState.error(err)
+            failoverToNextSource("Exception in play(): ${err.message}")
         }
     }
 
     override fun pause() {
         runCatching { player?.controls()?.pause() }
+        runCatching {
+            sourceDataLine?.stop()
+            AudioVisualizerManager.onPlaybackPaused()
+        }
     }
 
     override fun resume() {
+        runCatching {
+            sourceDataLine?.start()
+            AudioVisualizerManager.onPlaybackResumed()
+        }
         runCatching { player?.controls()?.play() }
     }
 
@@ -350,11 +559,17 @@ class VlcAudioPlayer(
 
     override fun seekTo(positionMs: Long) {
         runCatching { player?.controls()?.setTime(positionMs) }
+        runCatching { sourceDataLine?.flush() }
         _positionMs.value = positionMs
     }
 
     override fun stop() {
         runCatching { player?.controls()?.stop() }
+        runCatching {
+            sourceDataLine?.stop()
+            sourceDataLine?.flush()
+            AudioVisualizerManager.clear()
+        }
         _currentTrack.value = null
         _positionMs.value = 0L
         _durationMs.value = 0L
@@ -443,7 +658,14 @@ class VlcAudioPlayer(
     override fun setVolume(volume: Float) {
         val clamped = volume.coerceIn(0f, 1f)
         _volume.value = clamped
-        runCatching { player?.audio()?.setVolume((clamped * 100).toInt()) }
+        val volInt = (clamped * 100).toInt()
+        if (volInt > 0) {
+            runCatching { settings?.putInt("user_volume_percent", volInt) }
+        }
+        runCatching {
+            player?.audio()?.setVolume(volInt)
+            player?.audio()?.setMute(clamped == 0f)
+        }
     }
 
     override fun setRepeatMode(mode: RepeatMode) {
@@ -512,6 +734,12 @@ class VlcAudioPlayer(
         isReleased = true
         runCatching { scope.coroutineContext.cancelChildren() }
         runCatching { player?.controls()?.stop() }
+        runCatching {
+            sourceDataLine?.stop()
+            sourceDataLine?.close()
+            sourceDataLine = null
+            AudioVisualizerManager.clear()
+        }
         runCatching { audioComponent?.release() }
     }
 }

@@ -64,7 +64,8 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
                             "gl": "US"
                         }
                     },
-                    "query": "${query.replace("\"", "\\\"")}"
+                    "query": "${query.replace("\"", "\\\"")}",
+                    "params": "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"
                 }
             """.trimIndent()
 
@@ -137,37 +138,99 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
 
             if (videoId.isNullOrBlank()) return null
 
-            // Title
+            // Title: combine all text runs
             val titleCol = flexCols?.firstOrNull()?.jsonObject
                 ?.get("musicResponsiveListItemFlexColumnRenderer")?.jsonObject
                 ?.get("text")?.jsonObject?.get("runs")?.jsonArray
-            val title = titleCol?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content?.trim() ?: "Unknown Track"
+            val rawTitle = titleCol?.mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.content }
+                ?.joinToString("")?.trim()?.ifBlank { null } ?: "Unknown Track"
 
-            // Artist & Album
+            // Artist, Album & Duration
             var artistName = "YouTube Music"
             var albumName: String? = null
+            var durationMs: Long? = null
             if (flexCols != null && flexCols.size > 1) {
                 val secondColRuns = flexCols[1].jsonObject
                     ?.get("musicResponsiveListItemFlexColumnRenderer")?.jsonObject
                     ?.get("text")?.jsonObject?.get("runs")?.jsonArray
                 if (secondColRuns != null && secondColRuns.isNotEmpty()) {
-                    val firstRun = secondColRuns[0].jsonObject["text"]?.jsonPrimitive?.content?.trim()
-                    if (!firstRun.isNullOrBlank()) artistName = firstRun
-                    if (secondColRuns.size > 2) {
-                        val albumRun = secondColRuns[2].jsonObject["text"]?.jsonPrimitive?.content?.trim()
-                        if (!albumRun.isNullOrBlank()) albumName = albumRun
+                    val rawRuns = secondColRuns.mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.content }
+                    val sections = mutableListOf<String>()
+                    val curr = StringBuilder()
+                    for (r in rawRuns) {
+                        val cleaned = r.trim()
+                        if (cleaned == "•" || cleaned == "·" || cleaned == "â€¢" || cleaned == "\u2022" || cleaned == "\u00b7" || cleaned == "\u2027" || cleaned == "\ufffd") {
+                            if (curr.isNotBlank()) {
+                                sections.add(curr.toString().trim())
+                                curr.clear()
+                            }
+                        } else {
+                            curr.append(r)
+                        }
+                    }
+                    if (curr.isNotBlank()) {
+                        sections.add(curr.toString().trim())
+                    }
+
+                    if (sections.isNotEmpty() && sections[0].lowercase() in setOf("song", "video", "episode", "podcast")) {
+                        sections.removeAt(0)
+                    }
+
+                    if (sections.isNotEmpty()) {
+                        var parsedArtist = sections[0].trim()
+                        for (p in listOf("Song", "Video", "Episode", "Podcast")) {
+                            if (parsedArtist.startsWith(p, ignoreCase = true)) {
+                                parsedArtist = parsedArtist.substring(p.length).trim(' ', '\t', '\n', '\r', '•', '·', '-', '–', ':')
+                            }
+                        }
+                        if (parsedArtist.isNotBlank() && !isGarbageArtist(parsedArtist)) {
+                            artistName = parsedArtist
+                        }
+                    }
+
+                    if (sections.size > 1) {
+                        val lastSec = sections.last()
+                        if (lastSec.contains(":") && lastSec.any { it.isDigit() }) {
+                            val parts = lastSec.split(":")
+                            if (parts.size == 2) {
+                                val min = parts[0].trim().toLongOrNull() ?: 0L
+                                val sec = parts[1].trim().toLongOrNull() ?: 0L
+                                durationMs = (min * 60 + sec) * 1000L
+                            }
+                            if (sections.size > 2) {
+                                val candAlbum = sections[1].trim()
+                                if (!isGarbageAlbum(candAlbum)) {
+                                    albumName = candAlbum
+                                }
+                            }
+                        } else {
+                            val candAlbum = sections[1].trim()
+                            if (!isGarbageAlbum(candAlbum)) {
+                                albumName = candAlbum
+                            }
+                        }
                     }
                 }
             }
 
-            // Thumbnail
+            if ((isGarbageArtist(artistName) || artistName == "YouTube Music") && rawTitle.contains(" - ")) {
+                val left = rawTitle.substringBefore(" - ").trim()
+                val right = rawTitle.substringAfter(" - ").trim()
+                if (left.isNotBlank() && right.isNotBlank() && left.length < 50 && !isGarbageArtist(left)) {
+                    artistName = left
+                }
+            }
+
+            val cleanTitle = cleanTrackTitle(rawTitle, artistName)
+
+            // Thumbnail with high-res 544x544 upgrade
             var thumbUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
             val thumbRenderer = item["thumbnail"]?.jsonObject?.get("musicThumbnailRenderer")?.jsonObject
             val thumbs = thumbRenderer?.get("thumbnail")?.jsonObject?.get("thumbnails")?.jsonArray
             if (thumbs != null && thumbs.isNotEmpty()) {
                 val lastThumb = thumbs.last().jsonObject["url"]?.jsonPrimitive?.content
                 if (!lastThumb.isNullOrBlank()) {
-                    thumbUrl = lastThumb
+                    thumbUrl = lastThumb.replace(Regex("""=w\d+-h\d+[^&?]*"""), "=w544-h544-l90-rj")
                 }
             }
 
@@ -175,27 +238,42 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
                 id = videoId,
                 quality = 160,
                 title = "YouTube Audio (Adaptive)",
-                extras = mapOf(
-                    "video_id" to videoId,
-                    "extension_id" to "youtube_music",
-                    "track_title" to title,
-                    "artist_name" to artistName
-                )
+                extras = buildMap {
+                    put("video_id", videoId)
+                    put("extension_id", "youtube_music")
+                    put("track_title", cleanTitle)
+                    if (!isGarbageArtist(artistName)) put("artist_name", artistName)
+                    put("cover_url", thumbUrl)
+                    if (albumName != null && !isGarbageAlbum(albumName)) put("album_name", albumName)
+                }
             )
+
+            val artistList = if (artistName.contains(",") || artistName.contains("&")) {
+                artistName.split(Regex("""[,&]""")).map { it.trim() }.filter { it.isNotBlank() && !isGarbageArtist(it) }.map { Artist(id = it, name = it) }
+            } else if (!isGarbageArtist(artistName)) {
+                listOf(Artist(id = artistName, name = artistName))
+            } else emptyList()
+
+            val finalArtists = if (artistList.isNotEmpty()) artistList else listOf(Artist(id = "Audix Hi-Res Audio", name = "Audix Hi-Res Audio"))
 
             Track(
                 id = videoId,
-                title = title,
-                artists = listOf(Artist(id = artistName, name = artistName)),
-                album = albumName?.let { Album(id = it, title = it) },
+                title = cleanTitle,
+                artists = finalArtists,
+                album = albumName?.takeIf { !isGarbageAlbum(it) }?.let { Album(id = it, title = it) },
                 cover = thumbUrl.toImageHolder(),
+                duration = durationMs,
                 streamables = listOf(streamable),
-                extras = mapOf(
-                    "video_id" to videoId,
-                    "extension_id" to "youtube_music",
-                    "track_title" to title,
-                    "artist_name" to artistName
-                )
+                extras = buildMap {
+                    put("video_id", videoId)
+                    put("extension_id", "youtube_music")
+                    put("track_title", cleanTitle)
+                    put("raw_title", rawTitle)
+                    if (durationMs != null) put("duration_ms", durationMs.toString())
+                    if (!isGarbageArtist(artistName)) put("artist_name", artistName)
+                    put("cover_url", thumbUrl)
+                    if (albumName != null && !isGarbageAlbum(albumName)) put("album_name", albumName)
+                }
             )
         }.getOrNull()
     }
@@ -412,14 +490,89 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         return track.copy(streamables = listOf(s))
     }
 
+    private fun isGarbageArtist(name: String?): Boolean {
+        if (name.isNullOrBlank()) return true
+        val low = name.lowercase().trim()
+        return low in setOf(
+            "song", "video", "episode", "podcast", "youtube music", "unknown artist",
+            "t-series", "sony music india", "zee music company", "speed records",
+            "yrf", "tips official", "aditya music", "saregama music", "audix music",
+            "audix hi-res audio", "various artists"
+        ) || low.startsWith("user-")
+    }
+
+    private fun isGarbageAlbum(album: String?): Boolean {
+        if (album.isNullOrBlank()) return true
+        val low = album.lowercase().trim()
+        if (low in setOf("single", "album", "ep", "audio", "video", "track", "music", "song", "audix", "youtube", "soundcloud", "unknown album", "various artists")) return true
+        if (low.contains("views") || low.contains("view") || low.contains("subscribers") || low.contains("subscriber") || low.contains("ago") || low.contains("stream") || low.contains("watching")) return true
+        if (low.matches(Regex("""^[\d\.,\s]+[kkmgbt]?\s*(views|subscribers|plays)?$""", RegexOption.IGNORE_CASE))) return true
+        return false
+    }
+
+    private fun unescapeHtml(text: String): String {
+        return text
+            .replace("&quot;", "\"")
+            .replace("&amp;", "&")
+            .replace("&#039;", "'")
+            .replace("&apos;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .trim()
+    }
+
+    private fun cleanTrackTitle(title: String, artist: String): String {
+        var t = unescapeHtml(title)
+        // Strip pipe metadata: "Song Title | Movie | Actors | Label" -> "Song Title"
+        if (t.contains("|")) {
+            val beforePipe = t.substringBefore("|").trim()
+            if (beforePipe.isNotBlank()) {
+                t = beforePipe
+            }
+        }
+        // Strip double slashes or colons
+        if (t.contains("//")) {
+            val beforeSlash = t.substringBefore("//").trim()
+            if (beforeSlash.isNotBlank()) {
+                t = beforeSlash
+            }
+        }
+        // Remove bracketed suffixes: (Official Music Video), [Official Audio], (Lyrics), (From "Movie"), etc.
+        t = t.replace(Regex("""\s*[\(\[\{].*?(?:official|music\s*video|video|audio|lyrics|lyric\s*video|feat|ft\.|hd|4k|remaster|visualizer|live|full\s*song|from\s*["']|soundtrack|ost).*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s*[\(\[\{]\s*from\s+.*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+        // Remove artist prefixes/suffixes if repeated
+        if (artist.isNotBlank() && !isGarbageArtist(artist)) {
+            val esc = Regex.escape(artist)
+            t = t.replace(Regex("""^$esc\s*[-–:]\s*""", RegexOption.IGNORE_CASE), "")
+            t = t.replace(Regex("""\s*[-–:]\s*$esc$""", RegexOption.IGNORE_CASE), "")
+        } else if (t.contains(" - ") || t.contains(" – ")) {
+            val parts = t.split(Regex("""\s+[-–]\s+"""))
+            if (parts.size >= 2 && parts[1].isNotBlank()) {
+                t = parts[1].trim()
+            }
+        }
+        // Remove trailing " - Official Video", " - From ...", etc.
+        t = t.replace(Regex("""\s*[-–:]\s*(?:official\s*video|official\s*audio|lyrics|lyric\s*video|from\s+["'].*?|soundtrack|ost)\s*$""", RegexOption.IGNORE_CASE), "")
+        // Remove unparenthesized "feat. ..."
+        t = t.replace(Regex("""\s+(?:feat|ft)\.?\s+.*$""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s*[\(\[\{]\s*[\)\]\}]"""), "")
+        // Clean whitespace
+        t = t.replace(Regex("""\s+"""), " ").trim()
+        return if (t.isNotBlank()) t else title.trim()
+    }
+
     override suspend fun loadStreamableMedia(streamable: Streamable, isDownload: Boolean): Streamable.Media = withContext(Dispatchers.IO) {
         val videoId = streamable.extras["video_id"] ?: streamable.id
         val rawTitle = streamable.extras["track_title"] ?: streamable.title ?: ""
         val trackTitle = if (rawTitle.equals("YouTube Audio (Adaptive)", ignoreCase = true)) "" else rawTitle
         val rawArtist = streamable.extras["artist_name"] ?: ""
-        val artistName = if (rawArtist.equals("YouTube Music", ignoreCase = true)) "" else rawArtist
+        val artistName = if (isGarbageArtist(rawArtist)) "" else rawArtist
 
-        // 1. Try resolving direct YouTube stream via ANDROID_VR Innertube
+        val cleanArtist = if (isGarbageArtist(artistName)) "" else artistName
+        val cleanTitle = cleanTrackTitle(trackTitle, cleanArtist)
+        val targetDurationMs = streamable.extras["duration_ms"]?.toLongOrNull()
+
+        // 1. Direct YouTube stream via ANDROID_VR client (if available) - highest priority
         val ytDirectUrl = tryResolveYouTubeDirect(videoId)
         if (!ytDirectUrl.isNullOrBlank()) {
             val source = Streamable.Source.Http(
@@ -431,31 +584,29 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             return@withContext Streamable.Media.Server(listOf(source), merged = false)
         }
 
-        // 2. High-fidelity audio match on JioSaavn (320kbps MP4/AAC)
-        val query = if (artistName.isNotBlank() && !artistName.equals("YouTube Music", ignoreCase = true)) {
-            "$trackTitle $artistName"
-        } else {
-            trackTitle
+        // 2. High-fidelity audio match on JioSaavn (320kbps MP4/AAC Studio Master) with verified candidate scoring
+        if (cleanTitle.isNotBlank()) {
+            val saavnSources = tryMatchSaavnStream(cleanTitle, cleanArtist, targetDurationMs)
+            if (!saavnSources.isNullOrEmpty()) {
+                return@withContext Streamable.Media.Server(saavnSources, merged = false)
+            }
         }
 
-        val saavnSources = tryMatchSaavnStream(query)
-        if (!saavnSources.isNullOrEmpty()) {
-            return@withContext Streamable.Media.Server(saavnSources, merged = false)
+        // 3. Fallback match on SoundCloud progressive MP3 with verified candidate scoring
+        if (cleanTitle.isNotBlank()) {
+            val soundcloudStreamUrl = tryMatchSoundCloudStream(cleanTitle, cleanArtist, targetDurationMs)
+            if (!soundcloudStreamUrl.isNullOrBlank()) {
+                val source = Streamable.Source.Http(
+                    request = soundcloudStreamUrl.toGetRequest(),
+                    quality = 128,
+                    title = "128 kbps (SoundCloud Stream)",
+                    isLive = false
+                )
+                return@withContext Streamable.Media.Server(listOf(source), merged = false)
+            }
         }
 
-        // 3. Fallback match on SoundCloud progressive MP3
-        val soundcloudStreamUrl = tryMatchSoundCloudStream(query)
-        if (!soundcloudStreamUrl.isNullOrBlank()) {
-            val source = Streamable.Source.Http(
-                request = soundcloudStreamUrl.toGetRequest(),
-                quality = 128,
-                title = "128 kbps (SoundCloud Stream)",
-                isLive = false
-            )
-            return@withContext Streamable.Media.Server(listOf(source), merged = false)
-        }
-
-        error("Unable to resolve audio stream for YouTube track: $videoId ($trackTitle)")
+        error("Unable to resolve audio stream for YouTube track: $videoId ($trackTitle by $artistName)")
     }
 
     private fun tryResolveYouTubeDirect(videoId: String): String? {
@@ -527,10 +678,116 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         )
     }
 
-    private fun tryMatchSaavnStream(query: String): List<Streamable.Source.Http>? {
+    private fun scoreTrackCandidate(
+        candidateTitle: String,
+        candidateArtist: String,
+        targetTitle: String,
+        targetArtist: String,
+        candidateDurationMs: Long? = null,
+        targetDurationMs: Long? = null
+    ): Int {
+        val cTitle = unescapeHtml(candidateTitle).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val cArtist = unescapeHtml(candidateArtist).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val tTitle = unescapeHtml(targetTitle).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val tArtist = unescapeHtml(targetArtist).lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+
+        val normCTitle = cTitle.replace(Regex("""\s+"""), " ").trim()
+        val normTTitle = tTitle.replace(Regex("""\s+"""), " ").trim()
+        if (normCTitle.isBlank() || normTTitle.isBlank()) return 0
+
+        var score = 0
+        val cleanC = cleanTrackTitle(candidateTitle, "").lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+        val cleanT = cleanTrackTitle(targetTitle, "").lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+
+        val baseC = cleanC.substringBefore("-").trim()
+        val baseT = cleanT.substringBefore("-").trim()
+
+        val isExactTitleMatch = (normCTitle == normTTitle) ||
+                (cleanC.isNotBlank() && cleanC == cleanT) ||
+                ((baseC.isNotBlank() && baseC == cleanT) || (baseT.isNotBlank() && cleanC == baseT) || (baseC.isNotBlank() && baseT.isNotBlank() && baseC == baseT))
+
+        if (isExactTitleMatch) {
+            score += 60
+        } else if (normCTitle.startsWith(normTTitle) || normTTitle.startsWith(normCTitle) || (cleanC.isNotBlank() && cleanT.isNotBlank() && (cleanC.startsWith(cleanT) || cleanT.startsWith(cleanC)))) {
+            score += 40
+        } else if (normCTitle.contains(normTTitle) || normTTitle.contains(normCTitle)) {
+            score += 30
+        }
+
+        // Check Dash / Colon separation: "Artist - Title" or "Title - Artist"
+        if (targetTitle.contains("-") || targetTitle.contains("–") || targetTitle.contains(":")) {
+            val parts = targetTitle.split(Regex("""[-–:]""")).map { it.trim() }.filter { it.isNotBlank() }
+            if (parts.size >= 2) {
+                val pArt = parts[0].lowercase().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+                val pTit = parts.drop(1).joinToString(" ").lowercase().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+                // Artist - Title
+                if (normCTitle == pTit || cleanC == pTit || pTit.contains(normCTitle) || normCTitle.contains(pTit)) {
+                    if (cArtist.isNotBlank() && (cArtist.contains(pArt) || pArt.contains(cArtist))) {
+                        score = maxOf(score, 85)
+                    } else {
+                        score = maxOf(score, 60)
+                    }
+                }
+                // Title - Artist
+                if (normCTitle == pArt || cleanC == pArt || pArt.contains(normCTitle) || normCTitle.contains(pArt)) {
+                    if (cArtist.isNotBlank() && (cArtist.contains(pTit) || pTit.contains(cArtist))) {
+                        score = maxOf(score, 85)
+                    } else {
+                        score = maxOf(score, 60)
+                    }
+                }
+            }
+        }
+
+        if (score == 0) {
+            val tWords = normTTitle.split(" ").filter { it.length > 2 }
+            if (tWords.isNotEmpty()) {
+                val matches = tWords.count { normCTitle.contains(it) }
+                val ratio = matches.toFloat() / tWords.size
+                if (ratio >= 0.75f) score += (30 * ratio).toInt() else return 0
+            } else return 0
+        }
+
+        // Penalize remix/cover if target is not remix/cover
+        val isTargetRemix = normTTitle.contains("remix") || normTTitle.contains("cover") || normTTitle.contains("live")
+        val isCandRemix = normCTitle.contains("remix") || normCTitle.contains("cover") || normCTitle.contains("live") || normCTitle.contains("karaoke")
+        if (isCandRemix && !isTargetRemix) {
+            score -= 40
+        }
+
+        if (tArtist.isNotBlank() && !isGarbageArtist(tArtist)) {
+            val normCArtist = cArtist.replace(Regex("""\s+"""), " ").trim()
+            val normTArtist = tArtist.replace(Regex("""\s+"""), " ").trim()
+            if (normCArtist.contains(normTArtist) || normTArtist.contains(normCArtist)) {
+                score += 35
+            } else {
+                val firstWord = normTArtist.split(" ").firstOrNull { it.length > 2 }
+                if (firstWord != null && normCArtist.contains(firstWord)) {
+                    score += 20
+                } else {
+                    // Zero word overlap: If Title is an Exact Match (+60) AND duration matches within ±3000ms,
+                    // award a Duration + Exact Title Synergy Bonus of +15 points (Total = 60 + 15 = 75),
+                    // qualifying genuine regional/soundtrack tracks while blocking mismatches.
+                    val isDurationMatch = candidateDurationMs != null && targetDurationMs != null &&
+                            Math.abs(candidateDurationMs - targetDurationMs) <= 3000L
+                    if (isExactTitleMatch && isDurationMatch) {
+                        score += 15
+                    } else {
+                        // Conflicting artist with duration mismatch or non-exact title: reject candidate immediately
+                        return 0
+                    }
+                }
+            }
+        }
+        return score.coerceAtLeast(0)
+    }
+
+    private fun tryMatchSaavnStream(targetTitle: String, targetArtist: String, targetDurationMs: Long? = null): List<Streamable.Source.Http>? {
         return runCatching {
+            val cleanArtist = if (isGarbageArtist(targetArtist)) "" else targetArtist
+            val query = if (cleanArtist.isNotBlank()) "$targetTitle $cleanArtist" else targetTitle
             val encoded = URLEncoder.encode(query, "UTF-8")
-            val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=5&q=$encoded"
+            val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=8&q=$encoded"
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
@@ -541,9 +798,28 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val results = root["results"]?.jsonArray ?: return@runCatching null
             if (results.isEmpty()) return@runCatching null
 
-            val first = results[0].jsonObject
-            val enc = first["encrypted_media_url"]?.jsonPrimitive?.content
-            val preview = first["media_preview_url"]?.jsonPrimitive?.content
+            var bestScore = -1
+            var bestObj: JsonObject? = null
+            for (elem in results) {
+                val obj = elem.jsonObject
+                val cTitle = obj["song"]?.jsonPrimitive?.content ?: ""
+                val cArtist = obj["primary_artists"]?.jsonPrimitive?.content ?: ""
+                val candDurationSec = obj["duration"]?.jsonPrimitive?.content?.toDoubleOrNull()
+                val candDurationMs = candDurationSec?.let { (it * 1000).toLong() }
+                val score = scoreTrackCandidate(cTitle, cArtist, targetTitle, targetArtist, candDurationMs, targetDurationMs)
+                if (score > bestScore) {
+                    bestScore = score
+                    bestObj = obj
+                }
+            }
+
+            // Strictly require an authentic match (bestScore >= 75)
+            if (bestScore < 75 || bestObj == null) {
+                return@runCatching null
+            }
+
+            val enc = bestObj["encrypted_media_url"]?.jsonPrimitive?.content
+            val preview = bestObj["media_preview_url"]?.jsonPrimitive?.content
 
             val rawUrl = enc?.let { decryptSaavnRawMediaUrl(it) } ?: preview
             if (!rawUrl.isNullOrBlank()) {
@@ -552,10 +828,12 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         }.getOrNull()
     }
 
-    private fun tryMatchSoundCloudStream(query: String): String? {
+    private fun tryMatchSoundCloudStream(targetTitle: String, targetArtist: String, targetDurationMs: Long? = null): String? {
         return runCatching {
+            val cleanArtist = if (isGarbageArtist(targetArtist)) "" else targetArtist
+            val query = if (cleanArtist.isNotBlank()) "$targetTitle $cleanArtist" else targetTitle
             val encoded = URLEncoder.encode(query, "UTF-8")
-            val url = "https://api-v2.soundcloud.com/search/tracks?q=$encoded&client_id=$soundCloudClientId&limit=3"
+            val url = "https://api-v2.soundcloud.com/search/tracks?q=$encoded&client_id=$soundCloudClientId&limit=5"
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
@@ -566,7 +844,26 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val collection = root["collection"]?.jsonArray ?: return@runCatching null
             if (collection.isEmpty()) return@runCatching null
 
-            val trackObj = collection[0].jsonObject
+            var bestScore = -1
+            var bestObj: JsonObject? = null
+            for (elem in collection) {
+                val obj = elem.jsonObject
+                val cTitle = obj["title"]?.jsonPrimitive?.content ?: ""
+                val cArtist = obj["user"]?.jsonObject?.get("username")?.jsonPrimitive?.content ?: ""
+                val candDurationMs = obj["duration"]?.jsonPrimitive?.content?.toLongOrNull()
+                val score = scoreTrackCandidate(cTitle, cArtist, targetTitle, targetArtist, candDurationMs, targetDurationMs)
+                if (score > bestScore) {
+                    bestScore = score
+                    bestObj = obj
+                }
+            }
+
+            // Strictly require an authentic match (bestScore >= 75)
+            if (bestScore < 75 || bestObj == null) {
+                return@runCatching null
+            }
+
+            val trackObj = bestObj
             val mediaObj = trackObj["media"]?.jsonObject
             val transArray = mediaObj?.get("transcodings")?.jsonArray ?: return@runCatching null
 

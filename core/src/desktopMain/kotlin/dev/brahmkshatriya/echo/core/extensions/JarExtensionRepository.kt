@@ -59,20 +59,19 @@ class JarExtensionRepository @JvmOverloads constructor(
             )
             for (name in bundled) {
                 val file = File(destDir, name)
-                if (!file.exists() || file.length() == 0L) {
-                    val stream = javaClass.getResourceAsStream("/extensions/$name")
-                        ?: javaClass.getResourceAsStream("extensions/$name")
-                        ?: Thread.currentThread().contextClassLoader?.getResourceAsStream("extensions/$name")
-                        ?: ClassLoader.getSystemResourceAsStream("extensions/$name")
-                        ?: findDiskExtensionStream(name)
-                    if (stream != null) {
-                        stream.use { input ->
-                            file.outputStream().use { output -> input.copyTo(output) }
-                        }
-                        println("[Echo JarExtensionRepository] Unpacked bundled extension $name to ${file.absolutePath}")
-                    } else {
-                        System.err.println("[Echo JarExtensionRepository] Warning: Could not locate bundled extension $name")
+                val stream = javaClass.getResourceAsStream("/extensions/$name")
+                    ?: javaClass.getResourceAsStream("extensions/$name")
+                    ?: Thread.currentThread().contextClassLoader?.getResourceAsStream("extensions/$name")
+                    ?: ClassLoader.getSystemResourceAsStream("extensions/$name")
+                    ?: findDiskExtensionStream(name)
+                if (stream != null) {
+                    val bytes = stream.use { it.readBytes() }
+                    if (!file.exists() || file.length() != bytes.size.toLong()) {
+                        file.writeBytes(bytes)
+                        println("[Echo JarExtensionRepository] Updated bundled extension $name (${bytes.size} bytes) to ${file.absolutePath}")
                     }
+                } else if (!file.exists()) {
+                    System.err.println("[Echo JarExtensionRepository] Warning: Could not locate bundled extension $name")
                 }
             }
         } catch (e: Exception) {

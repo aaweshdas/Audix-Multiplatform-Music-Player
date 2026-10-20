@@ -15,8 +15,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -27,9 +30,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import java.util.Locale
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -39,8 +45,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import dev.brahmkshatriya.echo.desktop.ui.DesktopBackgroundManager
+import dev.brahmkshatriya.echo.desktop.ui.BackgroundWallpaper
 import dev.brahmkshatriya.echo.common.MusicExtension
 import dev.brahmkshatriya.echo.common.models.Album
 import dev.brahmkshatriya.echo.common.models.Artist
@@ -49,6 +58,7 @@ import dev.brahmkshatriya.echo.common.models.ImageHolder
 import dev.brahmkshatriya.echo.common.models.Playlist
 import dev.brahmkshatriya.echo.common.models.QuickSearchItem
 import dev.brahmkshatriya.echo.common.models.Shelf
+import dev.brahmkshatriya.echo.common.models.Streamable
 import dev.brahmkshatriya.echo.common.models.Track
 import dev.brahmkshatriya.echo.core.extensions.ExtensionManager
 import dev.brahmkshatriya.echo.desktop.download.DesktopDownloadManager
@@ -73,41 +83,187 @@ import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
-import java.util.Locale
 import javax.swing.JFileChooser
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import dev.brahmkshatriya.echo.common.models.NetworkRequest.Companion.toGetRequest
+import dev.brahmkshatriya.echo.common.clients.SearchFeedClient
+import dev.brahmkshatriya.echo.common.clients.AlbumClient
+import dev.brahmkshatriya.echo.common.clients.ArtistClient
+
+private val REGEX_VIEWS = Regex("""^[\d\s\.,kmb]+views?$""", RegexOption.IGNORE_CASE)
+private val REGEX_DASH_SPLIT = Regex("""\s+[-–]\s+""")
+private val REGEX_BRACKETED_MEDIA = Regex("""\s*[\(\[\{].*?(?:official|music\s*video|video|audio|lyrics|lyric\s*video|feat|ft\.|hd|4k|remaster|visualizer|live|full\s*song|from\s*["']|soundtrack|ost).*?[\)\]\}]""", RegexOption.IGNORE_CASE)
+private val REGEX_BRACKETED_FROM = Regex("""\s*[\(\[\{]\s*from\s+.*?[\)\]\}]""", RegexOption.IGNORE_CASE)
+private val REGEX_TRAILING_MEDIA = Regex("""\s*[-–:]\s*(?:official\s*video|official\s*audio|lyrics|lyric\s*video|from\s+["'].*?|soundtrack|ost)\s*$""", RegexOption.IGNORE_CASE)
+private val REGEX_FEAT = Regex("""\s+(?:feat|ft)\.?\s+.*$""", RegexOption.IGNORE_CASE)
+private val REGEX_EMPTY_PARENS = Regex("""\s*[\(\[\{]\s*[\)\]\}]""")
+private val REGEX_SPACES = Regex("""\s+""")
+private val REGEX_ARTIST_SPLIT = Regex("""[,&]""")
+
+private fun isGarbageAlbum(title: String?): Boolean {
+    if (title.isNullOrBlank()) return true
+    val t = title.lowercase().trim()
+    if (t in setOf("single", "album", "audio", "video", "song", "episode", "podcast", "youtube music", "soundcloud", "soundcloud single")) return true
+    if (t.contains("views") || t.contains("view") || t.contains("subscribers") || t.contains("watching") || t.contains("streamed")) return true
+    if (t.contains("ago") || t.contains("uploaded")) return true
+    if (t.matches(REGEX_VIEWS)) return true
+    return false
+}
+
+private fun cleanDisplayAlbum(album: String?, fallback: String = ""): String {
+    if (album.isNullOrBlank()) return fallback
+    val a = album.trim()
+    return if (isGarbageAlbum(a)) fallback else a
+}
 
 private fun StoredTrack.toTrack(): Track {
+    val realCover = coverUrl?.takeIf { it.isNotBlank() } ?: extras["cover_url"]
+    val imageHolder = realCover?.takeIf { it.isNotBlank() }?.let {
+        ImageHolder.NetworkRequestImageHolder(
+            request = dev.brahmkshatriya.echo.common.models.NetworkRequest(url = it),
+            crop = false
+        )
+    }
+    val cleanArtists = artists.filterNot { name ->
+        name.isBlank() || name.equals("Song", true) || name.equals("Video", true) || name.equals("Episode", true) || name.equals("Unknown Artist", true) || name.equals("YouTube Music", true)
+    }.map { name ->
+        if (name.endsWith(" - Topic", ignoreCase = true)) name.substring(0, name.length - 8).trim() else name
+    }
+    var detectedArtist = cleanArtists.firstOrNull() ?: extras["artist_name"]?.takeIf { !it.equals("Song", true) && !it.equals("Video", true) } ?: ""
+    var cleanedTitle = cleanDisplayTitle(title)
+    if (detectedArtist.isBlank() && (title.contains(" - ") || title.contains(" – "))) {
+        val parts = title.split(REGEX_DASH_SPLIT)
+        if (parts.size >= 2 && parts[0].isNotBlank() && parts[0].length < 40) {
+            detectedArtist = parts[0].trim()
+            cleanedTitle = cleanDisplayTitle(parts.drop(1).joinToString(" - "))
+        }
+    }
+
+    val finalArtists = when {
+        cleanArtists.isNotEmpty() -> cleanArtists.map { Artist(id = it, name = it) }
+        detectedArtist.isNotBlank() -> listOf(Artist(id = detectedArtist, name = detectedArtist))
+        else -> listOf(Artist(id = "Audix Hi-Res Audio", name = "Audix Hi-Res Audio"))
+    }
+    val validAlbumTitle = albumTitle?.takeIf { !isGarbageAlbum(it) }
+
     return Track(
         id = id,
-        title = title,
-        artists = artists.map { Artist(id = it, name = it) },
-        album = albumTitle?.let { Album(id = it, title = it) },
-        cover = coverUrl?.let {
-            ImageHolder.NetworkRequestImageHolder(
-                request = dev.brahmkshatriya.echo.common.models.NetworkRequest(url = it),
-                crop = false
-            )
-        },
+        title = cleanedTitle.ifBlank { title },
+        artists = finalArtists,
+        album = validAlbumTitle?.let { Album(id = it, title = it, cover = imageHolder) },
+        cover = imageHolder,
         duration = durationMs,
-        extras = extras
+        extras = buildMap {
+            putAll(extras)
+            if (!realCover.isNullOrBlank()) put("cover_url", realCover)
+            if (cleanedTitle.isNotBlank()) put("track_title", cleanedTitle)
+            if (finalArtists.isNotEmpty()) put("artist_name", finalArtists.joinToString(", ") { it.name })
+            if (validAlbumTitle != null) put("album_name", validAlbumTitle) else remove("album_name")
+        }
     )
 }
 
 private fun Track.toStoredTrack(): StoredTrack {
-    val coverUrl = when (val c = cover ?: album?.cover) {
+    val directCover = when (val c = cover ?: album?.cover) {
         is ImageHolder.NetworkRequestImageHolder -> c.request.url
         is ImageHolder.ResourceUriImageHolder -> c.uri
         else -> null
     }
+    val extraCover = extras["cover_url"]
+    val effectiveCover = when {
+        !extraCover.isNullOrBlank() && !extraCover.contains("hqdefault.jpg") && !extraCover.contains("120x120") -> extraCover
+        !directCover.isNullOrBlank() && !directCover.contains("hqdefault.jpg") && !directCover.contains("120x120") -> directCover
+        !extraCover.isNullOrBlank() -> extraCover
+        !directCover.isNullOrBlank() -> directCover
+        else -> null
+    }
+
+    val cleanArtists = artists.map { it.name }.filterNot { name ->
+        name.isBlank() || name.equals("Song", true) || name.equals("Video", true) || name.equals("Episode", true) || name.equals("Unknown Artist", true) || name.equals("YouTube Music", true)
+    }.map { name ->
+        if (name.endsWith(" - Topic", ignoreCase = true)) name.substring(0, name.length - 8).trim() else name
+    }
+    var detectedArtist = cleanArtists.firstOrNull() ?: extras["artist_name"]?.takeIf { !it.equals("Song", true) && !it.equals("Video", true) } ?: ""
+    var cleanedTitle = cleanDisplayTitle(title)
+    if (detectedArtist.isBlank() && (title.contains(" - ") || title.contains(" – "))) {
+        val parts = title.split(REGEX_DASH_SPLIT)
+        if (parts.size >= 2 && parts[0].isNotBlank() && parts[0].length < 40) {
+            detectedArtist = parts[0].trim()
+            cleanedTitle = cleanDisplayTitle(parts.drop(1).joinToString(" - "))
+        }
+    }
+
+    val finalArtists = when {
+        cleanArtists.isNotEmpty() -> cleanArtists
+        detectedArtist.isNotBlank() -> listOf(detectedArtist)
+        else -> listOf("Audix Hi-Res Audio")
+    }
+    val validAlbumTitle = album?.title?.takeIf { !isGarbageAlbum(it) }
+
     return StoredTrack(
         id = id,
-        title = title,
-        artists = artists.map { it.name },
-        albumTitle = album?.title,
-        coverUrl = coverUrl,
+        title = cleanedTitle.ifBlank { title },
+        artists = finalArtists,
+        albumTitle = validAlbumTitle,
+        coverUrl = effectiveCover,
         durationMs = duration,
-        extras = extras
+        extras = buildMap {
+            putAll(extras)
+            if (!effectiveCover.isNullOrBlank()) put("cover_url", effectiveCover)
+            if (cleanedTitle.isNotBlank()) put("track_title", cleanedTitle)
+            if (finalArtists.isNotEmpty()) put("artist_name", finalArtists.joinToString(", "))
+            if (validAlbumTitle != null) put("album_name", validAlbumTitle) else remove("album_name")
+        }
     )
+}
+
+private fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Audix Hi-Res Audio"): String {
+    if (artists.isNullOrEmpty()) return fallback
+    val filtered = artists.map { it.name.trim() }.filterNot { name ->
+        name.isBlank() ||
+        name.equals("Song", true) ||
+        name.equals("Video", true) ||
+        name.equals("Episode", true) ||
+        name.equals("Podcast", true) ||
+        name.equals("Unknown Artist", true) ||
+        name.equals("Unknown", true) ||
+        name.equals("YouTube Music", true) ||
+        name.equals("Spotify Artist", true) ||
+        name.equals("Various Artists", true) ||
+        name.equals("Audix Artist", true) ||
+        name.equals("Music Video", true) ||
+        name.equals("T-Series", true) ||
+        name.equals("SonyMusicIndiaVEVO", true) ||
+        name.equals("Zee Music Company", true) ||
+        name.equals("Tips Official", true)
+    }.map { name ->
+        if (name.endsWith(" - Topic", ignoreCase = true)) name.substring(0, name.length - 8).trim() else name
+    }
+    return if (filtered.isNotEmpty()) filtered.joinToString(", ") else fallback
+}
+
+private fun cleanDisplayTitle(title: String?): String {
+    if (title.isNullOrBlank()) return "Untitled Track"
+    var t = title.trim()
+    if (t.contains("|")) t = t.substringBefore("|").trim()
+    if (t.contains("//")) t = t.substringBefore("//").trim()
+    t = t.replace(REGEX_BRACKETED_MEDIA, "")
+    t = t.replace(REGEX_BRACKETED_FROM, "")
+    t = t.replace(REGEX_TRAILING_MEDIA, "")
+    t = t.replace(REGEX_FEAT, "")
+    t = t.replace(REGEX_EMPTY_PARENS, "")
+    t = t.replace(REGEX_SPACES, " ").trim()
+    return if (t.isNotBlank()) t else title.trim()
 }
 
 // =========================================================================
@@ -121,8 +277,8 @@ private val SurfaceHover = Color(0xCC161E34)
 private val BorderMuted = Color(0x1FFFFFFF)
 private val BorderSubtle = Color(0x33FFFFFF)
 private val TextPrimary = Color(0xFFFFFFFF)
-private val TextSecondary = Color(0xFFA0A0A0)
-private val TextMuted = Color(0xFF6E6E6E)
+private val TextSecondary = Color(0xFFFFFFFF)
+private val TextMuted = Color(0xFFFFFFFF)
 
 private fun ImageHolder?.toCoverUrl(): String? = when (this) {
     is ImageHolder.NetworkRequestImageHolder -> request.url
@@ -131,11 +287,23 @@ private fun ImageHolder?.toCoverUrl(): String? = when (this) {
 }
 
 private fun EchoMediaItem.extractCoverUrl(): String? = when (this) {
-    is Track -> (cover ?: album?.cover).toCoverUrl()
-    else -> cover.toCoverUrl()
+    is Track -> this.extractCoverUrl()
+    else -> cover.toCoverUrl() ?: (this as? dev.brahmkshatriya.echo.common.models.Album)?.cover.toCoverUrl()
 }
 
-private fun Track.extractCoverUrl(): String? = (cover ?: album?.cover).toCoverUrl()
+private fun Track.extractCoverUrl(): String? {
+    val fromHolder = (cover ?: album?.cover).toCoverUrl()
+    val extraCover = extras["cover_url"]
+    if (!extraCover.isNullOrBlank()) {
+        val isGeneric = fromHolder.isNullOrBlank() ||
+            fromHolder.contains("charts-images.scdn.co") ||
+            fromHolder.contains("hqdefault.jpg") ||
+            fromHolder.contains("mqdefault.jpg") ||
+            fromHolder.contains("120x120")
+        if (isGeneric) return extraCover
+    }
+    return fromHolder ?: extraCover
+}
 
 private fun formatTrackDuration(durationMs: Long?): String {
     if (durationMs == null || durationMs <= 0L) return "--:--"
@@ -155,6 +323,19 @@ fun MiniEqualizerBars(
     modifier: Modifier = Modifier,
     color: Color = Color.White
 ) {
+    if (!isPlaying) {
+        Row(
+            modifier = modifier.size(width = 16.dp, height = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Box(Modifier.width(3.dp).fillMaxHeight(0.3f).clip(RoundedCornerShape(1.5.dp)).background(color))
+            Box(Modifier.width(3.dp).fillMaxHeight(0.6f).clip(RoundedCornerShape(1.5.dp)).background(color))
+            Box(Modifier.width(3.dp).fillMaxHeight(0.4f).clip(RoundedCornerShape(1.5.dp)).background(color))
+        }
+        return
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "EqualizerTransition")
 
     val height1 by infiniteTransition.animateFloat(
@@ -190,28 +371,24 @@ fun MiniEqualizerBars(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        val effective1 = if (isPlaying) height1 else 0.3f
-        val effective2 = if (isPlaying) height2 else 0.6f
-        val effective3 = if (isPlaying) height3 else 0.4f
-
         Box(
             Modifier
                 .width(3.dp)
-                .fillMaxHeight(effective1)
+                .fillMaxHeight(height1)
                 .clip(RoundedCornerShape(1.5.dp))
                 .background(color)
         )
         Box(
             Modifier
                 .width(3.dp)
-                .fillMaxHeight(effective2)
+                .fillMaxHeight(height2)
                 .clip(RoundedCornerShape(1.5.dp))
                 .background(color)
         )
         Box(
             Modifier
                 .width(3.dp)
-                .fillMaxHeight(effective3)
+                .fillMaxHeight(height3)
                 .clip(RoundedCornerShape(1.5.dp))
                 .background(color)
         )
@@ -243,8 +420,8 @@ fun CategoryCard(
             .height(88.dp)
             .pointerHoverIcon(PointerIcon.Hand),
         shape = RoundedCornerShape(12.dp),
-        backgroundColor = if (isHovered) Color(0xFF1B233A).copy(alpha = 0.85f) else Color(0xFF0C101F).copy(alpha = 0.65f),
-        borderColor = if (isHovered) Color(0xFF38BDF8).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.12f),
+        backgroundColor = if (isHovered) Color.White.copy(alpha = 0.12f) else Color(0xFF0A0C10).copy(alpha = 0.30f),
+        borderColor = if (isHovered) Color.White.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.12f),
         onClick = onClick
     ) {
         Row(
@@ -316,8 +493,8 @@ fun RecommendedTrackTasteCard(
             .width(172.dp)
             .pointerHoverIcon(PointerIcon.Hand),
         shape = RoundedCornerShape(14.dp),
-        backgroundColor = if (isHovered) Color(0xFF1B233A).copy(alpha = 0.85f) else Color(0xFF0C101F).copy(alpha = 0.65f),
-        borderColor = if (isHovered) Color(0xFF38BDF8).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.12f),
+        backgroundColor = if (isHovered) Color.White.copy(alpha = 0.12f) else Color(0xFF0A0C10).copy(alpha = 0.30f),
+        borderColor = if (isHovered) Color.White.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.12f),
         onClick = onPlay
     ) {
         Column(
@@ -340,7 +517,7 @@ fun RecommendedTrackTasteCard(
                     Icon(
                         Icons.Default.MusicNote,
                         contentDescription = null,
-                        tint = Color(0xFF475569),
+                        tint = Color.White,
                         modifier = Modifier.size(42.dp)
                     )
                 }
@@ -373,17 +550,17 @@ fun RecommendedTrackTasteCard(
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = track.title,
+                    text = cleanDisplayTitle(track.title),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFF8FAFC),
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = track.artists.joinToString(", ") { it.name }.ifBlank { "Unknown Artist" },
+                    text = formatArtistsForDisplay(track.artists, "Audix Artist"),
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8),
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -396,12 +573,12 @@ fun RecommendedTrackTasteCard(
             ) {
                 LiquidGlassBox(
                     shape = RoundedCornerShape(4.dp),
-                    backgroundColor = Color(0xFF0C101F).copy(alpha = 0.70f),
+                    backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                     borderColor = Color.White.copy(alpha = 0.08f)
                 ) {
                     Text(
                         text = "320k",
-                        color = Color(0xFF64748B),
+                        color = Color.White,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -419,7 +596,7 @@ fun RecommendedTrackTasteCard(
                         Icon(
                             Icons.AutoMirrored.Filled.PlaylistAdd,
                             contentDescription = "Add to playlist",
-                            tint = if (isHovered) Color(0xFFE2E8F0) else Color(0xFF64748B),
+                            tint = Color.White,
                             modifier = Modifier.size(15.dp)
                         )
                     }
@@ -431,7 +608,7 @@ fun RecommendedTrackTasteCard(
                         Icon(
                             Icons.Default.Download,
                             contentDescription = "Download offline",
-                            tint = if (isHovered) Color(0xFFE2E8F0) else Color(0xFF64748B),
+                            tint = Color.White,
                             modifier = Modifier.size(14.dp)
                         )
                     }
@@ -447,7 +624,7 @@ fun SearchDiscoveryHub(
     onSelectQuery: (String) -> Unit,
     onRemoveRecent: (String) -> Unit,
     onClearRecents: () -> Unit,
-    onPlayTrack: (Track) -> Unit = {},
+    onPlayTrack: (Track, List<Track>) -> Unit = { _, _ -> },
     onAddToPlaylist: (Track) -> Unit = {},
     onDownloadTrack: (Track) -> Unit = {},
     modifier: Modifier = Modifier
@@ -549,8 +726,8 @@ fun SearchDiscoveryHub(
 
                         LiquidGlassBox(
                             shape = RoundedCornerShape(20.dp),
-                            backgroundColor = Color(0xFF0C101F).copy(alpha = 0.70f),
-                            borderColor = Color(0xFF38BDF8).copy(alpha = 0.35f)
+                            backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
+                            borderColor = Color.White.copy(alpha = 0.20f)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -582,7 +759,7 @@ fun SearchDiscoveryHub(
                             items(userFavoriteArtists, key = { it }) { artist ->
                                 LiquidGlassBox(
                                     shape = RoundedCornerShape(16.dp),
-                                    backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+                                    backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                                     borderColor = Color.White.copy(alpha = 0.15f),
                                     modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                                     onClick = { onSelectQuery(artist) }
@@ -595,14 +772,14 @@ fun SearchDiscoveryHub(
                                         Icon(
                                             Icons.Default.Person,
                                             contentDescription = null,
-                                            tint = Color(0xFF94A3B8),
+                                            tint = Color.White,
                                             modifier = Modifier.size(13.dp)
                                         )
                                         Text(
                                             text = artist,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = Color(0xFFF1F5F9)
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -618,7 +795,7 @@ fun SearchDiscoveryHub(
                         items(recommendedTracks, key = { it.id }) { track ->
                             RecommendedTrackTasteCard(
                                 track = track,
-                                onPlay = { onPlayTrack(track) },
+                                onPlay = { onPlayTrack(track, recommendedTracks) },
                                 onAddToPlaylist = { onAddToPlaylist(track) },
                                 onDownload = {
                                     downloadManager.downloadTrack(track)
@@ -663,7 +840,7 @@ fun SearchDiscoveryHub(
                             items(recentSearches, key = { it }) { term ->
                                 LiquidGlassBox(
                                     shape = RoundedCornerShape(18.dp),
-                                    backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+                                    backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                                     borderColor = Color.White.copy(alpha = 0.12f),
                                     modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
                                 ) {
@@ -720,7 +897,7 @@ fun SearchDiscoveryHub(
                         items(trendingPills, key = { it }) { pill ->
                             LiquidGlassBox(
                                 shape = RoundedCornerShape(18.dp),
-                                backgroundColor = Color(0xFF0C101F).copy(alpha = 0.60f),
+                                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                                 borderColor = Color.White.copy(alpha = 0.12f),
                                 modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
                                 onClick = { onSelectQuery(pill) }
@@ -826,8 +1003,8 @@ fun TopResultSpotlightCard(
             .fillMaxWidth()
             .pointerHoverIcon(PointerIcon.Hand),
         shape = RoundedCornerShape(14.dp),
-        backgroundColor = if (isHovered) Color(0xFF1B233A).copy(alpha = 0.85f) else Color(0xFF0C101F).copy(alpha = 0.65f),
-        borderColor = if (isHovered) Color(0xFF38BDF8).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.12f),
+        backgroundColor = if (isHovered) Color.White.copy(alpha = 0.12f) else Color(0xFF0A0C10).copy(alpha = 0.30f),
+        borderColor = if (isHovered) Color.White.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.12f),
         onClick = onClick
     ) {
         Column(
@@ -915,7 +1092,7 @@ fun TopResultSpotlightCard(
             ) {
                 LiquidGlassBox(
                     shape = RoundedCornerShape(4.dp),
-                    backgroundColor = Color(0xFF0C101F).copy(alpha = 0.70f),
+                    backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                     borderColor = Color.White.copy(alpha = 0.15f)
                 ) {
                     Text(
@@ -1038,15 +1215,53 @@ fun SearchTrackItemRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = track.title,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.SemiBold
-                ),
-                color = TextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.SemiBold
+                    ),
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+
+                val sourceTag = track.extras["source_name"] ?: when {
+                    track.extras["extension_id"]?.contains("youtube", true) == true -> "YouTube"
+                    track.extras["extension_id"]?.contains("saavn", true) == true || track.extras["source"] == "JioSaavn" -> "JioSaavn"
+                    track.extras["extension_id"]?.contains("spotify", true) == true -> "Spotify"
+                    track.extras["extension_id"]?.contains("soundcloud", true) == true -> "SoundCloud"
+                    track.extras["extension_id"]?.contains("radio", true) == true -> "Radio"
+                    else -> null
+                }
+                if (sourceTag != null) {
+                    val (badgeBg, badgeBorder, badgeText) = when {
+                        sourceTag.contains("YouTube", true) -> Triple(Color(0x33FF0000), Color(0x66FF0000), Color(0xFFFF6E6E))
+                        sourceTag.contains("Saavn", true) -> Triple(Color(0x3310B981), Color(0x6610B981), Color(0xFF34D399))
+                        sourceTag.contains("Spotify", true) -> Triple(Color(0x331DB954), Color(0x661DB954), Color(0xFF1DB954))
+                        sourceTag.contains("SoundCloud", true) -> Triple(Color(0x33F97316), Color(0x66F97316), Color(0xFFFB923C))
+                        sourceTag.contains("Radio", true) -> Triple(Color(0x3338BDF8), Color(0x6638BDF8), Color(0xFF38BDF8))
+                        else -> Triple(Color(0x22FFFFFF), Color(0x44FFFFFF), Color(0xFFCCCCCC))
+                    }
+                    LiquidGlassBox(
+                        shape = RoundedCornerShape(4.dp),
+                        backgroundColor = badgeBg,
+                        borderColor = badgeBorder
+                    ) {
+                        Text(
+                            text = sourceTag,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = badgeText,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+            }
             Text(
                 text = track.subtitle ?: "Unknown Artist",
                 style = MaterialTheme.typography.bodySmall,
@@ -1123,7 +1338,7 @@ fun TopSongsQuickList(
     LiquidGlassCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
         borderColor = Color.White.copy(alpha = 0.12f)
     ) {
         Column(
@@ -1357,7 +1572,7 @@ fun SearchErrorBanner(
             .fillMaxWidth()
             .padding(24.dp),
         shape = RoundedCornerShape(12.dp),
-        backgroundColor = Color(0xFF13172A).copy(alpha = 0.65f),
+        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.40f),
         borderColor = Color.White.copy(alpha = 0.15f)
     ) {
         Row(
@@ -1613,6 +1828,1059 @@ fun AddToPlaylistDialog(
 }
 
 // =========================================================================
+// UNIFIED CATALOG AGGREGATOR & DETAIL MODALS
+// =========================================================================
+
+object UnifiedCatalogEngine {
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+        .followRedirects(true)
+        .build()
+
+    private val jsonParser = Json { ignoreUnknownKeys = true }
+    private val saavnDesKey = "38346591".toByteArray(Charsets.UTF_8)
+
+    fun decryptSaavnRaw(encUrl: String): String? {
+        return runCatching {
+            val cleanEnc = encUrl.replace("\\/", "/").replace("\\", "").trim()
+            if (cleanEnc.length < 8 || cleanEnc.length > 2048) return null
+            val cipher = javax.crypto.Cipher.getInstance("DES/ECB/PKCS5Padding")
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, javax.crypto.spec.SecretKeySpec(saavnDesKey, "DES"))
+            var normalizedBase64 = cleanEnc.replace("-", "+").replace("_", "/")
+            val missingPadding = (4 - (normalizedBase64.length % 4)) % 4
+            normalizedBase64 += "=".repeat(missingPadding)
+            val decoded = runCatching { java.util.Base64.getDecoder().decode(normalizedBase64) }
+                .getOrElse { java.util.Base64.getUrlDecoder().decode(cleanEnc) }
+            val decrypted = cipher.doFinal(decoded)
+            String(decrypted, Charsets.UTF_8).trim()
+        }.getOrNull()
+    }
+
+    fun decryptSaavnUrl(encUrl: String): String? {
+        val raw = decryptSaavnRaw(encUrl) ?: return null
+        return raw.replace("_96.mp4", "_320.mp4").replace("_160.mp4", "_320.mp4")
+    }
+
+    fun unescapeHtml(text: String): String {
+        return text
+            .replace("&quot;", "\"")
+            .replace("&amp;", "&")
+            .replace("&#039;", "'")
+            .replace("&apos;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .trim()
+    }
+
+    suspend fun fetchSaavnSearchCatalog(query: String): List<Shelf> = withContext(Dispatchers.IO) {
+        val shelves = mutableListOf<Shelf>()
+        val encoded = runCatching { java.net.URLEncoder.encode(query, "UTF-8") }.getOrDefault(query)
+
+        // 1. Fetch Tracks
+        runCatching {
+            val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=25&q=$encoded"
+            val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+            okHttpClient.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string() ?: ""
+                    val root = jsonParser.parseToJsonElement(body).jsonObject
+                    val results = root["results"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
+                    val tracks = results.mapNotNull { elem ->
+                        val obj = elem.jsonObject
+                        val id = obj["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val rawTitle = obj["song"]?.jsonPrimitive?.content ?: "Unknown Track"
+                        val rawArtist = obj["primary_artists"]?.jsonPrimitive?.content ?: "Unknown Artist"
+                        val realTitle = unescapeHtml(rawTitle)
+                        val realArtist = unescapeHtml(rawArtist)
+                        val rawImage = obj["image"]?.jsonPrimitive?.content ?: ""
+                        val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500")
+                        val durSec = obj["duration"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                        val durationMs = durSec * 1000L
+                        val albumName = unescapeHtml(obj["album"]?.jsonPrimitive?.content ?: "")
+
+                        val encUrl = obj["encrypted_media_url"]?.jsonPrimitive?.content
+                        val previewUrl = obj["media_preview_url"]?.jsonPrimitive?.content
+                        val streamUrl = encUrl?.let { decryptSaavnUrl(it) } ?: previewUrl ?: ""
+
+                        val coverHolder = if (highResImage.isNotBlank()) ImageHolder.NetworkRequestImageHolder(highResImage.toGetRequest(), false) else null
+                        val artistList = if (realArtist.contains(",") || realArtist.contains("&")) {
+                            realArtist.split(REGEX_ARTIST_SPLIT).map { it.trim() }.filter { it.isNotBlank() }.map { Artist(id = it, name = it) }
+                        } else listOf(Artist(id = realArtist, name = realArtist))
+
+                        val streamable = if (streamUrl.isNotBlank()) {
+                            Streamable.server(
+                                id = id,
+                                quality = 320,
+                                title = "320 kbps (JioSaavn HQ)",
+                                extras = mapOf(
+                                    "stream_url" to streamUrl,
+                                    "extension_id" to "saavn_music",
+                                    "track_title" to realTitle,
+                                    "artist_name" to realArtist
+                                )
+                            )
+                        } else null
+
+                        Track(
+                            id = id,
+                            title = realTitle,
+                            artists = artistList,
+                            album = if (albumName.isNotBlank()) Album(id = albumName, title = albumName, cover = coverHolder) else null,
+                            cover = coverHolder,
+                            streamables = if (streamable != null) listOf(streamable) else emptyList(),
+                            duration = durationMs,
+                            extras = buildMap {
+                                put("extension_id", "saavn_music")
+                                put("source_name", "JioSaavn")
+                                put("source", "JioSaavn")
+                                put("song_id", id)
+                                if (streamUrl.isNotBlank()) put("stream_url", streamUrl)
+                                put("track_title", realTitle)
+                                put("artist_name", realArtist)
+                                if (highResImage.isNotBlank()) put("cover_url", highResImage)
+                                if (albumName.isNotBlank()) put("album_name", albumName)
+                            }
+                        )
+                    }
+                    if (tracks.isNotEmpty()) {
+                        shelves.add(Shelf.Lists.Tracks(id = "saavn_tracks", title = "JioSaavn Studio Tracks", list = tracks))
+                    }
+                }
+            }
+        }
+
+        // 2. Fetch Albums
+        runCatching {
+            val url = "https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&ctx=android&p=1&n=12&q=$encoded"
+            val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+            okHttpClient.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string() ?: ""
+                    val root = jsonParser.parseToJsonElement(body).jsonObject
+                    val results = root["results"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
+                    val albums = results.mapNotNull { elem ->
+                        val obj = elem.jsonObject
+                        val id = obj["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val rawTitle = obj["title"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val realTitle = unescapeHtml(rawTitle)
+                        val rawArtist = obj["primary_artists"]?.jsonPrimitive?.content ?: obj["artist"]?.jsonPrimitive?.content ?: ""
+                        val realArtist = unescapeHtml(rawArtist)
+                        val rawImage = obj["image"]?.jsonPrimitive?.content ?: ""
+                        val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500")
+                        val year = obj["year"]?.jsonPrimitive?.content ?: ""
+                        val coverHolder = if (highResImage.isNotBlank()) ImageHolder.NetworkRequestImageHolder(highResImage.toGetRequest(), false) else null
+
+                        Album(
+                            id = id,
+                            title = realTitle,
+                            artists = if (realArtist.isNotBlank()) listOf(Artist(id = realArtist, name = realArtist)) else emptyList(),
+                            cover = coverHolder,
+                            subtitle = year,
+                            extras = buildMap {
+                                put("extension_id", "saavn_music")
+                                put("source_name", "JioSaavn")
+                                put("album_id", id)
+                                if (highResImage.isNotBlank()) put("cover_url", highResImage)
+                            }
+                        )
+                    }
+                    if (albums.isNotEmpty()) {
+                        shelves.add(Shelf.Lists.Items(id = "saavn_albums", title = "JioSaavn Albums", list = albums))
+                    }
+                }
+            }
+        }
+
+        // 3. Fetch Artists
+        runCatching {
+            val url = "https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&ctx=android&p=1&n=8&q=$encoded"
+            val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+            okHttpClient.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string() ?: ""
+                    val root = jsonParser.parseToJsonElement(body).jsonObject
+                    val results = root["results"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
+                    val artists = results.mapNotNull { elem ->
+                        val obj = elem.jsonObject
+                        val id = obj["artistid"]?.jsonPrimitive?.content ?: obj["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val rawName = obj["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                        val realName = unescapeHtml(rawName)
+                        val rawImage = obj["image"]?.jsonPrimitive?.content ?: ""
+                        val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500")
+                        val coverHolder = if (highResImage.isNotBlank()) ImageHolder.NetworkRequestImageHolder(highResImage.toGetRequest(), false) else null
+
+                        Artist(
+                            id = id,
+                            name = realName,
+                            cover = coverHolder,
+                            subtitle = "JioSaavn Artist",
+                            extras = buildMap {
+                                put("extension_id", "saavn_music")
+                                put("source_name", "JioSaavn")
+                                put("artist_id", id)
+                                if (highResImage.isNotBlank()) put("cover_url", highResImage)
+                            }
+                        )
+                    }
+                    if (artists.isNotEmpty()) {
+                        shelves.add(Shelf.Lists.Items(id = "saavn_artists", title = "Artists", list = artists))
+                    }
+                }
+            }
+        }
+
+        shelves
+    }
+
+    suspend fun loadAlbumTracks(album: Album, extensionManager: ExtensionManager): List<Track> = withContext(Dispatchers.IO) {
+        val extId = album.extras["extension_id"]
+        val allMusic = extensionManager.music.value
+        val ext = allMusic.firstOrNull { it.id.equals(extId, ignoreCase = true) || it.metadata.id.equals(extId, ignoreCase = true) }
+            ?: extensionManager.current.value ?: allMusic.firstOrNull()
+
+        if (ext != null) {
+            val albumClient = runCatching {
+                (ext.instance.value ?: ext.instance.value().getOrNull()) as? dev.brahmkshatriya.echo.common.clients.AlbumClient
+            }.getOrNull()
+            if (albumClient != null) {
+                val extTracks = runCatching {
+                    val feed = albumClient.loadTracks(album)
+                    val pagedData = feed?.getPagedData(null)?.pagedData
+                    pagedData?.loadAll() ?: emptyList<Track>()
+                }.getOrNull()
+                if (!extTracks.isNullOrEmpty()) {
+                    return@withContext extTracks.map { t ->
+                        t.copy(extras = t.extras + ("extension_id" to ext.id) + ("source_name" to ext.metadata.name))
+                    }
+                }
+            }
+        }
+
+        val albumId = album.extras["album_id"] ?: album.id.takeIf { it.all { ch -> ch.isDigit() } }
+        if (!albumId.isNullOrBlank()) {
+            val tracks = runCatching {
+                val url = "https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=$albumId"
+                val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+                okHttpClient.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string() ?: ""
+                        val root = jsonParser.parseToJsonElement(body).jsonObject
+                        val songs = root["songs"]?.jsonArray ?: return@use emptyList<Track>()
+                        songs.mapNotNull { elem ->
+                            val obj = elem.jsonObject
+                            val sId = obj["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                            val rawTitle = obj["song"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                            val realTitle = unescapeHtml(rawTitle)
+                            val rawArtist = obj["primary_artists"]?.jsonPrimitive?.content ?: ""
+                            val realArtist = unescapeHtml(rawArtist)
+                            val rawImage = obj["image"]?.jsonPrimitive?.content ?: ""
+                            val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500")
+                            val durSec = obj["duration"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                            val coverHolder = if (highResImage.isNotBlank()) ImageHolder.NetworkRequestImageHolder(highResImage.toGetRequest(), false) else album.cover
+
+                            val encUrl = obj["encrypted_media_url"]?.jsonPrimitive?.content
+                            val previewUrl = obj["media_preview_url"]?.jsonPrimitive?.content
+                            val streamUrl = encUrl?.let { decryptSaavnUrl(it) } ?: previewUrl ?: ""
+
+                            val streamable = if (streamUrl.isNotBlank()) {
+                                Streamable.server(
+                                    id = sId,
+                                    quality = 320,
+                                    title = "320 kbps (JioSaavn HQ)",
+                                    extras = mapOf(
+                                        "stream_url" to streamUrl,
+                                        "extension_id" to "saavn_music",
+                                        "track_title" to realTitle,
+                                        "artist_name" to realArtist
+                                    )
+                                )
+                            } else null
+
+                            Track(
+                                id = sId,
+                                title = realTitle,
+                                artists = if (realArtist.isNotBlank()) listOf(Artist(id = realArtist, name = realArtist)) else album.artists,
+                                album = album,
+                                cover = coverHolder,
+                                streamables = if (streamable != null) listOf(streamable) else emptyList(),
+                                duration = durSec * 1000L,
+                                extras = buildMap {
+                                    put("extension_id", "saavn_music")
+                                    put("source_name", "JioSaavn")
+                                    put("source", "JioSaavn")
+                                    put("song_id", sId)
+                                    if (streamUrl.isNotBlank()) put("stream_url", streamUrl)
+                                    put("track_title", realTitle)
+                                    if (realArtist.isNotBlank()) put("artist_name", realArtist)
+                                    if (highResImage.isNotBlank()) put("cover_url", highResImage)
+                                }
+                            )
+                        }
+                    } else emptyList()
+                }
+            }.getOrDefault(emptyList())
+
+            if (tracks.isNotEmpty()) return@withContext tracks
+        }
+
+        val artistName = album.artists.firstOrNull()?.name ?: ""
+        val targetQuery = if (artistName.isNotBlank()) "${album.title} $artistName" else album.title
+        val searchShelves = fetchSaavnSearchCatalog(targetQuery)
+        val candidateTracks = searchShelves.filterIsInstance<Shelf.Lists.Tracks>().flatMap { it.list }
+        if (candidateTracks.isNotEmpty()) {
+            return@withContext candidateTracks.take(15)
+        }
+
+        emptyList()
+    }
+
+    suspend fun loadArtistDiscography(artist: Artist, extensionManager: ExtensionManager): Pair<List<Track>, List<Album>> = withContext(Dispatchers.IO) {
+        val extId = artist.extras["extension_id"]
+        val allMusic = extensionManager.music.value
+        val ext = allMusic.firstOrNull { it.id.equals(extId, ignoreCase = true) || it.metadata.id.equals(extId, ignoreCase = true) }
+            ?: extensionManager.current.value ?: allMusic.firstOrNull()
+
+        var loadedTracks = emptyList<Track>()
+        var loadedAlbums = emptyList<Album>()
+
+        if (ext != null) {
+            val artistClient = runCatching {
+                (ext.instance.value ?: ext.instance.value().getOrNull()) as? dev.brahmkshatriya.echo.common.clients.ArtistClient
+            }.getOrNull()
+            if (artistClient != null) {
+                runCatching {
+                    val feed = artistClient.loadFeed(artist)
+                    val pagedData = feed.getPagedData(null)?.pagedData
+                    val shelves = pagedData?.loadAll() ?: emptyList<Shelf>()
+                    val tracks = shelves.filterIsInstance<Shelf.Lists.Tracks>().flatMap { it.list }
+                    val albums = shelves.filterIsInstance<Shelf.Lists.Items>().flatMap { it.list }.filterIsInstance<Album>()
+                    if (tracks.isNotEmpty()) loadedTracks = tracks.map { t -> t.copy(extras = t.extras + ("extension_id" to ext.id) + ("source_name" to ext.metadata.name)) }
+                    if (albums.isNotEmpty()) loadedAlbums = albums
+                }
+            }
+        }
+
+        if (loadedTracks.isEmpty() || loadedAlbums.isEmpty()) {
+            val saavnShelves = fetchSaavnSearchCatalog(artist.name)
+            if (loadedTracks.isEmpty()) {
+                val sTracks = saavnShelves.filterIsInstance<Shelf.Lists.Tracks>().flatMap { it.list }
+                if (sTracks.isNotEmpty()) loadedTracks = sTracks.take(15)
+            }
+            if (loadedAlbums.isEmpty()) {
+                val sAlbums = saavnShelves.filterIsInstance<Shelf.Lists.Items>().flatMap { it.list }.filterIsInstance<Album>()
+                if (sAlbums.isNotEmpty()) loadedAlbums = sAlbums.take(12)
+            }
+        }
+
+        Pair(loadedTracks, loadedAlbums)
+    }
+
+    suspend fun searchUnified(
+        query: String,
+        musicExtensions: List<MusicExtension>,
+        extensionManager: ExtensionManager
+    ): List<Shelf> = kotlinx.coroutines.coroutineScope {
+        val activeExtensions = musicExtensions.filter { it.isEnabled }.ifEmpty { musicExtensions }
+        val deferredExt = activeExtensions.map { ext ->
+            async(Dispatchers.IO) {
+                val shelves: List<Shelf> = runCatching {
+                    val client = (ext.instance.value ?: ext.instance.value().getOrNull()) as? dev.brahmkshatriya.echo.common.clients.SearchFeedClient
+                    if (client != null) {
+                        val feed = client.loadSearchFeed(query)
+                        val pagedData = feed.getPagedData(null)?.pagedData
+                        val loaded = pagedData?.loadAll() ?: emptyList<Shelf>()
+                        loaded.map { s -> stampShelf(s, ext.id, ext.metadata.name) }
+                    } else emptyList<Shelf>()
+                }.getOrDefault(emptyList<Shelf>())
+                shelves
+            }
+        }
+
+        val saavnDeferred = async(Dispatchers.IO) {
+            runCatching { fetchSaavnSearchCatalog(query) }.getOrDefault(emptyList<Shelf>())
+        }
+
+        val allShelves = deferredExt.awaitAll().flatten() + saavnDeferred.await()
+        organizeShelves(allShelves)
+    }
+
+    private fun stampShelf(shelf: Shelf, extId: String, extName: String): Shelf {
+        return when (shelf) {
+            is Shelf.Lists.Tracks -> shelf.copy(list = shelf.list.map { t -> stampTrack(t, extId, extName) })
+            is Shelf.Lists.Items -> shelf.copy(list = shelf.list.map { item ->
+                if (item is Track) stampTrack(item, extId, extName) else item
+            })
+            else -> shelf
+        }
+    }
+
+    private fun stampTrack(track: Track, extId: String, extName: String): Track {
+        val existingExt = track.extras["extension_id"]
+        val existingSrc = track.extras["source_name"] ?: track.extras["source"]
+        val finalExtId = if (existingExt.isNullOrBlank()) extId else existingExt
+        val finalSrcName = if (existingSrc.isNullOrBlank()) extName else existingSrc
+        return track.copy(extras = track.extras + ("extension_id" to finalExtId) + ("source_name" to finalSrcName))
+    }
+
+    private fun organizeShelves(shelves: List<Shelf>): List<Shelf> {
+        val result = mutableListOf<Shelf>()
+        val allTracks = mutableListOf<Track>()
+        val allAlbums = mutableListOf<Album>()
+        val allArtists = mutableListOf<Artist>()
+        val otherShelves = mutableListOf<Shelf>()
+
+        for (shelf in shelves) {
+            when (shelf) {
+                is Shelf.Lists.Tracks -> allTracks.addAll(shelf.list)
+                is Shelf.Lists.Items -> {
+                    for (item in shelf.list) {
+                        when (item) {
+                            is Track -> allTracks.add(item)
+                            is Album -> allAlbums.add(item)
+                            is Artist -> allArtists.add(item)
+                            else -> {}
+                        }
+                    }
+                }
+                else -> otherShelves.add(shelf)
+            }
+        }
+
+        val seenTrackKeys = mutableSetOf<String>()
+        val distinctTracks = mutableListOf<Track>()
+        for (t in allTracks) {
+            val key = "${t.title.lowercase().trim()}_${t.artists.firstOrNull()?.name?.lowercase()?.trim()}"
+            if (seenTrackKeys.add(key)) {
+                distinctTracks.add(t)
+            }
+        }
+        if (distinctTracks.isNotEmpty()) {
+            result.add(Shelf.Lists.Tracks(id = "unified_top_tracks", title = "Top Songs (Unified Catalog)", list = distinctTracks))
+        }
+
+        val seenAlbumKeys = mutableSetOf<String>()
+        val distinctAlbums = mutableListOf<Album>()
+        for (a in allAlbums) {
+            val key = a.title.lowercase().trim()
+            if (seenAlbumKeys.add(key)) {
+                distinctAlbums.add(a)
+            }
+        }
+        if (distinctAlbums.isNotEmpty()) {
+            result.add(Shelf.Lists.Items(id = "unified_albums", title = "Albums (All Sources)", list = distinctAlbums))
+        }
+
+        val seenArtistKeys = mutableSetOf<String>()
+        val distinctArtists = mutableListOf<Artist>()
+        for (art in allArtists) {
+            val key = art.name.lowercase().trim()
+            if (seenArtistKeys.add(key)) {
+                distinctArtists.add(art)
+            }
+        }
+        if (distinctArtists.isNotEmpty()) {
+            result.add(Shelf.Lists.Items(id = "unified_artists", title = "Artists (All Sources)", list = distinctArtists))
+        }
+
+        result.addAll(otherShelves)
+        return result
+    }
+}
+
+@Composable
+fun ShelfMediaCardRow(
+    title: String,
+    subtitle: String,
+    badge: String,
+    coverUrl: String?,
+    isCircle: Boolean = false,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isHovered) Color.White.copy(alpha = 0.08f) else Color.Transparent)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        val shape = if (isCircle) CircleShape else RoundedCornerShape(8.dp)
+        Box(
+            modifier = Modifier
+                .size(46.dp)
+                .clip(shape)
+                .background(Color.White.copy(alpha = 0.06f))
+        ) {
+            if (!coverUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = coverUrl,
+                    contentDescription = title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = if (isCircle) Icons.Default.Person else Icons.Default.Album,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.size(22.dp).align(Alignment.Center)
+                )
+            }
+        }
+
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        LiquidGlassBox(
+            shape = RoundedCornerShape(6.dp),
+            backgroundColor = Color.White.copy(alpha = 0.08f),
+            borderColor = Color.White.copy(alpha = 0.15f)
+        ) {
+            Text(
+                text = badge,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun SeniorShelfDetailModal(
+    shelf: Shelf,
+    onDismiss: () -> Unit,
+    onMediaSelected: (EchoMediaItem) -> Unit,
+    onPlayTrack: (Track, List<Track>) -> Unit,
+    onAddToPlaylist: (Track) -> Unit,
+    onDownloadTrack: (Track) -> Unit
+) {
+    val items: List<EchoMediaItem> = remember(shelf) {
+        when (shelf) {
+            is Shelf.Lists.Tracks -> shelf.list
+            is Shelf.Lists.Items -> shelf.list
+            is Shelf.Item -> listOf(shelf.media)
+            else -> emptyList()
+        }
+    }
+    val tracks = remember(items) { items.filterIsInstance<Track>() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.78f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                onDismiss()
+            }
+            .zIndex(100f),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(860.dp)
+                .heightIn(max = 700.dp)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                    // Prevent dismiss on inner click
+                }
+        ) {
+            LiquidGlassBox(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(24.dp),
+                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.65f),
+                borderColor = Color.White.copy(alpha = 0.22f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = shelf.title.ifBlank { "All Items" },
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(12.dp),
+                                    backgroundColor = Color.White.copy(alpha = 0.12f),
+                                    borderColor = Color.White.copy(alpha = 0.20f)
+                                ) {
+                                    Text(
+                                        text = "${items.size} Items",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Full scrollable catalog view • Instant high-fidelity playback",
+                                fontSize = 12.sp,
+                                color = TextMuted
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (tracks.isNotEmpty()) {
+                                Button(
+                                    onClick = { onPlayTrack(tracks.first(), tracks) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Play All", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        val sh = tracks.shuffled()
+                                        if (sh.isNotEmpty()) onPlayTrack(sh.first(), sh)
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Shuffle", color = Color.White, fontSize = 12.sp)
+                                }
+                            }
+
+                            IconButton(
+                                onClick = onDismiss,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.10f))
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp)
+
+                    // Items List
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        itemsIndexed(items, key = { idx, item -> "${item.id}_$idx" }) { index, item ->
+                            when (item) {
+                                is Track -> {
+                                    SearchTrackItemRow(
+                                        track = item,
+                                        index = index,
+                                        isCurrentTrack = false,
+                                        isPlaying = false,
+                                        onPlay = { onPlayTrack(item, if (tracks.isNotEmpty()) tracks else listOf(item)) },
+                                        onAddToPlaylist = { onAddToPlaylist(item) },
+                                        onDownload = { onDownloadTrack(item) }
+                                    )
+                                }
+                                is Album -> {
+                                    ShelfMediaCardRow(
+                                        title = item.title,
+                                        subtitle = item.artists.joinToString(", ") { it.name }.ifBlank { "Album" },
+                                        badge = "ALBUM",
+                                        coverUrl = when (val c = item.cover) {
+                                            is ImageHolder.NetworkRequestImageHolder -> c.request.url
+                                            is ImageHolder.ResourceUriImageHolder -> c.uri
+                                            else -> item.extras["cover_url"]
+                                        },
+                                        onClick = { onMediaSelected(item) }
+                                    )
+                                }
+                                is Artist -> {
+                                    ShelfMediaCardRow(
+                                        title = item.name,
+                                        subtitle = item.subtitle ?: "Artist",
+                                        badge = "ARTIST",
+                                        isCircle = true,
+                                        coverUrl = when (val c = item.cover) {
+                                            is ImageHolder.NetworkRequestImageHolder -> c.request.url
+                                            is ImageHolder.ResourceUriImageHolder -> c.uri
+                                            else -> item.extras["cover_url"]
+                                        },
+                                        onClick = { onMediaSelected(item) }
+                                    )
+                                }
+                                is Playlist -> {
+                                    ShelfMediaCardRow(
+                                        title = item.title,
+                                        subtitle = "${item.trackCount ?: 0} tracks",
+                                        badge = "PLAYLIST",
+                                        coverUrl = when (val c = item.cover) {
+                                            is ImageHolder.NetworkRequestImageHolder -> c.request.url
+                                            is ImageHolder.ResourceUriImageHolder -> c.uri
+                                            else -> item.extras["cover_url"]
+                                        },
+                                        onClick = { onMediaSelected(item) }
+                                    )
+                                }
+                                else -> {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SeniorMediaDetailModal(
+    media: EchoMediaItem,
+    onDismiss: () -> Unit,
+    onMediaSelected: (EchoMediaItem) -> Unit,
+    playerViewModel: PlayerViewModel,
+    extensionManager: ExtensionManager,
+    onAddToPlaylist: (Track) -> Unit,
+    onDownloadTrack: (Track) -> Unit
+) {
+    var albumTracks by remember(media) { mutableStateOf<List<Track>>(emptyList()) }
+    var artistTracks by remember(media) { mutableStateOf<List<Track>>(emptyList()) }
+    var artistAlbums by remember(media) { mutableStateOf<List<Album>>(emptyList()) }
+    var isLoading by remember(media) { mutableStateOf(true) }
+
+    LaunchedEffect(media) {
+        isLoading = true
+        when (media) {
+            is Album -> {
+                albumTracks = UnifiedCatalogEngine.loadAlbumTracks(media, extensionManager)
+            }
+            is Artist -> {
+                val (t, a) = UnifiedCatalogEngine.loadArtistDiscography(media, extensionManager)
+                artistTracks = t
+                artistAlbums = a
+            }
+            else -> {}
+        }
+        isLoading = false
+    }
+
+    val isAlbum = media is Album
+    val isArtist = media is Artist
+
+    val title = when (media) {
+        is Album -> media.title
+        is Artist -> media.name
+        is Playlist -> media.title
+        is Track -> media.title
+        else -> "Details"
+    }
+    val subtitle = when (media) {
+        is Album -> media.artists.joinToString(", ") { it.name }.ifBlank { "Album" }
+        is Artist -> media.subtitle ?: "Artist"
+        is Playlist -> "${media.trackCount ?: 0} tracks"
+        is Track -> media.artists.joinToString(", ") { it.name }
+        else -> ""
+    }
+    val coverUrl = when (val c = media.cover) {
+        is ImageHolder.NetworkRequestImageHolder -> c.request.url
+        is ImageHolder.ResourceUriImageHolder -> c.uri
+        else -> media.extras["cover_url"]
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.82f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                onDismiss()
+            }
+            .zIndex(110f),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(880.dp)
+                .heightIn(max = 740.dp)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                    // Prevent dismiss on inner click
+                }
+        ) {
+            LiquidGlassBox(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(24.dp),
+                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.65f),
+                borderColor = Color.White.copy(alpha = 0.22f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(26.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    // HERO HEADER
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(22.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        val imgShape = if (isArtist) CircleShape else RoundedCornerShape(16.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(140.dp)
+                                .clip(imgShape)
+                                .border(1.dp, Color.White.copy(alpha = 0.20f), imgShape)
+                                .shadow(14.dp, imgShape, spotColor = Color(0xFF38BDF8))
+                        ) {
+                            if (!coverUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = coverUrl,
+                                    contentDescription = title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = if (isArtist) Icons.Default.Person else Icons.Default.Album,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.40f),
+                                    modifier = Modifier.size(54.dp).align(Alignment.Center)
+                                )
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(8.dp),
+                                    backgroundColor = Color.White.copy(alpha = 0.12f),
+                                    borderColor = Color.White.copy(alpha = 0.22f)
+                                ) {
+                                    Text(
+                                        text = if (isArtist) "ARTIST" else if (isAlbum) "ALBUM" else "COLLECTION",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF38BDF8),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = onDismiss,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.10f))
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                                }
+                            }
+
+                            Text(
+                                text = title,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Text(
+                                text = subtitle,
+                                fontSize = 13.5.sp,
+                                color = TextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            val activeTracks = if (isAlbum) albumTracks else artistTracks
+                            Row(
+                                modifier = Modifier.padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (activeTracks.isNotEmpty()) {
+                                    Button(
+                                        onClick = { playerViewModel.playWithQueue(activeTracks.first(), activeTracks) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(if (isArtist) "Play Popular" else "Play Album", fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            val sh = activeTracks.shuffled()
+                                            if (sh.isNotEmpty()) playerViewModel.playWithQueue(sh.first(), sh)
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Shuffle", color = Color.White, fontSize = 12.5.sp)
+                                    }
+                                }
+
+                                if (isAlbum && albumTracks.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = {
+                                            albumTracks.forEach { onDownloadTrack(it) }
+                                        },
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.08f))
+                                    ) {
+                                        Icon(Icons.Default.Download, contentDescription = "Download All", tint = Color.White, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp)
+
+                    // BODY: TRACKS & DISCOGRAPHY
+                    if (isLoading) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (isAlbum) {
+                                if (albumTracks.isEmpty()) {
+                                    item {
+                                        Text("No tracks found for this album.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
+                                    }
+                                } else {
+                                    item {
+                                        Text(
+                                            text = "Tracklist (${albumTracks.size} Songs)",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White.copy(alpha = 0.90f),
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                    }
+                                    itemsIndexed(albumTracks, key = { idx, tr -> "${tr.id}_$idx" }) { idx, tr ->
+                                        SearchTrackItemRow(
+                                            track = tr,
+                                            index = idx,
+                                            isCurrentTrack = false,
+                                            isPlaying = false,
+                                            onPlay = { playerViewModel.playWithQueue(tr, albumTracks) },
+                                            onAddToPlaylist = { onAddToPlaylist(tr) },
+                                            onDownload = { onDownloadTrack(tr) }
+                                        )
+                                    }
+                                }
+                            } else if (isArtist) {
+                                if (artistTracks.isNotEmpty()) {
+                                    item {
+                                        Text(
+                                            text = "Popular Songs",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                    }
+                                    itemsIndexed(artistTracks.take(8), key = { idx, tr -> "${tr.id}_$idx" }) { idx, tr ->
+                                        SearchTrackItemRow(
+                                            track = tr,
+                                            index = idx,
+                                            isCurrentTrack = false,
+                                            isPlaying = false,
+                                            onPlay = { playerViewModel.playWithQueue(tr, artistTracks) },
+                                            onAddToPlaylist = { onAddToPlaylist(tr) },
+                                            onDownload = { onDownloadTrack(tr) }
+                                        )
+                                    }
+                                }
+
+                                if (artistAlbums.isNotEmpty()) {
+                                    item {
+                                        Spacer(Modifier.height(12.dp))
+                                        Text(
+                                            text = "Albums & Discography (${artistAlbums.size})",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        )
+                                    }
+                                    items(artistAlbums, key = { it.id }) { alb ->
+                                        ShelfMediaCardRow(
+                                            title = alb.title,
+                                            subtitle = alb.releaseDate?.toString()?.takeIf { it.isNotBlank() } ?: alb.subtitle ?: "Album",
+                                            badge = "ALBUM",
+                                            coverUrl = when (val c = alb.cover) {
+                                                is ImageHolder.NetworkRequestImageHolder -> c.request.url
+                                                is ImageHolder.ResourceUriImageHolder -> c.uri
+                                                else -> alb.extras["cover_url"]
+                                            },
+                                            onClick = { onMediaSelected(alb) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
 // MAIN REDESIGNED SEARCH SCREEN (Pure Decent Black & White)
 // =========================================================================
 
@@ -1650,6 +2918,14 @@ fun SearchScreen(
         mutableStateOf(listOf("The Weeknd", "Lofi Beats", "Coldplay", "Hans Zimmer", "Synthwave"))
     }
 
+    var selectedSourceId by remember { mutableStateOf("all") }
+    var unifiedShelves by remember { mutableStateOf<List<Shelf>>(emptyList()) }
+    var isUnifiedLoading by remember { mutableStateOf(false) }
+    var unifiedError by remember { mutableStateOf<Throwable?>(null) }
+    var selectedShelfForModal by remember { mutableStateOf<Shelf?>(null) }
+    var selectedMediaForDetail by remember { mutableStateOf<EchoMediaItem?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
     // Safety: ensure default music extension is active if none is set
     LaunchedEffect(musicExtensions) {
         if (extensionManager.current.value == null && musicExtensions.isNotEmpty()) {
@@ -1675,22 +2951,59 @@ fun SearchScreen(
         )
     }
 
+    val playTrackWithSource: (Track) -> Unit = { track ->
+        val ext = currentExt
+        val stamped = if (track.extras["extension_id"].isNullOrBlank() && ext != null) {
+            track.copy(extras = track.extras + ("extension_id" to ext.id))
+        } else track
+        playerViewModel.play(stamped)
+    }
+
+    val playTrackWithQueueContext: (Track, List<Track>) -> Unit = { track, queueContext ->
+        val ext = currentExt
+        val stamped = if (track.extras["extension_id"].isNullOrBlank() && ext != null) {
+            track.copy(extras = track.extras + ("extension_id" to ext.id))
+        } else track
+        val stampedQueue = if (queueContext.isNotEmpty()) {
+            queueContext.map { t ->
+                if (t.extras["extension_id"].isNullOrBlank() && ext != null) {
+                    t.copy(extras = t.extras + ("extension_id" to ext.id))
+                } else t
+            }
+        } else listOf(stamped)
+        playerViewModel.playWithQueue(stamped, stampedQueue)
+    }
+
     fun executeSearch(searchTerm: String) {
         val trimmed = searchTerm.trim()
         if (trimmed.isNotBlank()) {
-            if (extensionManager.current.value == null && musicExtensions.isNotEmpty()) {
-                val defaultExt = musicExtensions.firstOrNull { it.isEnabled } ?: musicExtensions.firstOrNull()
-                if (defaultExt != null) {
-                    extensionManager.setupMusicExtension(defaultExt, true)
-                }
-            }
             queryInput = trimmed
             hasSearched = true
             if (!recentSearches.contains(trimmed)) {
                 recentSearches = (listOf(trimmed) + recentSearches).take(10)
             }
             viewModel.updateQuery(trimmed)
-            viewModel.search(trimmed)
+            if (selectedSourceId == "all") {
+                isUnifiedLoading = true
+                unifiedError = null
+                coroutineScope.launch {
+                    try {
+                        unifiedShelves = UnifiedCatalogEngine.searchUnified(trimmed, musicExtensions, extensionManager)
+                    } catch (e: Throwable) {
+                        unifiedError = e
+                    } finally {
+                        isUnifiedLoading = false
+                    }
+                }
+            } else {
+                if (extensionManager.current.value == null && musicExtensions.isNotEmpty()) {
+                    val defaultExt = musicExtensions.firstOrNull { it.isEnabled } ?: musicExtensions.firstOrNull()
+                    if (defaultExt != null) {
+                        extensionManager.setupMusicExtension(defaultExt, true)
+                    }
+                }
+                viewModel.search(trimmed)
+            }
         }
     }
 
@@ -1738,7 +3051,7 @@ fun SearchScreen(
                         )
 
                         // Text Field with desktop Enter key interception
-                        OutlinedTextField(
+                        BasicTextField(
                             value = queryInput,
                             onValueChange = {
                                 queryInput = it
@@ -1747,25 +3060,30 @@ fun SearchScreen(
                                     hasSearched = false
                                 }
                             },
-                            placeholder = {
-                                Text(
-                                    "Search songs, artists, albums, or playlists...",
-                                    color = TextMuted,
-                                    fontSize = 13.5.sp
-                                )
-                            },
                             singleLine = true,
+                            textStyle = TextStyle(
+                                color = Color.White,
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Normal
+                            ),
+                            cursorBrush = SolidColor(Color.White),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = { executeSearch(queryInput) }),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                cursorColor = Color.White,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent
-                            ),
+                            decorationBox = { innerTextField ->
+                                Box(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    if (queryInput.isEmpty()) {
+                                        Text(
+                                            "Search songs, artists, albums, or playlists...",
+                                            color = TextMuted,
+                                            fontSize = 13.5.sp
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .onPreviewKeyEvent { event ->
@@ -1829,18 +3147,17 @@ fun SearchScreen(
                 }
 
                 // Integrated Source Selector (Toolbar Right)
-                if (musicExtensions.isNotEmpty()) {
-                    LiquidGlassBox(
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.height(48.dp)
+                LiquidGlassBox(
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
-                        ) {
                         Text(
                             text = "Source",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
@@ -1848,16 +3165,58 @@ fun SearchScreen(
                             modifier = Modifier.padding(horizontal = 8.dp)
                         )
 
+                        // 1. Unified All-in-One Aggregator Engine
+                        val isAllSelected = selectedSourceId == "all"
+                        LiquidGlassBox(
+                            shape = RoundedCornerShape(8.dp),
+                            backgroundColor = if (isAllSelected) Color.White.copy(alpha = 0.22f) else Color(0x30181818),
+                            borderColor = if (isAllSelected) Color.White.copy(alpha = 0.70f) else Color.White.copy(alpha = 0.12f),
+                            modifier = Modifier
+                                .pointerHoverIcon(PointerIcon.Hand)
+                                .clickable {
+                                    if (!isAllSelected) {
+                                        selectedSourceId = "all"
+                                        if (hasSearched && queryInput.isNotBlank()) {
+                                            executeSearch(queryInput)
+                                        }
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (isAllSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(5.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White)
+                                    )
+                                }
+                                Text(
+                                    text = "⚡ Unified (All Sources)",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium
+                                    ),
+                                    color = if (isAllSelected) Color.White else TextSecondary
+                                )
+                            }
+                        }
+
+                        // 2. Individual Extension Sources
                         musicExtensions.forEach { ext ->
-                            val isSelected = currentExt?.metadata?.id == ext.metadata.id
+                            val isSelected = selectedSourceId == ext.metadata.id
                             LiquidGlassBox(
                                 shape = RoundedCornerShape(8.dp),
-                                backgroundColor = if (isSelected) Color.White else Color(0x30181818),
-                                borderColor = if (isSelected) Color.White else Color.White.copy(alpha = 0.12f),
+                                backgroundColor = if (isSelected) Color.White.copy(alpha = 0.22f) else Color(0x30181818),
+                                borderColor = if (isSelected) Color.White.copy(alpha = 0.70f) else Color.White.copy(alpha = 0.12f),
                                 modifier = Modifier
                                     .pointerHoverIcon(PointerIcon.Hand)
                                     .clickable {
                                         if (!isSelected) {
+                                            selectedSourceId = ext.metadata.id
                                             extensionManager.setupMusicExtension(ext, true)
                                             if (hasSearched && queryInput.isNotBlank()) {
                                                 viewModel.search(queryInput)
@@ -1875,7 +3234,7 @@ fun SearchScreen(
                                             modifier = Modifier
                                                 .size(5.dp)
                                                 .clip(CircleShape)
-                                                .background(Color.Black)
+                                                .background(Color.White)
                                         )
                                     }
                                     Text(
@@ -1883,14 +3242,13 @@ fun SearchScreen(
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         ),
-                                        color = if (isSelected) Color.Black else TextSecondary
+                                        color = if (isSelected) Color.White else TextSecondary
                                     )
                                 }
                             }
                         }
                     }
                 }
-            }
             }
 
             // Autocomplete suggestions dropdown when typing (anchored directly under the search bar)
@@ -1907,7 +3265,14 @@ fun SearchScreen(
                                     .pointerHoverIcon(PointerIcon.Hand)
                                     .clickable {
                                         if (item is QuickSearchItem.Media) {
-                                            onMediaSelected(item.media)
+                                            val media = item.media
+                                            if (media is Track) {
+                                                val quickTracks = quickResults.filterIsInstance<QuickSearchItem.Media>().mapNotNull { it.media as? Track }
+                                                val q = if (quickTracks.isNotEmpty()) quickTracks else listOf(media)
+                                                playTrackWithQueueContext(media, q)
+                                            } else {
+                                                onMediaSelected(media)
+                                            }
                                         } else {
                                             executeSearch(item.title)
                                         }
@@ -1971,6 +3336,10 @@ fun SearchScreen(
         // -----------------------------------------------------------------
         // 4. MAIN BODY (Discovery Hub vs Skeletons vs Error vs Results)
         // -----------------------------------------------------------------
+        val effectiveShelves = if (selectedSourceId == "all") unifiedShelves else shelves
+        val effectiveLoading = if (selectedSourceId == "all") isUnifiedLoading else isLoading
+        val effectiveError = if (selectedSourceId == "all") unifiedError else error
+
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 // IDLE STATE (Nothing searched yet or search cleared)
@@ -1980,33 +3349,34 @@ fun SearchScreen(
                         onSelectQuery = { executeSearch(it) },
                         onRemoveRecent = { term -> recentSearches = recentSearches.filter { it != term } },
                         onClearRecents = { recentSearches = emptyList() },
-                        onPlayTrack = { playerViewModel.play(it) },
+                        onPlayTrack = playTrackWithQueueContext,
                         onAddToPlaylist = { trackForPlaylist = it },
                         onDownloadTrack = { downloadManager.downloadTrack(it) }
                     )
                 }
 
                 // LOADING STATE
-                isLoading && shelves.isEmpty() -> {
+                effectiveLoading && effectiveShelves.isEmpty() -> {
                     SearchLoadingSkeleton()
                 }
 
                 // ERROR STATE
-                error != null && shelves.isEmpty() -> {
+                effectiveError != null && effectiveShelves.isEmpty() -> {
                     SearchErrorBanner(
-                        error = error,
-                        onRetry = { viewModel.search(queryInput) },
+                        error = effectiveError,
+                        onRetry = { executeSearch(queryInput) },
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
 
                 // ZERO RESULTS FOUND
-                !isLoading && shelves.isEmpty() && error == null -> {
+                !effectiveLoading && effectiveShelves.isEmpty() && effectiveError == null -> {
                     SearchZeroResultsView(
                         query = queryInput,
                         extensions = musicExtensions,
                         currentExt = currentExt,
                         onSwitchExtension = { ext ->
+                            selectedSourceId = ext.metadata.id
                             extensionManager.setupMusicExtension(ext, true)
                             viewModel.search(queryInput)
                         },
@@ -2014,26 +3384,27 @@ fun SearchScreen(
                             queryInput = ""
                             hasSearched = false
                             viewModel.clearSearch()
+                            unifiedShelves = emptyList()
                         }
                     )
                 }
 
                 // RESULTS LOADED
-                shelves.isNotEmpty() -> {
-                    val allTracks = remember(shelves) {
-                        shelves.filterIsInstance<Shelf.Lists.Tracks>().flatMap { it.list }
+                effectiveShelves.isNotEmpty() -> {
+                    val allTracks = remember(effectiveShelves) {
+                        effectiveShelves.filterIsInstance<Shelf.Lists.Tracks>().flatMap { it.list }
                     }
-                    val topSongs = remember(shelves, allTracks) {
+                    val topSongs = remember(effectiveShelves, allTracks) {
                         if (allTracks.isNotEmpty()) allTracks.take(4)
                         else {
-                            shelves.filterIsInstance<Shelf.Lists.Items>()
+                            effectiveShelves.filterIsInstance<Shelf.Lists.Items>()
                                 .flatMap { it.list }
                                 .filterIsInstance<Track>()
                                 .take(4)
                         }
                     }
-                    val topResultItem: EchoMediaItem? = remember(shelves, topSongs) {
-                        val firstItem = shelves.firstOrNull()?.let { shelf ->
+                    val topResultItem: EchoMediaItem? = remember(effectiveShelves, topSongs) {
+                        val firstItem = effectiveShelves.firstOrNull()?.let { shelf ->
                             when (shelf) {
                                 is Shelf.Lists.Tracks -> shelf.list.firstOrNull()
                                 is Shelf.Lists.Items -> shelf.list.firstOrNull()
@@ -2088,12 +3459,22 @@ fun SearchScreen(
                                             isPlaying = isPlaying,
                                             onPlay = {
                                                 if (topResultItem is Track) {
-                                                    playerViewModel.play(topResultItem)
+                                                    val q = if (allTracks.isNotEmpty()) allTracks else topSongs
+                                                    playTrackWithQueueContext(topResultItem, q)
                                                 } else {
+                                                    selectedMediaForDetail = topResultItem
                                                     onMediaSelected(topResultItem)
                                                 }
                                             },
-                                            onClick = { onMediaSelected(topResultItem) },
+                                            onClick = {
+                                                if (topResultItem is Track) {
+                                                    val q = if (allTracks.isNotEmpty()) allTracks else topSongs
+                                                    playTrackWithQueueContext(topResultItem, q)
+                                                } else {
+                                                    selectedMediaForDetail = topResultItem
+                                                    onMediaSelected(topResultItem)
+                                                }
+                                            },
                                             modifier = Modifier.weight(0.40f)
                                         )
 
@@ -2101,7 +3482,10 @@ fun SearchScreen(
                                             tracks = topSongs,
                                             currentTrack = currentTrack,
                                             isPlaying = isPlaying,
-                                            onPlayTrack = { playerViewModel.play(it) },
+                                            onPlayTrack = { track ->
+                                                val q = if (allTracks.isNotEmpty()) allTracks else topSongs
+                                                playTrackWithQueueContext(track, q)
+                                            },
                                             onAddToPlaylist = { trackForPlaylist = it },
                                             onDownloadTrack = { downloadManager.downloadTrack(it) },
                                             modifier = Modifier.weight(0.60f)
@@ -2113,16 +3497,69 @@ fun SearchScreen(
 
 
                         // ALL CATEGORIZED RESULT SHELVES
-                        items(shelves, key = { it.id }) { shelf ->
+                        items(effectiveShelves, key = { it.id }) { shelf ->
                             ShelfRow(
                                 shelf = shelf,
-                                onMediaClick = onMediaSelected,
-                                onPlayTrack = { playerViewModel.play(it) },
-                                onMoreClick = {}
+                                onMediaClick = { item ->
+                                    if (item is Track) {
+                                        val shelfTracks = when (shelf) {
+                                            is Shelf.Lists.Tracks -> shelf.list
+                                            is Shelf.Lists.Items -> shelf.list.filterIsInstance<Track>()
+                                            else -> emptyList()
+                                        }
+                                        val q = if (shelfTracks.isNotEmpty()) shelfTracks else if (allTracks.isNotEmpty()) allTracks else topSongs
+                                        playTrackWithQueueContext(item, q)
+                                    } else {
+                                        selectedMediaForDetail = item
+                                        onMediaSelected(item)
+                                    }
+                                },
+                                onPlayTrack = { track ->
+                                    val shelfTracks = when (shelf) {
+                                        is Shelf.Lists.Tracks -> shelf.list
+                                        is Shelf.Lists.Items -> shelf.list.filterIsInstance<Track>()
+                                        else -> emptyList()
+                                    }
+                                    val q = if (shelfTracks.isNotEmpty()) shelfTracks else if (allTracks.isNotEmpty()) allTracks else topSongs
+                                    playTrackWithQueueContext(track, q)
+                                },
+                                onMoreClick = {
+                                    selectedShelfForModal = shelf
+                                }
                             )
                         }
                     }
                 }
+            }
+
+            // MODALS: Interactive Full Shelf ("See All") & Full Media Detail (Album / Artist)
+            selectedShelfForModal?.let { shelf ->
+                SeniorShelfDetailModal(
+                    shelf = shelf,
+                    onDismiss = { selectedShelfForModal = null },
+                    onMediaSelected = { item ->
+                        selectedMediaForDetail = item
+                        onMediaSelected(item)
+                    },
+                    onPlayTrack = playTrackWithQueueContext,
+                    onAddToPlaylist = { trackForPlaylist = it },
+                    onDownloadTrack = { downloadManager.downloadTrack(it) }
+                )
+            }
+
+            selectedMediaForDetail?.let { mediaItem ->
+                SeniorMediaDetailModal(
+                    media = mediaItem,
+                    onDismiss = { selectedMediaForDetail = null },
+                    onMediaSelected = { item ->
+                        selectedMediaForDetail = item
+                        onMediaSelected(item)
+                    },
+                    playerViewModel = playerViewModel,
+                    extensionManager = extensionManager,
+                    onAddToPlaylist = { trackForPlaylist = it },
+                    onDownloadTrack = { downloadManager.downloadTrack(it) }
+                )
             }
         }
     }
@@ -2306,8 +3743,7 @@ fun LibraryScreen(
                     Button(
                         onClick = {
                             val domainTracks = openPlaylist.tracks.map { t: StoredTrack -> t.toTrack() }
-                            playerViewModel.addToQueue(domainTracks)
-                            playerViewModel.play(domainTracks.first())
+                            playerViewModel.playWithQueue(domainTracks.first(), domainTracks)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                         shape = RoundedCornerShape(8.dp)
@@ -2359,7 +3795,7 @@ fun LibraryScreen(
                         LiquidGlassCard(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
-                            backgroundColor = if (isTrackActive) Color(0xFF1B233A).copy(alpha = 0.85f) else Color(0xFF0C101F).copy(alpha = 0.60f),
+                            backgroundColor = if (isTrackActive) Color.White.copy(alpha = 0.18f) else Color(0xFF0A0C10).copy(alpha = 0.30f),
                             borderColor = if (isTrackActive) Color(0xFF38BDF8).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.10f)
                         ) {
                             Row(
@@ -2398,7 +3834,7 @@ fun LibraryScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = track.artists.joinToString(", ") { a: Artist -> a.name }.ifBlank { "Unknown Artist" },
+                                        text = formatArtistsForDisplay(track.artists, "Audix Artist"),
                                         fontSize = 11.5.sp,
                                         color = TextSecondary,
                                         maxLines = 1,
@@ -2411,7 +3847,10 @@ fun LibraryScreen(
                                 IconButton(
                                     onClick = {
                                         if (isTrackActive && isPlaying) playerViewModel.pause()
-                                        else playerViewModel.play(track)
+                                        else {
+                                            val domainTracks = openPlaylist.tracks.map { it.toTrack() }
+                                            playerViewModel.playWithQueue(track, domainTracks)
+                                        }
                                     }
                                 ) {
                                     Icon(
@@ -2512,32 +3951,68 @@ fun LibraryScreen(
             Spacer(Modifier.height(16.dp))
 
             // Filter search field for tracks
-            OutlinedTextField(
-                value = filterQuery,
-                onValueChange = { filterQuery = it },
-                placeholder = { Text("Filter items in ${selectedTab.title.lowercase()}...", fontSize = 12.5.sp, color = TextMuted) },
-                singleLine = true,
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = TextMuted, modifier = Modifier.size(16.dp))
-                },
-                trailingIcon = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .background(SurfaceDark, RoundedCornerShape(8.dp))
+                    .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    BasicTextField(
+                        value = filterQuery,
+                        onValueChange = { filterQuery = it },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal
+                        ),
+                        cursorBrush = SolidColor(Color.White),
+                        decorationBox = { innerTextField ->
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                if (filterQuery.isEmpty()) {
+                                    Text(
+                                        "Filter items in ${selectedTab.title.lowercase()}...",
+                                        fontSize = 12.5.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
                     if (filterQuery.isNotBlank()) {
-                        IconButton(onClick = { filterQuery = "" }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(14.dp))
+                        IconButton(
+                            onClick = { filterQuery = "" },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Clear",
+                                tint = TextMuted,
+                                modifier = Modifier.size(14.dp)
+                            )
                         }
                     }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color.White.copy(alpha = 0.50f),
-                    unfocusedBorderColor = BorderSubtle,
-                    focusedContainerColor = SurfaceDark,
-                    unfocusedContainerColor = SurfaceDark
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth().height(44.dp)
-            )
+                }
+            }
 
             Spacer(Modifier.height(18.dp))
 
@@ -2570,8 +4045,7 @@ fun LibraryScreen(
                             Text("${filteredFavorites.size} Favorite Tracks", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
                             Button(
                                 onClick = {
-                                    playerViewModel.addToQueue(filteredFavorites)
-                                    playerViewModel.play(filteredFavorites.first())
+                                    playerViewModel.playWithQueue(filteredFavorites.first(), filteredFavorites)
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                                 shape = RoundedCornerShape(8.dp),
@@ -2594,7 +4068,7 @@ fun LibraryScreen(
                                 LiquidGlassCard(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(10.dp),
-                                    backgroundColor = if (isTrackActive) Color(0xFF1B233A).copy(alpha = 0.85f) else Color(0xFF0C101F).copy(alpha = 0.60f),
+                                    backgroundColor = if (isTrackActive) Color.White.copy(alpha = 0.18f) else Color(0xFF0A0C10).copy(alpha = 0.30f),
                                     borderColor = if (isTrackActive) Color(0xFF38BDF8).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.10f)
                                 ) {
                                     Row(
@@ -2631,7 +4105,7 @@ fun LibraryScreen(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
-                                                text = track.artists.joinToString(", ") { it.name }.ifBlank { "Unknown Artist" },
+                                                text = formatArtistsForDisplay(track.artists, "Audix Artist"),
                                                 fontSize = 11.5.sp,
                                                 color = TextSecondary,
                                                 maxLines = 1,
@@ -2644,7 +4118,7 @@ fun LibraryScreen(
                                         IconButton(
                                             onClick = {
                                                 if (isTrackActive && isPlaying) playerViewModel.pause()
-                                                else playerViewModel.play(track)
+                                                else playerViewModel.playWithQueue(track, filteredFavorites)
                                             }
                                         ) {
                                             Icon(
@@ -2711,7 +4185,7 @@ fun LibraryScreen(
                                         .fillMaxWidth()
                                         .pointerHoverIcon(PointerIcon.Hand),
                                     shape = RoundedCornerShape(12.dp),
-                                    backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+                                    backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                                     borderColor = Color.White.copy(alpha = 0.12f),
                                     onClick = { activePlaylistDetails = pl }
                                 ) {
@@ -2745,8 +4219,7 @@ fun LibraryScreen(
                                             IconButton(
                                                 onClick = {
                                                     val domainTracks = pl.tracks.map { t: StoredTrack -> t.toTrack() }
-                                                    playerViewModel.addToQueue(domainTracks)
-                                                    playerViewModel.play(domainTracks.first())
+                                                    playerViewModel.playWithQueue(domainTracks.first(), domainTracks)
                                                 }
                                             ) {
                                                 Icon(Icons.Default.PlayArrow, contentDescription = "Play All", tint = Color.White)
@@ -2814,7 +4287,7 @@ fun LibraryScreen(
                                 LiquidGlassCard(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(10.dp),
-                                    backgroundColor = if (isTrackActive) Color(0xFF1B233A).copy(alpha = 0.85f) else Color(0xFF0C101F).copy(alpha = 0.60f),
+                                    backgroundColor = if (isTrackActive) Color.White.copy(alpha = 0.18f) else Color(0xFF0A0C10).copy(alpha = 0.30f),
                                     borderColor = if (isTrackActive) Color(0xFF38BDF8).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.10f)
                                 ) {
                                     Row(
@@ -2851,7 +4324,7 @@ fun LibraryScreen(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
-                                                text = track.artists.joinToString(", ") { it.name }.ifBlank { "Unknown Artist" },
+                                                text = formatArtistsForDisplay(track.artists, "Audix Artist"),
                                                 fontSize = 11.5.sp,
                                                 color = TextSecondary,
                                                 maxLines = 1,
@@ -2864,7 +4337,7 @@ fun LibraryScreen(
                                         IconButton(
                                             onClick = {
                                                 if (isTrackActive && isPlaying) playerViewModel.pause()
-                                                else playerViewModel.play(track)
+                                                else playerViewModel.playWithQueue(track, filteredHistory)
                                             }
                                         ) {
                                             Icon(
@@ -2989,7 +4462,7 @@ fun DownloadsScreen(
         ) {
             LiquidGlassCard(
                 shape = RoundedCornerShape(10.dp),
-                backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                 borderColor = Color.White.copy(alpha = 0.12f),
                 modifier = Modifier.weight(1f)
             ) {
@@ -3002,7 +4475,7 @@ fun DownloadsScreen(
 
             LiquidGlassCard(
                 shape = RoundedCornerShape(10.dp),
-                backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                 borderColor = Color.White.copy(alpha = 0.12f),
                 modifier = Modifier.weight(1f)
             ) {
@@ -3015,7 +4488,7 @@ fun DownloadsScreen(
 
             LiquidGlassCard(
                 shape = RoundedCornerShape(10.dp),
-                backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                 borderColor = Color.White.copy(alpha = 0.12f),
                 modifier = Modifier.weight(1.6f)
             ) {
@@ -3024,7 +4497,7 @@ fun DownloadsScreen(
                     Spacer(Modifier.height(4.dp))
                     Text(
                         downloadDir.absolutePath,
-                        color = Color(0xFFE2E8F0),
+                        color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -3044,7 +4517,7 @@ fun DownloadsScreen(
                 activeDownloads.forEach { task: DownloadTask ->
                     LiquidGlassCard(
                         shape = RoundedCornerShape(10.dp),
-                        backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+                        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                         borderColor = Color.White.copy(alpha = 0.15f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -3057,7 +4530,7 @@ fun DownloadsScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(task.track.title, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Color.White)
                                     Text(
-                                        task.track.artists.joinToString(", ") { it.name }.ifBlank { "Unknown Artist" },
+                                        formatArtistsForDisplay(task.track.artists, "Audix Artist"),
                                         fontSize = 11.5.sp,
                                         color = TextSecondary
                                     )
@@ -3066,7 +4539,7 @@ fun DownloadsScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     LiquidGlassBox(
                                         shape = RoundedCornerShape(4.dp),
-                                        backgroundColor = Color(0xFF0C101F).copy(alpha = 0.70f),
+                                        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                                         borderColor = Color.White.copy(alpha = 0.15f)
                                     ) {
                                         Text(
@@ -3112,32 +4585,68 @@ fun DownloadsScreen(
         Spacer(Modifier.height(20.dp))
 
         // Search in downloaded tracks
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search offline tracks by title or artist...", fontSize = 12.5.sp, color = TextMuted) },
-            singleLine = true,
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = TextMuted, modifier = Modifier.size(16.dp))
-            },
-            trailingIcon = {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(SurfaceDark, RoundedCornerShape(8.dp))
+                .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.size(16.dp)
+                )
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    ),
+                    cursorBrush = SolidColor(Color.White),
+                    decorationBox = { innerTextField ->
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    "Search offline tracks by title or artist...",
+                                    fontSize = 12.5.sp,
+                                    color = TextMuted
+                                )
+                            }
+                            innerTextField()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
                 if (searchQuery.isNotBlank()) {
-                    IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(14.dp))
+                    IconButton(
+                        onClick = { searchQuery = "" },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Clear",
+                            tint = TextMuted,
+                            modifier = Modifier.size(14.dp)
+                        )
                     }
                 }
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = Color.White.copy(alpha = 0.50f),
-                unfocusedBorderColor = BorderSubtle,
-                focusedContainerColor = SurfaceDark,
-                unfocusedContainerColor = SurfaceDark
-            ),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth().height(44.dp)
-        )
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
 
@@ -3172,7 +4681,7 @@ fun DownloadsScreen(
                     LiquidGlassCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
-                        backgroundColor = if (isTrackActive) Color(0xFF1B233A).copy(alpha = 0.85f) else Color(0xFF0C101F).copy(alpha = 0.60f),
+                        backgroundColor = if (isTrackActive) Color.White.copy(alpha = 0.18f) else Color(0xFF0A0C10).copy(alpha = 0.30f),
                         borderColor = if (isTrackActive) Color(0xFF38BDF8).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.10f)
                     ) {
                         Row(
@@ -3209,7 +4718,7 @@ fun DownloadsScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = dl.track.artists.joinToString(", ") { a: Artist -> a.name }.ifBlank { "Unknown Artist" },
+                                    text = formatArtistsForDisplay(dl.track.artists, "Audix Artist"),
                                     fontSize = 11.5.sp,
                                     color = TextSecondary,
                                     maxLines = 1,
@@ -3220,7 +4729,7 @@ fun DownloadsScreen(
                             // Format tag
                             LiquidGlassBox(
                                 shape = RoundedCornerShape(4.dp),
-                                backgroundColor = Color(0xFF0C101F).copy(alpha = 0.70f),
+                                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                                 borderColor = Color.White.copy(alpha = 0.12f)
                             ) {
                                 Text(
@@ -3381,7 +4890,7 @@ fun SettingsCategoryCard(
     LiquidGlassCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
         borderColor = Color.White.copy(alpha = 0.12f)
     ) {
         Column(Modifier.padding(18.dp)) {
@@ -3397,7 +4906,7 @@ fun SettingsCategoryCard(
                     LiquidGlassBox(
                         modifier = Modifier.size(32.dp),
                         shape = RoundedCornerShape(8.dp),
-                        backgroundColor = Color(0xFF141B30).copy(alpha = 0.80f),
+                        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.35f),
                         borderColor = Color.White.copy(alpha = 0.15f)
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -3430,7 +4939,7 @@ fun SettingsCategoryCard(
                 if (badge != null) {
                     LiquidGlassBox(
                         shape = RoundedCornerShape(4.dp),
-                        backgroundColor = Color(0xFF0C101F).copy(alpha = 0.70f),
+                        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                         borderColor = Color.White.copy(alpha = 0.18f)
                     ) {
                         Text(
@@ -3519,7 +5028,17 @@ fun SettingsScreen(
     val settings = koinInject<EchoSettings>()
     val platform = koinInject<AppPlatform>()
 
-    var activeSection by remember { mutableStateOf(SettingsSection.AUDIO) }
+    LaunchedEffect(settings) {
+        DesktopBackgroundManager.initialize(settings)
+    }
+
+    val wallpapers by DesktopBackgroundManager.wallpapers.collectAsState()
+    val currentWallpaperId by DesktopBackgroundManager.currentWallpaperId.collectAsState()
+
+    val initialSectionName = settings.getString("active_settings_section", "APPEARANCE") ?: "APPEARANCE"
+    var activeSection by remember {
+        mutableStateOf(runCatching { SettingsSection.valueOf(initialSectionName) }.getOrDefault(SettingsSection.APPEARANCE))
+    }
     var searchQuery by remember { mutableStateOf("") }
 
     // Audio & Playback state
@@ -3770,37 +5289,70 @@ fun SettingsScreen(
         }
 
         // Live Search Bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            placeholder = {
-                Text("Search settings (e.g. latency, cache, tray, quality, folders)...", fontSize = 13.sp, color = Color.White.copy(alpha = 0.40f))
-            },
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.55f), modifier = Modifier.size(18.dp))
-            },
-            trailingIcon = {
+                .height(44.dp)
+                .background(Color(0xFF141414), RoundedCornerShape(8.dp))
+                .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.55f),
+                    modifier = Modifier.size(18.dp)
+                )
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    ),
+                    cursorBrush = SolidColor(Color.White),
+                    decorationBox = { innerTextField ->
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    "Search settings (e.g. latency, cache, tray, quality, folders)...",
+                                    fontSize = 13.sp,
+                                    color = Color.White.copy(alpha = 0.40f)
+                                )
+                            }
+                            innerTextField()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
                 if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear search", tint = Color.White.copy(alpha = 0.60f), modifier = Modifier.size(16.dp))
+                    IconButton(
+                        onClick = { searchQuery = "" },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Clear search",
+                            tint = Color.White.copy(alpha = 0.60f),
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(8.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFF141414),
-                unfocusedContainerColor = Color(0xFF101010),
-                focusedBorderColor = Color.White.copy(alpha = 0.45f),
-                unfocusedBorderColor = Color.White.copy(alpha = 0.10f),
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                cursorColor = Color.White
-            )
-        )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         val q = searchQuery.trim().lowercase()
         val isSearching = q.isNotEmpty()
@@ -3840,6 +5392,7 @@ fun SettingsScreen(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable(interactionSource = interactionSource, indication = null) {
                                     activeSection = section
+                                    settings.putString("active_settings_section", section.name)
                                 }
                         ) {
                             Row(
@@ -3941,6 +5494,21 @@ fun SettingsScreen(
                             }
                         }
                         SettingsSection.APPEARANCE -> {
+                            item {
+                                RenderWorkspaceWallpaperCard(
+                                    wallpapers = wallpapers,
+                                    currentWallpaperId = currentWallpaperId,
+                                    onSelectWallpaper = { id ->
+                                        DesktopBackgroundManager.selectWallpaper(id)
+                                    },
+                                    onAddWallpaper = { file ->
+                                        DesktopBackgroundManager.addCustomWallpaper(file)
+                                    },
+                                    onDeleteWallpaper = { id ->
+                                        DesktopBackgroundManager.deleteCustomWallpaper(id)
+                                    }
+                                )
+                            }
                             item {
                                 RenderScreensaverStudioCard(
                                     screensaverTheme = screensaverTheme,
@@ -4148,7 +5716,7 @@ fun SettingsScreen(
                                         val usedMem = totalMem - freeMem
                                         val diag = buildString {
                                             appendLine("=== AUDIX DESKTOP DIAGNOSTICS ===")
-                                            appendLine("Version: 1.0.0-nightly")
+                                            appendLine("Version: 1.0.3-UNIFIED")
                                             appendLine("OS: ${System.getProperty("os.name")} (${System.getProperty("os.arch")})")
                                             appendLine("Java: ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")}")
                                             appendLine("Memory: Used ${usedMem}MB / Total ${totalMem}MB / Max ${maxMem}MB")
@@ -4358,11 +5926,19 @@ fun SettingsScreen(
                                 cacheDirName = platform.cacheDir.name,
                                 onRefresh = { refreshCacheSize() },
                                 onClearCache = {
-                                    Thread {
+                                    isCalculatingCache = true
+                                    coroutineScope.launch(Dispatchers.IO) {
                                         runCatching { platform.cacheDir.toFile().deleteRecursively() }
-                                        refreshCacheSize()
-                                    }.start()
-                                    showCacheClearedDialog = true
+                                        val size = runCatching {
+                                            val cDir = platform.cacheDir.toFile()
+                                            if (cDir.exists()) cDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } else 0L
+                                        }.getOrDefault(0L)
+                                        withContext(Dispatchers.Main) {
+                                            cacheSizeBytes = size
+                                            isCalculatingCache = false
+                                            showCacheClearedDialog = true
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -4443,7 +6019,7 @@ fun SettingsScreen(
                                     val usedMem = totalMem - freeMem
                                     val diag = buildString {
                                         appendLine("=== AUDIX DESKTOP DIAGNOSTICS ===")
-                                        appendLine("Version: 1.0.0-nightly")
+                                        appendLine("Version: 1.0.3-UNIFIED")
                                         appendLine("OS: ${System.getProperty("os.name")} (${System.getProperty("os.arch")})")
                                         appendLine("Java: ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")}")
                                         appendLine("Memory: Used ${usedMem}MB / Total ${totalMem}MB / Max ${maxMem}MB")
@@ -4579,7 +6155,7 @@ private fun RenderAudioEngineCard(
         ) {
             LiquidGlassBox(
                 shape = RoundedCornerShape(4.dp),
-                backgroundColor = Color(0xFF0C101F).copy(alpha = 0.70f),
+                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                 borderColor = Color.White.copy(alpha = 0.20f)
             ) {
                 Text(
@@ -4869,7 +6445,7 @@ private fun RenderScreensaverStudioCard(
             LiquidGlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
-                backgroundColor = Color(0xFF0C101F).copy(alpha = 0.65f),
+                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                 borderColor = Color.White.copy(alpha = 0.12f)
             ) {
                 Row(
@@ -4961,7 +6537,7 @@ private fun RenderScreensaverStudioCard(
         ) {
             LiquidGlassBox(
                 shape = RoundedCornerShape(4.dp),
-                backgroundColor = Color(0xFF0C101F).copy(alpha = 0.70f),
+                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.30f),
                 borderColor = Color.White.copy(alpha = 0.20f)
             ) {
                 Text(
@@ -5074,6 +6650,330 @@ private fun RenderScreensaverStudioCard(
                 checked = screensaverMouseExit,
                 onCheckedChange = onMouseExitChange
             )
+        }
+    }
+}
+
+@Composable
+private fun RenderWorkspaceWallpaperCard(
+    wallpapers: List<BackgroundWallpaper>,
+    currentWallpaperId: String,
+    onSelectWallpaper: (String) -> Unit,
+    onAddWallpaper: (File) -> Unit,
+    onDeleteWallpaper: (String) -> Unit
+) {
+    SettingsCategoryCard(
+        title = "Workspace Wallpaper & Atmosphere",
+        subtitle = "Personalize your studio backdrop with high-resolution themes or custom photography.",
+        icon = Icons.Default.Wallpaper,
+        badge = "${wallpapers.size} Themes"
+    ) {
+        // Active Wallpaper Hero Glass Bar
+        val activeWallpaper = wallpapers.find { it.id == currentWallpaperId } ?: wallpapers.firstOrNull()
+
+        LiquidGlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            backgroundColor = Color(0xFF0F131D).copy(alpha = 0.35f),
+            borderColor = Color.White.copy(alpha = 0.15f)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Active thumbnail preview
+                val activeThumb = activeWallpaper?.let { remember(it.id) { DesktopBackgroundManager.loadThumbnailBitmap(it) } }
+                Box(
+                    modifier = Modifier
+                        .size(width = 80.dp, height = 48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (activeThumb != null) {
+                        Image(
+                            bitmap = activeThumb,
+                            contentDescription = activeWallpaper.title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        LiquidGlassBox(shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.Default.Wallpaper, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(24.dp))
+                        }
+                    }
+                }
+
+                Spacer(Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = activeWallpaper?.title ?: "Default Master",
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        LiquidGlassBox(
+                            shape = RoundedCornerShape(12.dp),
+                            backgroundColor = Color(0xFF22C55E).copy(alpha = 0.15f),
+                            borderColor = Color(0xFF22C55E).copy(alpha = 0.40f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .background(Color(0xFF22C55E), CircleShape)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = "ACTIVE BACKDROP",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF86EFAC)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = activeWallpaper?.subtitle ?: "Live application canvas background",
+                        fontSize = 11.5.sp,
+                        color = Color.White.copy(alpha = 0.60f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(Modifier.width(12.dp))
+
+                // Upload / Add Image Button
+                Button(
+                    onClick = {
+                        launchSettingsImageFilePicker(null) { chosenFile ->
+                            onAddWallpaper(chosenFile)
+                        }
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF3B82F6).copy(alpha = 0.25f),
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF60A5FA).copy(alpha = 0.45f)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF93C5FD))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add Wallpaper", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        Text(
+            text = "SELECT BACKDROP THEME",
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.45f),
+            letterSpacing = 1.sp
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        // Grid of Wallpapers in 2 columns
+        val chunkedWallpapers = remember(wallpapers) { wallpapers.chunked(2) }
+
+        chunkedWallpapers.forEach { rowWallpapers ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                rowWallpapers.forEach { wp ->
+                    val isSelected = wp.id == currentWallpaperId
+                    val thumbBitmap = remember(wp.id) { DesktopBackgroundManager.loadThumbnailBitmap(wp) }
+
+                    LiquidGlassCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onSelectWallpaper(wp.id) },
+                        shape = RoundedCornerShape(10.dp),
+                        backgroundColor = if (isSelected) Color(0xFF1E293B).copy(alpha = 0.55f) else Color(0xFF0C1017).copy(alpha = 0.28f),
+                        borderColor = if (isSelected) Color(0xFF38BDF8).copy(alpha = 0.70f) else Color.White.copy(alpha = 0.10f)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(110.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) Color(0xFF38BDF8).copy(alpha = 0.85f) else Color.White.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                            ) {
+                                if (thumbBitmap != null) {
+                                    Image(
+                                        bitmap = thumbBitmap,
+                                        contentDescription = wp.title,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize().background(Color(0xFF141A24)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Wallpaper, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(28.dp))
+                                    }
+                                }
+
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(6.dp)
+                                    ) {
+                                        LiquidGlassBox(
+                                            shape = RoundedCornerShape(12.dp),
+                                            backgroundColor = Color(0xFF0369A1).copy(alpha = 0.75f),
+                                            borderColor = Color(0xFF38BDF8)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Check,
+                                                    contentDescription = "Selected",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(Modifier.width(3.dp))
+                                                Text(
+                                                    text = "APPLIED",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (wp.isCustom) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .padding(6.dp)
+                                    ) {
+                                        LiquidGlassBox(
+                                            shape = RoundedCornerShape(6.dp),
+                                            backgroundColor = Color(0xFF7F1D1D).copy(alpha = 0.75f),
+                                            borderColor = Color(0xFFEF4444).copy(alpha = 0.5f),
+                                            modifier = Modifier.clickable { onDeleteWallpaper(wp.id) }
+                                        ) {
+                                            Icon(
+                                                Icons.Default.DeleteOutline,
+                                                contentDescription = "Delete custom wallpaper",
+                                                tint = Color.White,
+                                                modifier = Modifier.padding(4.dp).size(13.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            Text(
+                                text = wp.title,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isSelected) Color(0xFFE0F2FE) else Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(Modifier.height(2.dp))
+
+                            Text(
+                                text = wp.subtitle,
+                                fontSize = 10.5.sp,
+                                color = Color.White.copy(alpha = 0.50f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                if (rowWallpapers.size < 2) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+
+        // Add custom wallpaper prompt banner
+        LiquidGlassCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    launchSettingsImageFilePicker(null) { chosenFile ->
+                        onAddWallpaper(chosenFile)
+                    }
+                },
+            shape = RoundedCornerShape(10.dp),
+            backgroundColor = Color(0xFF0F1522).copy(alpha = 0.25f),
+            borderColor = Color(0xFF38BDF8).copy(alpha = 0.25f)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LiquidGlassBox(
+                    shape = RoundedCornerShape(8.dp),
+                    backgroundColor = Color(0xFF1E293B).copy(alpha = 0.4f),
+                    borderColor = Color(0xFF38BDF8).copy(alpha = 0.35f),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Import Custom Wallpaper or Photo",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Select any JPG, PNG, WEBP, or BMP file from your computer to use as your studio background",
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.50f)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.40f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -5522,7 +7422,7 @@ private fun RenderAboutAndDiagnosticsCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Audix Native Edition", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
-                Text("Version 1.0.0-nightly (Windows x64 Build)", fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.70f), fontSize = 12.5.sp)
+                Text("Audix v1.0.3-UNIFIED (Windows x64 Build)", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 12.5.sp)
                 Spacer(Modifier.height(3.dp))
                 Text("Multiplatform Kotlin 2.2 • Jetpack Compose Desktop 1.8.2 • VLCJ / LibVLC 4.8.3", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.45f))
             }

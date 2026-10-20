@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
@@ -59,7 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
@@ -119,13 +120,21 @@ fun EchoDesktopApp() {
         )
     }
 
-    CompositionLocalProvider(LocalDensity provides scaledDensity) {
-        EchoTheme {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF070913))
+    val blurredBgBitmap by DesktopBackgroundManager.currentBlurredBitmap.collectAsState()
+
+    CompositionLocalProvider(
+        LocalDensity provides scaledDensity,
+        LocalAppBlurredBackground provides blurredBgBitmap
+    ) {
+        EchoTheme(darkTheme = true) {
+            CompositionLocalProvider(
+                LocalContentColor provides Color.White
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF070913))
+                ) {
             val playerViewModel = koinInject<PlayerViewModel>()
             val settings = runCatching { koinInject<EchoSettings>() }.getOrNull()
 
@@ -144,17 +153,14 @@ fun EchoDesktopApp() {
                 isScreensaverActive = true
             }
 
-            // Load custom background wallpaper image and Audix logo with in-memory caching
-            val bgBitmap = remember {
-                cachedBgBitmap ?: runCatching {
-                    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_bg.jpg")
-                        ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/music_notes_bg.jpg")
-                        ?: java.nio.file.Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
-                        ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
-                        ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "music_notes_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
-                    stream?.use { loadImageBitmap(it) }
-                }.getOrNull()?.also { cachedBgBitmap = it }
+            LaunchedEffect(settings) {
+                if (settings != null) {
+                    DesktopBackgroundManager.initialize(settings)
+                }
             }
+
+            // Live wallpaper backdrop observed from DesktopBackgroundManager
+            val bgBitmap by DesktopBackgroundManager.currentBitmap.collectAsState()
 
             val logoBitmap = remember {
                 cachedAppLogoBitmap ?: runCatching {
@@ -162,7 +168,7 @@ fun EchoDesktopApp() {
                         ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/spothub_logo.png")
                         ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "audix_logo.png").toFile().takeIf { it.exists() }?.inputStream()
                         ?: java.nio.file.Paths.get("src", "desktopMain", "resources", "images", "spothub_logo.png").toFile().takeIf { it.exists() }?.inputStream()
-                    stream?.use { loadImageBitmap(it) }
+                    stream?.use { javax.imageio.ImageIO.read(it)?.toComposeImageBitmap() }
                 }.getOrNull()?.also { cachedAppLogoBitmap = it }
             }
 
@@ -306,9 +312,10 @@ fun EchoDesktopApp() {
 
             Box(Modifier.fillMaxSize()) {
                 // 1. Sleek Gradient Noise Background Image across whole application
-                if (bgBitmap != null) {
+                val currentWallpaperBitmap = bgBitmap
+                if (currentWallpaperBitmap != null) {
                     Image(
-                        bitmap = bgBitmap,
+                        bitmap = currentWallpaperBitmap,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -333,7 +340,10 @@ fun EchoDesktopApp() {
                             .fillMaxWidth()
                             .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 6.dp)
                     ) {
-                        var selectedScreen by remember { mutableStateOf(Screen.HOME) }
+                        val savedScreenName = settings?.getString("initial_screen_tab", "HOME") ?: "HOME"
+                        var selectedScreen by remember {
+                            mutableStateOf(runCatching { Screen.valueOf(savedScreenName) }.getOrDefault(Screen.HOME))
+                        }
 
                         // 1. Floating Liquid-Glass Navigation Rail Island
                         LiquidGlassCard(
@@ -345,6 +355,7 @@ fun EchoDesktopApp() {
                                 logoBitmap = logoBitmap,
                                 onScreenSelected = {
                                     selectedScreen = it
+                                    settings?.putString("initial_screen_tab", it.name)
                                 },
                                 onLaunchScreensaver = launchScreensaver
                             )
@@ -355,6 +366,7 @@ fun EchoDesktopApp() {
                         // 2. Floating Liquid-Glass Workstation Viewport Island
                         LiquidGlassCard(
                             shape = RoundedCornerShape(22.dp),
+                            backgroundColor = if (selectedScreen == Screen.HOME) Color(0xFF0A0C10).copy(alpha = 0.28f) else Color(0xFF0A0C10).copy(alpha = 0.40f),
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         ) {
                             Box(Modifier.fillMaxSize()) {
@@ -406,6 +418,7 @@ fun EchoDesktopApp() {
     }
 }
 }
+}
 
 @Composable
 fun EchoNavigationRail(
@@ -442,8 +455,8 @@ fun EchoNavigationRail(
                     selectedIconColor = Color.White,
                     selectedTextColor = Color.White,
                     indicatorColor = Color.White.copy(alpha = 0.18f),
-                    unselectedIconColor = Color.White.copy(alpha = 0.65f),
-                    unselectedTextColor = Color.White.copy(alpha = 0.65f)
+                    unselectedIconColor = Color.White.copy(alpha = 0.85f),
+                    unselectedTextColor = Color.White
                 )
             )
         }
@@ -459,7 +472,7 @@ fun EchoNavigationRail(
             Icon(
                 Icons.Default.Tv,
                 contentDescription = "Ambient Screensaver",
-                tint = Color(0xFF94A3B8),
+                tint = Color.White,
                 modifier = Modifier.size(20.dp).align(Alignment.Center)
             )
         }

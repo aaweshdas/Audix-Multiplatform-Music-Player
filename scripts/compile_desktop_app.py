@@ -56,6 +56,8 @@ with zipfile.ZipFile(target_jar, 'r') as zin, zipfile.ZipFile(clean_ref_jar, 'w'
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ExtensionCategoryFilter') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/EchoDesktopAppKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/ComposableSingletons$EchoDesktopAppKt') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/DesktopBackgroundManager') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/BackgroundWallpaper') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/Screen') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/UiZoomManager') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/viewmodel/PlayerViewModel') and
@@ -64,6 +66,13 @@ with zipfile.ZipFile(target_jar, 'r') as zin, zipfile.ZipFile(clean_ref_jar, 'w'
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/MainKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/core/extensions/JarExtensionRepository') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/EchoTrayPainter') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/core/platform/VlcAudioPlayer') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/core/platform/AudioVisualizerManager') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/core/network/') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/theme/') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/ShelfRow') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/ComposableSingletons$ShelfRow') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/MediaCard') and
             not item.filename.startswith('dev/brahmkshatriya/echo/core/extensions/builtin/LocalMusicExtension')):
             zout.writestr(item, zin.read(item.filename))
 
@@ -72,18 +81,25 @@ app_jars.append(clean_ref_jar)
 app_cp = ';'.join(app_jars)
 
 source_files = [
+    os.path.join(PROJECT_ROOT, r'core\src\commonMain\kotlin\dev\brahmkshatriya\echo\core\network\HttpRetryInterceptor.kt'),
+    os.path.join(PROJECT_ROOT, r'core\src\commonMain\kotlin\dev\brahmkshatriya\echo\core\network\HttpClientFactory.kt'),
     os.path.join(PROJECT_ROOT, r'core\src\desktopMain\kotlin\dev\brahmkshatriya\echo\core\platform\VlcAudioPlayer.kt'),
+    os.path.join(PROJECT_ROOT, r'core\src\desktopMain\kotlin\dev\brahmkshatriya\echo\core\platform\AudioVisualizerManager.kt'),
     os.path.join(PROJECT_ROOT, r'core\src\desktopMain\kotlin\dev\brahmkshatriya\echo\core\extensions\JarExtensionRepository.kt'),
     os.path.join(PROJECT_ROOT, r'core\src\desktopMain\kotlin\dev\brahmkshatriya\echo\core\extensions\builtin\LocalMusicExtension.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\library\DesktopLibraryManager.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\download\DesktopDownloadManager.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\Main.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\viewmodel\PlayerViewModel.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\theme\EchoTheme.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\components\MediaCard.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\components\ShelfRow.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\player\MiniPlayer.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\HomeScreen.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screensaver\EchoScreensaver.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\SearchAndOthers.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\ExtensionsScreen.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\DesktopBackgroundManager.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\EchoDesktopApp.kt')
 ]
 

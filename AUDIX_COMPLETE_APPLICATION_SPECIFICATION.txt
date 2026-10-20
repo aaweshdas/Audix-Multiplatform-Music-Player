@@ -1,0 +1,675 @@
+====================================================================================================
+ AUDIX (ECHO DESKTOP) — COMPLETE APPLICATION SPECIFICATION & ARCHITECTURAL REFERENCE MANUAL
+ Version: 1.0.0-RELEASE (Windows Portable)
+ Platform: Windows x64 (OpenJDK 21, Compose Multiplatform, LibVLC 3.x)
+ Build Type: Native Standalone Portable Runtime
+====================================================================================================
+
+====================================================================================================
+TABLE OF CONTENTS
+====================================================================================================
+ 1. EXECUTIVE OVERVIEW & PRODUCT IDENTITY
+ 2. ARCHITECTURAL BLUEPRINT & TECHNOLOGY STACK
+ 3. COMPLETE REPOSITORY DIRECTORY TREE & MODULE TOPOLOGY
+ 4. CORE DATA MODELS & DOMAIN SCHEMAS
+ 5. AUDIO PLAYBACK ENGINE & PIPELINE SPECIFICATION
+ 6. SEARCH & CANDIDATE RESOLUTION MATRIX (THE SEARCH-TO-PLAYBACK SPEC)
+ 7. ALL 14 USER INTERFACE SCREENS & COMPONENT ARCHITECTURE
+ 8. EXTENSIONS ECOSYSTEM & ISOLATED CLASSLOADER ARCHITECTURE
+ 9. DOWNLOAD ENGINE & OFFLINE METADATA SUBSYSTEM
+10. FULL-STACK SECURITY ARCHITECTURE & VULNERABILITY AUDIT LOG
+11. APPLICATION SETTINGS REGISTRY & CONFIGURATION KEYS
+12. BUILD, COMPILATION, PACKAGING & DEPLOYMENT PIPELINES
+13. SYSTEM REQUIREMENTS, RUNTIME DEPENDENCIES & RUN PROTOCOLS
+14. KEYBOARD SHORTCUTS, ACCELERATORS & NAVIGATION MAPPINGS
+
+====================================================================================================
+1. EXECUTIVE OVERVIEW & PRODUCT IDENTITY
+====================================================================================================
+Audix (developed under the internal project name Echo Desktop / echo-nightly) is an enterprise-grade,
+ultra-high-fidelity desktop audio player, music streamer, and media manager engineered with Kotlin
+Multiplatform and Jetpack Compose Desktop.
+
+1.1 Core Mission & Design Principles:
+  - Universal Catalog Aggregation: Seamlessly merges music streaming catalogs across YouTube Music,
+    JioSaavn, Spotify, SoundCloud, Radio Browser, and local filesystem libraries into a single
+    monolithic listening environment.
+  - Zero-Latency Playback: Powered by native LibVLC 3.x bindings with low-jitter HTTP stream caching,
+    adaptive Opus/AAC audio extraction, and instantaneous buffer pre-warming.
+  - Strict Monochrome Aesthetics: Features a senior-developer minimalist monochromatic palette
+    (deep obsidian black #070913, liquid glass trans-opacity layers, and crisp typography) with
+    no oversaturated distraction colors.
+  - Portable Zero-Installer Distribution: Runs completely self-contained with embedded VLC native
+    binaries, runtime dependencies, and isolated ClassLoader extensions without requiring system
+    administrator privileges or registry writes.
+  - Millisecond Synchronized Lyrics: Real-time karaoke timecode alignment via crowdsourced LRCLIB,
+    Musixmatch, and Genius engines.
+  - Dynamic Visual Experience: Features an ambient 3D album mosaic screensaver, Apple iOS lockscreen
+    miniplayer aesthetics, and a cosmic gravitational lensing vortex clock.
+
+====================================================================================================
+2. ARCHITECTURAL BLUEPRINT & TECHNOLOGY STACK
+====================================================================================================
+Audix is architected as a layered reactive system following Unidirectional Data Flow (UDF) and
+Clean Architecture principles.
+
+2.1 Technology Stack Matrix:
+  - Programming Language: Kotlin 2.2.10 (Targeting JVM 21 bytecode)
+  - UI Framework: Compose Multiplatform for Desktop 1.7.3 (Skia rendering engine / AWT host)
+  - Audio Backend: VideoLAN LibVLC 3.0.x via vlcj 4.8.x and Java Native Access (JNA 5.14.0)
+  - Dependency Injection: Koin Multiplatform 4.0.0 (Global singleton context and screen injection)
+  - Reactive Asynchronous Flows: Kotlinx Coroutines 1.9.0 (StateFlow, SharedFlow, Dispatchers.IO/Main)
+  - Serialization: Kotlinx Serialization JSON 1.7.3 (Type-safe domain serialization)
+  - HTTP Network Layer: Square OkHttp 4.12.0 / 5.0 with custom security, retry, and SSRF interceptors
+  - Image Loading Pipeline: Coil3 Compose 3.0.0 with dual memory-caching and fallback resource loaders
+  - Isolated Plugin System: URLClassLoader sandbox per extension JAR with dynamic manifest discovery
+  - Desktop Interoperability: Java Desktop AWT API, Windows Explorer ProcessBuilder integrations
+
+2.2 Architecture Layers:
+  [UI Layer]: Compose Desktop Composables (HomeScreen, SearchScreen, SettingsScreen, MiniPlayer, etc.)
+      |
+  [State & Presentation Layer]: PlayerViewModel, ExtensionsViewModel, StateFlow reactive bindings
+      |
+  [Domain / Business Layer]: MediaDataRepository, DesktopDownloadManager, DesktopLibraryManager
+      |
+  [Core Engine Layer]: VlcAudioPlayer (LibVLC binding), ExtensionManager (JAR ClassLoader isolate)
+      |
+  [Hardware & Platform Layer]: Windows OS Kernel, AWT EventQueue, JNA libvlc.dll / libvlccore.dll
+
+====================================================================================================
+3. COMPLETE REPOSITORY DIRECTORY TREE & MODULE TOPOLOGY
+====================================================================================================
+The project repository is structured into modular Kotlin Multiplatform subprojects:
+
+s:\All Code\Antigravity\echo-nightly\
+├── build.gradle.kts                      # Root Gradle multi-project build configuration
+├── settings.gradle.kts                   # Subproject registrations and repository declarations
+├── gradle.properties                     # JVM allocation (-Xmx4g), Kotlin & Compose version flags
+├── local.properties                      # Local SDK and environment path configurations
+├── AI_POLICY.md                          # Engineering development standards and guidelines
+├── README.md                             # User-facing project documentation and quickstart
+├── Run-Audix-Desktop.bat                 # Primary standalone launcher script for portable JRE
+├── Run.bat                               # Quick launcher script
+│
+├── common/                               # Domain Contracts & Extension Interfaces
+│   └── src/commonMain/kotlin/dev/brahmkshatriya/echo/common/
+│       ├── Extension.kt                  # Base interface for all dynamic extensions
+│       ├── MusicExtension.kt             # Contract for audio stream search, catalog & feeds
+│       ├── LyricsExtension.kt            # Contract for synchronized and plain-text lyrics
+│       ├── TrackerExtension.kt            # Contract for scrobbling and playback tracking (Last.fm, Discord)
+│       ├── MiscExtension.kt               # Miscellaneous utilities contract
+│       └── models/                       # Core domain entities
+│           ├── Track.kt                  # Track schema with metadata, duration & extras
+│           ├── Album.kt                  # Album schema
+│           ├── Artist.kt                 # Artist schema
+│           ├── Streamable.kt             # Audio stream source hierarchy (Http, Server, File)
+│           ├── ImageHolder.kt            # Polymorphic image holder (Url, Resource, Byte array)
+│           ├── Metadata.kt               # Extension manifest descriptor schema
+│           ├── ExtensionType.kt          # Enum: MUSIC, LYRICS, TRACKER, MISC
+│           └── NetworkRequest.kt         # HTTP request encapsulation (URL, headers)
+│
+├── core/                                 # Business Logic, Repositories & Engine Drivers
+│   ├── src/commonMain/kotlin/dev/brahmkshatriya/echo/core/
+│   │   ├── data/
+│   │   │   └── MediaDataRepository.kt    # Unified catalog data layer
+│   │   ├── extensions/
+│   │   │   ├── ExtensionManager.kt       # Dynamic discovery and lifecycle coordinator
+│   │   │   ├── ExtensionRepository.kt    # Abstract interface for extension CRUD
+│   │   │   ├── JarExtensionRepository.kt # Isolated URLClassLoader JAR installer and scanner
+│   │   │   └── builtin/
+│   │   │       └── LocalMusicExtension.kt# Built-in local filesystem audio scanner
+│   │   ├── network/
+│   │   │   ├── HttpClientFactory.kt      # Configured OkHttpClient builder with timeouts
+│   │   │   └── HttpRetryInterceptor.kt   # Exponential backoff retry interceptor
+│   │   ├── player/
+│   │   │   └── AudioPlayerInterface.kt   # Abstract player contract: play, pause, queue, seek
+│   │   ├── security/
+│   │   │   └── SecurePrefs.kt            # In-memory and platform credential store
+│   │   └── settings/
+│   │       └── EchoSettings.kt           # Key-value persistent preferences engine
+│   └── src/desktopMain/kotlin/dev/brahmkshatriya/echo/core/platform/
+│       ├── AppPlatform.kt                # Platform paths (AppData, downloadsDir, extensionsDir)
+│       ├── AudioPlayer.kt                # Desktop AudioPlayer typealias
+│       └── VlcAudioPlayer.kt             # Native LibVLC audio driver with low-latency tuning
+│
+├── desktopApp/                           # User Interface, Presentation & Application Entry
+│   ├── src/desktopMain/kotlin/dev/brahmkshatriya/echo/desktop/
+│   │   ├── Main.kt                       # Application entrypoint: Window, AWT listeners, Koin init
+│   │   ├── download/
+│   │   │   └── DesktopDownloadManager.kt # Multi-threaded downloader with SSRF protection
+│   │   ├── library/
+│   │   │   └── DesktopLibraryManager.kt  # User library, playlists, favorites & history manager
+│   │   ├── viewmodel/
+│   │   │   ├── PlayerViewModel.kt        # Master playback controller, candidate matcher, queue state
+│   │   │   └── ExtensionsViewModel.kt    # Extension lifecycle manager and catalog provider
+│   │   └── ui/
+│   │       ├── EchoDesktopApp.kt         # Master shell: NavigationRail, window decorations, wallpaper
+│   │       ├── player/
+│   │       │   └── MiniPlayer.kt         # Docked bottom player, waveform, slider, volume controls
+│   │       ├── screens/
+│   │       │   ├── HomeScreen.kt         # Home discovery, carousels, charts, live audio visualizer
+│   │       │   ├── SearchAndOthers.kt    # Search, Settings (Senior Redesign), Library, Album, Artist
+│   │       │   └── ExtensionsScreen.kt   # Installed extensions manager and verified community store
+│   │       └── screensaver/
+│   │           └── EchoScreensaver.kt    # 3D album mosaic, Apple iOS player widget, Cosmic Vortex Clock
+│   └── src/desktopMain/resources/
+│       ├── images/                       # App backgrounds, logos, cosmic dial assets
+│       └── extensions/                   # Bundled seed extension JARs
+│
+├── extensions/                           # Autonomous Dynamic Extension Projects
+│   ├── youtube/                          # YouTube Music extension (InnerTube Android VR client)
+│   ├── saavn/                            # JioSaavn extension (320kbps AAC regional catalog)
+│   ├── spotify/                          # Spotify Charts and metadata matching extension
+│   └── soundcloud/                       # SoundCloud API extension
+│
+├── release-artifacts/                    # Production Portable Distribution Bundle
+│   ├── Audix-Windows-Portable/           # Unpacked runtime folder ready for direct execution
+│   │   ├── Audix.exe                     # Native launcher executable
+│   │   ├── app/                          # Application JARs, classloader libraries & resources
+│   │   └── runtime/                      # Bundled Java 21 JRE and VideoLAN VLC 3.0 binaries
+│   └── Audix-v1.0.0-Windows-Portable.zip # Compressed standalone release distribution (65.9 MB)
+│
+├── runtime/                              # Shared native libraries
+│   └── vlc/                              # libvlc.dll, libvlccore.dll, plugins/
+│
+├── scratch/                              # Bytecode Engineering, Patching & Verification Tools
+│   ├── compile_screens.py                # Standalone Kotlin 2.2.10 compiler script
+│   ├── inject_classes.py                 # Bytecode injector into production runtime JARs and ZIP
+│   ├── test_load_screens.py              # JRE classloading verification harness for all 14 screens
+│   ├── test_playback_resolution.py       # Candidate scoring, extension routing & SSRF test suite
+│   ├── test_search_verification.py       # Live API search and catalog matching verification
+│   └── test_yt.py                        # YouTube direct adaptive format extraction test
+│
+└── scripts/
+    └── compile_and_package_extensions.py # Automates build and deployment of all 10 extension JARs
+
+====================================================================================================
+4. CORE DATA MODELS & DOMAIN SCHEMAS
+====================================================================================================
+All media entities in Audix are strongly typed immutable data classes with serialization support.
+
+4.1 Track:
+  - id: String                       (Unique alphanumeric ID or foreign URI)
+  - title: String                    (Song title, sanitized)
+  - artists: List<Artist>            (List of contributing artists)
+  - album: Album?                    (Parent album reference, nullable)
+  - cover: ImageHolder?              (Artwork image holder: Network URL or local path)
+  - duration: Long?                  (Duration in milliseconds)
+  - plays: Long?                     (Play count or view count)
+  - releaseDate: String?             (ISO date string or year)
+  - explicit: Boolean?               (Explicit content advisory flag)
+  - extras: Map<String, String>      (Routing dictionary: "extension_id", "local_file", "video_id", etc.)
+
+4.2 Artist:
+  - id: String                       (Artist identifier)
+  - name: String                     (Artist display name)
+  - cover: ImageHolder?              (Artist portrait image)
+  - bio: String?                     (Biography text)
+  - extras: Map<String, String>      (Additional metadata)
+
+4.3 Album:
+  - id: String                       (Album identifier)
+  - title: String                    (Album display title)
+  - artists: List<Artist>            (Album primary artists)
+  - cover: ImageHolder?              (Album cover artwork)
+  - trackCount: Int?                 (Number of songs in album)
+  - releaseDate: String?             (Release date)
+  - extras: Map<String, String>      (Additional metadata)
+
+4.4 Streamable & Media:
+  - Streamable.Media.Server:
+    - id: String
+    - sources: List<Streamable.Source.Http> (Ordered list of audio stream sources)
+  - Streamable.Source.Http:
+    - request: NetworkRequest (Target URL, User-Agent, Origin, Referer)
+    - quality: Int (Bitrate in kbps: 320, 256, 160, 128)
+    - title: String? (MIME type or codec label: "audio/mp4", "audio/webm", "Opus")
+
+4.5 DownloadTask:
+  - id: String (Track ID)
+  - track: Track (Associated track metadata)
+  - status: Status (QUEUED, CONNECTING, DOWNLOADING, COMPLETED, FAILED, CANCELLED)
+  - progress: Float (0.0f to 1.0f)
+  - bytesRead: Long (Downloaded byte count)
+  - totalBytes: Long (Content-Length in bytes)
+  - errorMessage: String? (Error description upon failure)
+
+4.6 OfflineTrackMetadata (.echo.json sidecar file):
+  - id: String
+  - title: String
+  - artists: List<String>
+  - album: String?
+  - coverUrl: String?
+  - durationMs: Long?
+  - format: String ("MP3", "M4A", "OPUS", "FLAC")
+  - downloadTime: Long (Timestamp in milliseconds)
+  - extensionId: String? (Persisted extension ID: "youtube_music", "saavn_music", "local_music", etc.)
+
+====================================================================================================
+5. AUDIO PLAYBACK ENGINE & PIPELINE SPECIFICATION
+====================================================================================================
+The playback engine is implemented in VlcAudioPlayer.kt, providing a native bridge to LibVLC.
+
+5.1 Native LibVLC Discovery Hierarchy:
+  When initialized, VlcAudioPlayer locates native binaries across the following prioritized paths:
+  1. Bundled Application Runtime (Priority #1): <appBaseDir>\runtime\vlc\ (containing libvlc.dll, libvlccore.dll, plugins/)
+     as well as relative directories relative to codeSource (<codeSourceDir>\runtime\vlc, ..\runtime\vlc).
+     Guarantees the portable distribution always binds to the bundled 64-bit runtime rather than an incompatible or 32-bit system VLC.
+  2. System Program Files: C:\Program Files\VideoLAN\VLC and C:\Program Files (x86)\VideoLAN\VLC
+  3. Environment Variable: VLC_PLUGIN_PATH directory
+  4. vlcj NativeDiscovery fallback scan
+
+5.2 Native Tuning Arguments & Playback Flags:
+  Audio streams are initiated with optimal low-latency flags:
+  - :http-caching=400            (400ms network buffer to balance zero-stutter and fast seeks)
+  - :network-caching=400         (400ms socket read buffer)
+  - :live-caching=500            (500ms live stream buffer)
+  - :http-reconnect=true         (Automatic reconnection on transient connection dropouts)
+  - :clock-jitter=0              (Disables clock drift correction for real-time responsiveness)
+  - :drop-late-frames=true       (Drops stale frames to prevent buffer accumulation)
+  - :no-video                    (Completely disables video decoding pipelines to conserve CPU)
+  - :audio-replay-gain-mode=none (Prevents artificial dynamic range compression)
+  - MediaPlayerFactory Level Initialization: When audio_normalization is enabled, --audio-filter=normvol
+    is registered directly at the MediaPlayerFactory constructor level, guaranteeing factory-wide volume
+    leveling across all media without depending on per-media option parsing.
+
+5.3 Playback State Machine:
+  [IDLE] -> [LOADING] -> [BUFFERING] -> [PLAYING] -> [PAUSED] -> [ENDED]
+    |           |              |            |            |          |
+    +-----------+--------------+------------+------------+----------+---> [ERROR]
+  - IDLE: No media loaded or stopped.
+  - LOADING: Stream URL is being resolved by PlayerViewModel; audio component halted in 0ms.
+  - BUFFERING: LibVLC cache pre-fill (< 100% buffer).
+  - PLAYING: Active audio frame rendering. Position poller runs at 50ms interval for lyric sync.
+  - PAUSED: Media paused; audio position held.
+  - ENDED: Stream reached EOF. Triggers repeat logic (ONE -> replay, ALL -> skipNext, NONE -> skipNext if queue remains).
+  - ERROR: Stream load failure. Triggers activeSources failover, or auto-recovery ceiling (max 3 retries).
+
+5.4 Equalizer System:
+  VlcAudioPlayer supports a 10-band graphic equalizer via vlcj's Equalizer API:
+  - Frequencies: 60Hz, 170Hz, 310Hz, 600Hz, 1kHz, 3kHz, 6kHz, 12kHz, 14kHz, 16kHz
+  - Preamp Gain: -20.0 dB to +20.0 dB
+  - Band Gains: -20.0 dB to +20.0 dB per individual frequency band
+  - Built-in Presets: Flat, Bass Boost, Vocal Enhancer, Rock, Pop, Jazz, Electronic, Classical
+
+====================================================================================================
+6. SEARCH & CANDIDATE RESOLUTION MATRIX (THE SEARCH-TO-PLAYBACK SPEC)
+====================================================================================================
+Audix implements a strict, multi-tiered resolution matrix to prevent audio desynchronization and
+track hijacking.
+
+6.1 Extension Attribution Pipeline:
+  1. When a user clicks a song in the SearchScreen, SearchScreen automatically stamps
+     track.extras["extension_id"] = currentExt.id.
+  2. When PlayerViewModel.play(track) is called, it inspects the track origin in order:
+     a. Explicit track.extras["extension_id"] if present.
+     b. Local file indicator: if track.extras["local_file"] != null -> "local_music".
+     c. 11-Character Alphanumeric ID regex (^[a-zA-Z0-9_-]{11}$) -> "youtube_music".
+     d. 6-12 Digit Numeric ID regex (^\d{6,12}$) -> "saavn_music".
+     e. Prefix "sc_" -> "soundcloud".
+     f. URI containing "spotify:track:" -> "spotify_music".
+     g. Active extension fallback from ExtensionManager.
+
+6.2 YouTube Direct Resolution Priority (Zero Hijacking):
+  In YoutubeExtension.kt:
+  - Step 1: Direct YouTube Resolution (tryResolveYouTubeDirect)
+    Connects to YouTube InnerTube API using the ANDROID_VR client (Quest 3 emulation).
+    Directly extracts adaptive audio streams (Opus 160kbps, AAC 128kbps) from googlevideo.com.
+    Requires NO signature cipher deciphering and plays the EXACT YouTube audio in under 200ms.
+  - Step 2: Strict External Fallback (Only if Step 1 completely fails)
+    Queries JioSaavn search API with target title and artist.
+    Applies the Strict Candidate Scoring Algorithm (described below).
+
+6.3 Strict Candidate Scoring Algorithm:
+  Formula: Total Score = Title Score + Artist Score + Synergy Bonus - Noise Penalty
+  - Minimum Qualification Threshold: Strictly 75 points (prevents title-only hijackings).
+  - Title Scoring:
+    * Exact Title Match: +60 points
+    * Substring Title Match: +40 points
+    * Word Overlap Ratio: up to +30 points
+  - Artist Scoring & Hard Rejection:
+    * Exact Artist Match: +35 points
+    * Substring Artist Match: +25 points
+    * Word Overlap Ratio: up to +20 points
+    * ARTIST MISMATCH & COLLABORATION / SOUNDTRACK DURATION SYNERGY RULE:
+      If target artist is known, candidate artist is known, and they share ZERO word overlap:
+      - Default: SCORE = 0 (HARD REJECTION). This completely eliminates audio hijacking
+        where songs with common titles (e.g., "Stay" by The Kid LAROI) were matched to unrelated
+        songs by different artists (e.g., "Stay" by Jeet Gannguli).
+      - Collaboration / Regional Soundtrack Fallback: If Normalized Title is an Exact Match (+60)
+        AND track duration matches within ±3000ms (accounting for regional credits, e.g. YouTube
+        crediting playback singer "Arijit Singh" vs. JioSaavn crediting composer "Pritam" on "Kesariya"),
+        a Duration + Exact Title Synergy Bonus of +15 points is awarded (Total = 60 + 15 = 75 points).
+        This allows genuine soundtrack / collaborator matches to reach exactly the 75-point threshold
+        while hard-rejecting mismatched durations or title-only collisions (< 75).
+  - Token Normalization:
+    Strips noise tokens prior to comparison: "official", "video", "audio", "remastered", "lyric",
+    "lyrics", "hq", "hd", "visualizer", "topic", "vevo".
+
+====================================================================================================
+7. ALL 14 USER INTERFACE SCREENS & COMPONENT ARCHITECTURE
+====================================================================================================
+Audix provides 14 distinct, responsive, and beautifully crafted screens styled in a senior-developer
+minimalist monochrome liquid-glass design.
+
+7.1 Screen 1: Home Screen (HomeScreen.kt)
+  - Hero Discovery Header: Dynamic greeting based on time of day, active audio engine badge.
+  - Live Audio Spectrum Visualizer: 24 animated frequency bars with peak decay.
+  - Top Rotation Carousel: Curated high-fidelity tracks with quick-play buttons and album covers.
+  - Era-by-Era Carousels:
+    * 2025 Global Hits (Espresso, Birds of a Feather, Die With A Smile, A Bar Song)
+    * 2024 Hits (Cruel Summer, vampire, Paint The Town Red, greedy)
+    * 2023 Hits (Flowers, Kill Bill, Calm Down, Creepin')
+    * 2020s Decade Hits (Blinding Lights, Don't Start Now, Stay, Heat Waves)
+    * 2010s Golden Hits (Rolling in the Deep, Uptown Funk, Shape of You, Counting Stars)
+    * 2000s Millennial Hits (In the End, Hips Don't Lie, Umbrella, Hey Ya!)
+    * 90s Retro Classics (Smells Like Teen Spirit, Wonderwall, Zombie, Gangsta's Paradise)
+  - Quick Actions: Shuffle Library, View Downloads, Open Queue.
+
+7.2 Screen 2: Search Screen (SearchAndOthers.kt)
+  - Universal Search Input: Real-time search across the currently selected music provider.
+  - Provider Selector Pills: Quick-switch between YouTube Music, JioSaavn, Spotify, SoundCloud, Radio.
+  - Search Discovery Hub: Shows recent search history pills with individual deletion and clear-all.
+  - Search Result Shelves: Tracks, Albums, Artists, Playlists with high-density item rows.
+  - Direct Play Action: Stamps extension ID and triggers instant stream extraction without desync.
+
+7.3 Screen 3: Library Screen (SearchAndOthers.kt)
+  - Segmented Navigation: Playlists, Liked Songs, History, Local Tracks, Offline Downloads.
+  - Liked Songs Hub: One-click playback of all favorited tracks with shuffle-all support.
+  - History Tracker: Reverse chronological list of recently played tracks.
+  - Playlist Creator: In-memory and persisted custom playlist creation with track reordering.
+
+7.4 Screen 4: Docked MiniPlayer (MiniPlayer.kt)
+  - Persistent Bottom Bar: Stays docked at the bottom of the application window.
+  - Liquid Glass Container: Subtle dark translucent background with crisp 1px border.
+  - Track Metadata Display: High-resolution square thumbnail, scrolling title, artist name.
+  - Interactive Scrubbing Bar: Smooth drag-and-seek progress bar with elapsed and total timecode labels.
+  - Playback Controls: Previous, Play/Pause toggle, Next, Repeat Mode toggle, Shuffle toggle.
+  - Volume Controller: Interactive volume slider with mute toggle icon.
+  - Expanded Player & Queue Toggles: One-click buttons to open lyrics/expanded view and queue drawer.
+
+7.5 Screen 5: Expanded Fullscreen Player (SearchAndOthers.kt)
+  - High-Resolution Artwork: Large blurred backdrop with crisp central album art.
+  - Audio Telemetry Info: Bitrate badge (e.g., "320 kbps AAC" or "Opus High"), format, audio engine.
+  - Embedded Lyrics Viewer: Displays current lyrics in sync with playback.
+  - Advanced Controls: Equalizer toggle, speed selector (0.5x, 0.75x, 1.0x, 1.25x, 1.5x, 2.0x), sleep timer.
+
+7.6 Screen 6: Ambient Screensaver (EchoScreensaver.kt)
+  - Dual Activation Triggers: User inactivity timeout (customizable) or mouse pointer exiting app.
+  - 3D Album Mosaic Backdrop: Dynamic 5-column perspective grid of album artworks with subtle drift.
+  - Apple iOS Lockscreen Player Widget: Authentic iOS glass widget with progress slider and controls.
+  - Cosmic Gravitational Lensing Vortex Clock: Top-right analog dial with event horizon singularity,
+    swirling numerals, and live sweeping cyan neon hands.
+  - Wake-up Guards: Resets mouseExitedAt upon dismissal to prevent infinite lockout loops.
+
+7.7 Screen 7: Settings Screen (SearchAndOthers.kt - Senior Developer Redesign)
+  - Strict Monochrome Palette: Minimalist black and white design with no distracting colors.
+  - Categorized Sections:
+    * Audio Engine: Quality selector (320kbps, 160kbps, 128kbps), buffer latency (150ms-2000ms),
+      volume normalization, silence skipping.
+    * Screensaver Engine: Idle timeout (Off, 30s, 60s, 2m, 5m, 10m), mouse-exit trigger, theme,
+      custom background image picker, burn-in protection.
+    * Downloads & Storage: Custom download directory picker, clear cache button, cache size display.
+    * Local Library: Add/remove scanned music folders, automatic local file indexing.
+    * UI & UX Preferences: Minimize to tray on close, native desktop notifications, auto-updates.
+    * Keybindings & Shortcuts: Full reference table of keyboard accelerators.
+
+7.8 Screen 8: Extensions Manager Screen (ExtensionsScreen.kt)
+  - Dual Tab Architecture: "Installed" and "Community Catalog".
+  - Telemetry KPI Bar: Active audio engine, loaded lyrics provider, active trackers, total extensions.
+  - Verified Community Store: 1-click install for YouTube, JioSaavn, Spotify, SoundCloud, Radio Browser,
+    LRCLIB, Genius, Musixmatch, Discord RPC, Last.fm.
+  - Custom Extension Loader: AWT FileDialog integration for installing external .jar plugins.
+  - Security Sandbox: Path traversal sanitization on extension names and canonical boundary checks.
+
+7.9 Screen 9: Artist Detail Screen (SearchAndOthers.kt)
+  - Artist Banner & Portrait: High-resolution hero image with artist name and follower statistics.
+  - Top Tracks: Top 10 most popular songs with direct play and add-to-queue actions.
+  - Discography: Filterable list of Albums, Singles, and EPs.
+
+7.10 Screen 10: Album Detail Screen (SearchAndOthers.kt)
+  - Album Hero Section: Album cover art, release year, track count, total duration, record label.
+  - Track Listing: Numbered track rows with song title, duration, and download action.
+  - Batch Action: "Download Entire Album" button for offline storage.
+
+7.11 Screen 11: Playlist Detail Screen (SearchAndOthers.kt)
+  - Custom Cover & Title: User-editable playlist title and description.
+  - Track Management: Add to queue, remove track, reorder tracks via up/down actions.
+
+7.12 Screen 12: Active Queue Screen (SearchAndOthers.kt)
+  - Up Next List: Complete visual list of queued tracks.
+  - Queue Operations: Clear queue, shuffle queue, drag-to-reorder, remove individual items.
+  - Playing Indicator: Active track is highlighted with an animated waveform icon.
+
+7.13 Screen 13: Synchronized Lyrics Screen (SearchAndOthers.kt)
+  - Millisecond Alignment: Auto-scrolls actively sung line to center of screen.
+  - Typography Styling: Active line is rendered in large bold white; upcoming/past lines in muted gray.
+  - Manual Seek: Clicking any lyric line immediately seeks the audio player to that timestamp.
+
+7.14 Screen 14: Downloads & Offline Manager Screen (SearchAndOthers.kt)
+  - Active Downloads Shelf: Shows active progress bars, downloaded MB, total MB, and speed.
+  - Cancel & Retry Controls: Individual download cancellation and retry buttons.
+  - Offline Catalog: List of all downloaded tracks with zero-network local playback capability.
+  - File Management: "Open in File Explorer" button and "Delete from Disk" action.
+
+====================================================================================================
+8. EXTENSION ECOSYSTEM & ISOLATED CLASSLOADER ARCHITECTURE
+====================================================================================================
+Audix features a dynamic plugin architecture that isolates extensions in their own JVM ClassLoaders.
+
+8.1 Dynamic Extension Discovery:
+  - Extensions directory is resolved at runtime: %APPDATA%\Echo\extensions\
+  - JarExtensionRepository scans for all *.jar files inside this directory.
+  - For each JAR, it opens the JAR manifest or queries META-INF/services to identify classes
+    implementing Extension, MusicExtension, LyricsExtension, TrackerExtension, or MiscExtension.
+  - An isolated java.net.URLClassLoader is created for each JAR, ensuring extensions do not share
+    static state or conflict with application dependencies.
+
+8.2 Complete Extension Portfolio:
+  1. YouTube Music (youtube.jar):
+     - Catalog: Universal global streaming, search, artist radio, trending charts.
+     - Audio Engine: InnerTube Android VR client (Quest 3 emulation), 26 adaptive formats, Opus.
+  2. JioSaavn (saavn.jar):
+     - Catalog: 80M+ Bollywood, Regional Indian, and International songs.
+     - Audio Engine: High-fidelity 320kbps AAC streams extracted via direct encrypted media URL.
+  3. Spotify Global (spotify.jar):
+     - Catalog: Top 50 Global, Viral Hits, curated editorial playlists.
+     - Audio Engine: Seamless metadata matching to high-bitrate streaming endpoints.
+  4. SoundCloud (soundcloud.jar):
+     - Catalog: Indie artists, DJ sets, electronic music, live sets, remixes.
+     - Audio Engine: Progressive audio streams via SoundCloud v2 API.
+  5. Radio Browser (radiobrowser.jar):
+     - Catalog: 35,000+ live internet radio stations worldwide spanning all genres.
+     - Audio Engine: Direct ICY / Shoutcast / Icecast HTTP audio streams.
+  6. LRCLIB Realtime Lyrics (lrclib.jar):
+     - Catalog: Open crowdsourced synchronized lyrics database with millisecond timecodes.
+  7. Genius Lyrics & Trivia (genius.jar):
+     - Catalog: Verified songwriter annotations, track trivia, and song meanings.
+  8. Musixmatch (musixmatch.jar):
+     - Catalog: Multi-lingual synchronized lyrics database.
+  9. Discord Rich Presence (discordrpc.jar):
+     - Function: Broadcasts current song title, artist, album art, and elapsed time to Discord status.
+  10. Last.fm Scrobbler (lastfm.jar):
+      - Function: Automatically scrobbles played tracks to user's personal Last.fm listening history.
+
+====================================================================================================
+9. DOWNLOAD ENGINE & OFFLINE METADATA SUBSYSTEM
+====================================================================================================
+Audix includes a robust offline download manager implemented in DesktopDownloadManager.kt.
+
+9.1 Download Pipeline:
+  1. Trigger: User clicks download icon on track, album, or playlist.
+  2. Stream Resolution: Resolves exact audio stream URL via PlayerViewModel.resolveStreamUrl(track).
+  3. SSRF Validation: Validates URL and all redirect hops against private/loopback address filters.
+  4. Temporary File: Writes incoming audio chunks to <downloadDir>/<safeTitle>.part.
+  5. Progress Throttling: Progress updates emitted at 250ms intervals to prevent UI thread thrashing.
+  6. Atomic Rename: Moves <safeTitle>.part to final container (<safeTitle>.mp3 or <safeTitle>.m4a).
+  7. Sidecar Metadata: Writes complete track metadata to <safeTitle>.<format>.echo.json.
+
+9.2 Safe Filename Sanitization:
+  - Replaces illegal filesystem characters (\ / : * ? " < > | \r \n \t) with underscores.
+  - Windows Reserved Word Guard: If filename base matches CON, PRN, AUX, NUL, COM1-9, or LPT1-9,
+    a leading underscore is prepended to prevent Windows kernel filesystem errors.
+  - Hash Suffix: Appends a deterministic 6-character hex hash based on track ID to prevent collisions.
+
+====================================================================================================
+10. FULL-STACK SECURITY ARCHITECTURE & VULNERABILITY AUDIT LOG
+====================================================================================================
+A full-stack security audit was performed across the codebase. Below is the comprehensive audit log:
+
+10.1 Vulnerability Log & Security Patches:
+  - VULN-01 (SSRF Protection Bypass via HTTP Redirects):
+    * Severity: HIGH
+    * Vulnerable File: DesktopDownloadManager.kt
+    * Issue: validateStreamUrl checked only the initial URL. A malicious stream URL redirecting to
+      127.0.0.1 or 169.254.169.254 could access internal services.
+    * Patch: Implemented an OkHttp NetworkInterceptor that inspects and validates the resolved IP
+      address of EVERY HTTP redirect hop, rejecting loopback, link-local, and RFC 1918 addresses.
+  - VULN-02 (Path Traversal in Extension Downloader):
+    * Severity: HIGH
+    * Vulnerable File: ExtensionsScreen.kt
+    * Issue: Remote extension filenames were written without sanitization, risking directory traversal.
+    * Patch: Enforced regex sanitization ^[a-zA-Z0-9._-]+$ and verified that
+      targetFile.canonicalPath starts with destDir.canonicalPath.
+  - VULN-03 (Data Race in Download State Manager):
+    * Severity: HIGH
+    * Vulnerable File: DesktopDownloadManager.kt
+    * Issue: Concurrent coroutines mutated _activeDownloads list without synchronization.
+    * Patch: Enforced atomic StateFlow .update { } functional transformations.
+  - VULN-04 (Native LibVLC Deadlock on Callback Threads):
+    * Severity: CRITICAL
+    * Vulnerable File: VlcAudioPlayer.kt
+    * Issue: Synchronous invocation of VLC controls inside VLC native event callbacks caused deadlocks.
+    * Patch: Offloaded all player state modifications from event listeners to scope.launch(Dispatchers.IO).
+  - VULN-05 (Screensaver Lockout Loop):
+    * Severity: CRITICAL
+    * Vulnerable File: EchoDesktopApp.kt
+    * Issue: mouseExitedAt was not reset to 0L upon dismissal, causing immediate re-lockout.
+    * Patch: Reset mouseExitedAt = 0L upon any screensaver dismissal, keypress, or mouse movement.
+  - VULN-06 (Single-Instance IPC Token Storage & Socket Buffer Bounding):
+    * Severity: HIGH
+    * Vulnerable File: Main.kt
+    * Issue: session.token was created without owner-restricted permissions, and the local IPC socket
+      read lines without an upper boundary, risking local token interception or memory flooding.
+    * Patch: Enforced owner-only file permissions (setReadable/setWritable) and bounded IPC socket reads
+      to a maximum buffer of 512 characters with constant-time MessageDigest.isEqual token verification.
+  - VULN-07 (Unmanaged JVM Threads in Settings UI):
+    * Severity: MEDIUM
+    * Vulnerable File: SearchAndOthers.kt
+    * Issue: Cache clearing in the filtered search settings card spawned raw Thread { }.start()
+      bypassing coroutine lifecycle scopes and prematurely displaying success dialogs.
+    * Patch: Converted to structured coroutineScope.launch(Dispatchers.IO) with loading state tracking
+      and main dispatcher completion notification.
+
+====================================================================================================
+11. APPLICATION SETTINGS REGISTRY & CONFIGURATION KEYS
+====================================================================================================
+User settings are managed by EchoSettings and stored locally on the user's filesystem.
+
+11.1 Settings Key Registry:
+  | Configuration Key                | Type    | Default Value | Description                                   |
+  |----------------------------------|---------|---------------|-----------------------------------------------|
+  | audio_quality                    | String  | "HIGH"        | Streaming bitrate: HIGH (320k), MED, LOW      |
+  | audio_normalization              | Boolean | true          | Enables normvol volume level leveling         |
+  | skip_silence                     | Boolean | true          | Trims leading/trailing audio silence          |
+  | buffer_latency                   | Int     | 400           | LibVLC network cache buffer in milliseconds   |
+  | screensaver_timeout              | Int     | 60            | Inactivity timeout in seconds (0 = Disabled)  |
+  | screensaver_mouse_exit           | Boolean | true          | Activates screensaver when mouse leaves app   |
+  | screensaver_theme                | String  | "COSMIC"      | Theme style: COSMIC, MINIMAL, VINYL           |
+  | screensaver_spectrum_style       | String  | "BARS"        | Spectrum visualizer style: BARS, WAVE, DOTS   |
+  | screensaver_clock_format         | String  | "24H"         | Clock display mode: 12H vs 24H                |
+  | screensaver_show_seconds         | Boolean | true          | Displays seconds hand / digits on clock       |
+  | screensaver_show_date            | Boolean | true          | Displays calendar date on screensaver         |
+  | screensaver_show_telemetry       | Boolean | true          | Displays bitrate and format telemetry badge   |
+  | screensaver_burn_in_protection   | Boolean | true          | Shifts UI elements slightly to protect OLEDs  |
+  | screensaver_ambient_glow         | Boolean | true          | Enables subtle artwork glow backdrop          |
+  | screensaver_vinyl_speed          | String  | "33RPM"       | Turntable rotation speed: 33RPM vs 45RPM      |
+  | screensaver_bg_mode              | String  | "MOSAIC"      | Backdrop mode: MOSAIC, ARTWORK, CUSTOM        |
+  | screensaver_bg_custom_path       | String  | ""            | Filesystem path to custom background image    |
+  | screensaver_bg_opacity           | Int     | 65            | Background opacity percentage (10% - 100%)    |
+  | enable_animations                | Boolean | true          | Smooth Compose transition animations          |
+  | dynamic_accent_glow              | Boolean | false         | Monochromatic glow vs accent glow             |
+  | download_dir                     | String  | <Downloads>   | Custom filesystem path for offline music      |
+  | custom_music_folders             | String  | ""            | Semicolon-delimited paths to local folders    |
+  | minimize_to_tray_on_close        | Boolean | false         | Minimizes window to tray when closing         |
+  | show_track_notifications         | Boolean | true          | Displays desktop banner on track change       |
+  | check_for_updates                | Boolean | true          | Periodically checks for GitHub releases       |
+
+====================================================================================================
+12. BUILD, COMPILATION, PACKAGING & DEPLOYMENT PIPELINES
+====================================================================================================
+Audix utilizes a high-efficiency standalone build pipeline optimized for rapid iteration.
+
+12.1 Standalone Compiler Pipeline (scratch/compile_screens.py):
+  - Solves Gradle daemon memory exhaustion by executing the Kotlin 2.2.10 compiler directly via JRE.
+  - Dynamically extracts classpaths from recovered_classes.jar and Compose Multiplatform libraries.
+  - Compiles all modified UI screens and desktop ViewModels in under 20 seconds.
+  - Verifies zero syntax and type errors before producing bytecode.
+
+12.2 Bytecode Injector (scratch/inject_classes.py):
+  - Automatically injects newly compiled *.class files into:
+    * release-artifacts\Audix-Windows-Portable\app\recovered_classes-*.jar
+    * desktopApp\build\compose\binaries\main\app\Audix\app\recovered_classes-*.jar
+    * tools\recovered-reference\recovered_classes.jar
+  - Bundles background wallpapers, cosmic clock dial assets, and application logos into the JAR.
+  - Packages and embeds all 10 extension JARs into the classpath and portable distribution.
+  - Updates the standalone release ZIP: release-artifacts\Audix-v1.0.0-Windows-Portable.zip.
+
+12.3 Extension Compiler & Packager (scripts/compile_and_package_extensions.py):
+  - Iterates through extensions (YouTube, Saavn, Spotify, SoundCloud, Radio Browser).
+  - Compiles Kotlin extension sources with Extension base class dependencies.
+  - Packages JARs with META-INF/services manifests.
+  - Deploys JARs simultaneously to %APPDATA%\Echo\extensions\ and release-artifacts.
+
+====================================================================================================
+13. SYSTEM REQUIREMENTS, RUNTIME DEPENDENCIES & RUN PROTOCOLS
+====================================================================================================
+
+13.1 System Requirements:
+  - Operating System: Windows 10 (64-bit) / Windows 11 (64-bit), Build 19041 or higher
+  - Processor: Intel Core i3 / AMD Ryzen 3 or higher (x86_64 architecture)
+  - RAM: 4 GB minimum (8 GB recommended for large library caching)
+  - Disk Space: 300 MB free space for application runtime; additional space for offline music
+  - Display: 1280x720 minimum screen resolution (1920x1080 recommended)
+  - Graphics: DirectX 11 / OpenGL 3.3 compatible GPU for Compose Skia hardware acceleration
+
+13.2 Bundled Runtime Dependencies:
+  - OpenJDK 21 Runtime Environment (bundled in runtime\ or detected on system PATH)
+  - VideoLAN VLC 3.0.x 64-bit native binaries (libvlc.dll, libvlccore.dll, plugins\ directory)
+
+13.3 Launch Protocols:
+  - Method A (Direct Native Launcher):
+    Navigate to release-artifacts\Audix-Windows-Portable\ and double-click Audix.exe.
+  - Method B (Batch Launcher):
+    Run Run-Audix-Desktop.bat from the repository root.
+  - Method C (Command Line):
+    Run-Audix-Desktop.bat
+
+====================================================================================================
+14. KEYBOARD SHORTCUTS, ACCELERATORS & NAVIGATION MAPPINGS
+====================================================================================================
+Audix supports universal keyboard shortcuts for seamless control:
+
+  | Key Combination       | Function                                            |
+  |-----------------------|-----------------------------------------------------|
+  | Spacebar              | Toggle Playback (Play / Pause)                      |
+  | Ctrl + Right Arrow    | Skip to Next Track                                  |
+  | Ctrl + Left Arrow     | Skip to Previous Track / Restart Track              |
+  | Ctrl + Up Arrow       | Increase Volume by 5%                               |
+  | Ctrl + Down Arrow     | Decrease Volume by 5%                               |
+  | M                     | Mute / Unmute Audio Toggle                          |
+  | Ctrl + F / /          | Focus Global Search Input Field                     |
+  | Ctrl + L              | Navigate to Library Screen                          |
+  | Ctrl + H              | Navigate to Home Screen                             |
+  | Ctrl + ,              | Navigate to Settings Screen                         |
+  | Ctrl + E              | Navigate to Extensions Screen                       |
+  | Ctrl + Q              | Open Active Playback Queue Drawer                   |
+  | Ctrl + K              | Toggle Synchronized Lyrics Viewer                   |
+  | Esc                   | Dismiss Screensaver / Close Modals & Dialogs        |
+  | F11                   | Toggle Application Fullscreen Mode                  |
+
+====================================================================================================
+END OF SPECIFICATION FILE
+Generated: 2026-10-13T23:50:00+05:30
+Repository: S:\All Code\Antigravity\echo-nightly
+====================================================================================================

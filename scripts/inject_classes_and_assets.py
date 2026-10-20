@@ -41,7 +41,11 @@ if os.path.exists(bg_img_path):
         img_bytes = f.read()
     classes_to_update['images/audix_bg.jpg'] = img_bytes
     classes_to_update['images/music_notes_bg.jpg'] = img_bytes
-    print(f'[2/5] Loaded background image asset ({len(img_bytes)} bytes)')
+    bg_32k_path = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\audix_bg_32k_master.jpg')
+    if os.path.exists(bg_32k_path):
+        with open(bg_32k_path, 'rb') as f_32k:
+            classes_to_update['images/audix_bg_32k_master.jpg'] = f_32k.read()
+    print(f'[2/5] Loaded background image asset ({len(img_bytes)} bytes) and 32K Master asset')
 
 ss_img_path = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\screensaver_bg.jpg')
 if os.path.exists(ss_img_path):
@@ -65,6 +69,16 @@ if os.path.exists(logo_img_path):
     classes_to_update['images/audix_logo_square.png'] = logo_bytes
     classes_to_update['images/spothub_logo.png'] = logo_bytes
     print(f'[2/5] Loaded logo image assets ({len(logo_bytes)} bytes)')
+
+# Read all background theme images and thumbnails
+bg_dir = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\backgrounds')
+if os.path.exists(bg_dir):
+    for f in os.listdir(bg_dir):
+        fp = os.path.join(bg_dir, f)
+        if os.path.isfile(fp):
+            with open(fp, 'rb') as bg_f:
+                classes_to_update[f'images/backgrounds/{f}'] = bg_f.read()
+    print(f'[2/5] Loaded background theme assets from {bg_dir}')
 
 # Read all 10 extension JAR assets into classpath resources
 ext_dir = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\extensions')
@@ -99,6 +113,8 @@ def update_jar(jar_path):
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ExtensionCategoryFilter') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/EchoDesktopAppKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/ComposableSingletons$EchoDesktopAppKt') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/DesktopBackgroundManager') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/BackgroundWallpaper') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/Screen') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/UiZoomManager') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/viewmodel/PlayerViewModel') or
@@ -107,7 +123,13 @@ def update_jar(jar_path):
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/MainKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/core/extensions/JarExtensionRepository') or
                   item.filename.startswith('dev/brahmkshatriya/echo/core/platform/VlcAudioPlayer') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/core/platform/AudioVisualizerManager') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/EchoTrayPainter') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/core/network/') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/theme/') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/ShelfRow') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/ComposableSingletons$ShelfRow') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/MediaCard') or
                   item.filename.startswith('dev/brahmkshatriya/echo/core/extensions/builtin/LocalMusicExtension')):
                 continue
             zout.writestr(item, zin.read(item.filename))
@@ -115,14 +137,7 @@ def update_jar(jar_path):
         for path, data in classes_to_update.items():
             zout.writestr(path, data)
             
-    with open(temp_jar, 'rb') as f_in:
-        content = f_in.read()
-    with open(jar_path, 'wb') as f_out:
-        f_out.write(content)
-    try:
-        os.remove(temp_jar)
-    except Exception:
-        pass
+    os.replace(temp_jar, jar_path)
     print(f'   Successfully updated: {jar_path}')
 
 target_jars = [
@@ -152,6 +167,12 @@ for rd in res_dirs:
         shutil.copy2(logo_img_path, os.path.join(rd, 'spothub_logo.png'))
     if os.path.exists(clock_img_path):
         shutil.copy2(clock_img_path, os.path.join(rd, 'cosmic_clock_dial.png'))
+    bg_src_dir = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\backgrounds')
+    if os.path.exists(bg_src_dir):
+        bg_dst_dir = os.path.join(rd, 'backgrounds')
+        os.makedirs(bg_dst_dir, exist_ok=True)
+        for bf in os.listdir(bg_src_dir):
+            shutil.copy2(os.path.join(bg_src_dir, bf), os.path.join(bg_dst_dir, bf))
 
 # Copy all extension JARs to portable and app resource directories on disk
 ext_res_dirs = [
@@ -164,57 +185,105 @@ for erd in ext_res_dirs:
         with open(os.path.join(erd, name), 'wb') as ef:
             ef.write(data)
 
-# Also update the portable zip
-portable_zip = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.0-Windows-Portable.zip')
-if os.path.exists(portable_zip):
-    print(f'[5/5] Updating portable distribution zip: {portable_zip}...')
-    zip_temp = portable_zip + '.tmp'
-    rel_in_zip = 'Audix-Windows-Portable/app/recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar'
-    updated_jar = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar')
-    with open(updated_jar, 'rb') as f_jar:
-        jar_bytes = f_jar.read()
-    with open(bg_img_path, 'rb') as f_bg:
-        bg_bytes = f_bg.read()
-    bat1 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Audix.bat')
-    bat2 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Audix-Debug.bat')
-    with open(bat1, 'rb') as f1: bat1_bytes = f1.read()
-    with open(bat2, 'rb') as f2: bat2_bytes = f2.read()
-    with zipfile.ZipFile(portable_zip, 'r') as zin, zipfile.ZipFile(zip_temp, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
-        skip_items = {
-            rel_in_zip,
-            'Audix-Windows-Portable/app/resources/images/audix_bg.jpg',
-            'Audix-Windows-Portable/app/resources/images/music_notes_bg.jpg',
-            'Audix-Windows-Portable/app/resources/images/cosmic_clock_dial.png',
-            'Audix-Windows-Portable/Run-Audix.bat',
-            'Audix-Windows-Portable/Run-Audix-Debug.bat'
-        }
-        for name in extension_jars.keys():
-            skip_items.add(f'Audix-Windows-Portable/app/resources/extensions/{name}')
+# Update desktopApp-desktop JARs with latest extensions
+desktopapp_jars = [
+    os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\desktopApp-desktop-4130d35d0d637cce842324b8b1d9432.jar'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\build\compose\binaries\main\app\Audix\app\desktopApp-desktop-4130d35d0d637cce842324b8b1d9432.jar')
+]
+for dj in desktopapp_jars:
+    if os.path.exists(dj):
+        tmp_dj = dj + '.tmp'
+        with zipfile.ZipFile(dj, 'r') as zin, zipfile.ZipFile(tmp_dj, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                if item.filename.startswith('extensions/'):
+                    continue
+                zout.writestr(item, zin.read(item.filename))
+            for name, data in extension_jars.items():
+                zout.writestr(f'extensions/{name}', data)
+        with open(tmp_dj, 'rb') as f_in:
+            d_content = f_in.read()
+        with open(dj, 'wb') as f_out:
+            f_out.write(d_content)
+        try:
+            os.remove(tmp_dj)
+        except Exception:
+            pass
+        print(f'   Updated {dj} with all extension bundles.')
 
-        for item in zin.infolist():
-            if item.filename in skip_items:
-                continue
-            zout.writestr(item, zin.read(item.filename))
+# Update the current portable zip (Audix-v1.0.3-Windows-Portable.zip)
+zip_v103 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.3-Windows-Portable.zip')
+zip_v102 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.2-Windows-Portable.zip')
+zip_v101 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.1-Windows-Portable.zip')
+if not os.path.exists(zip_v103):
+    if os.path.exists(zip_v102):
+        shutil.copy2(zip_v102, zip_v103)
+    elif os.path.exists(zip_v101):
+        shutil.copy2(zip_v101, zip_v103)
 
-        zout.writestr(rel_in_zip, jar_bytes)
-        zout.writestr('Audix-Windows-Portable/app/resources/images/audix_bg.jpg', bg_bytes)
-        zout.writestr('Audix-Windows-Portable/app/resources/images/music_notes_bg.jpg', bg_bytes)
-        if os.path.exists(clock_img_path):
-            with open(clock_img_path, 'rb') as f_c:
-                zout.writestr('Audix-Windows-Portable/app/resources/images/cosmic_clock_dial.png', f_c.read())
-        zout.writestr('Audix-Windows-Portable/Run-Audix.bat', bat1_bytes)
-        zout.writestr('Audix-Windows-Portable/Run-Audix-Debug.bat', bat2_bytes)
-        for name, data in extension_jars.items():
-            zout.writestr(f'Audix-Windows-Portable/app/resources/extensions/{name}', data)
+portable_zips = [zip_v103]
+for portable_zip in portable_zips:
+    if os.path.exists(portable_zip):
+        print(f'[5/5] Updating portable distribution zip: {portable_zip}...')
+        zip_temp = portable_zip + '.tmp'
+        rel_in_zip = 'Audix-Windows-Portable/app/recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar'
+        rel_desktopapp = 'Audix-Windows-Portable/app/desktopApp-desktop-4130d35d0d637cce842324b8b1d9432.jar'
+        updated_jar = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar')
+        desktop_jar_disk = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\desktopApp-desktop-4130d35d0d637cce842324b8b1d9432.jar')
+        with open(updated_jar, 'rb') as f_jar:
+            jar_bytes = f_jar.read()
+        desktop_jar_bytes = None
+        if os.path.exists(desktop_jar_disk):
+            with open(desktop_jar_disk, 'rb') as f_djar:
+                desktop_jar_bytes = f_djar.read()
+        with open(bg_img_path, 'rb') as f_bg:
+            bg_bytes = f_bg.read()
+        bat1 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Audix.bat')
+        bat2 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Audix-Debug.bat')
+        with open(bat1, 'rb') as f1: bat1_bytes = f1.read()
+        with open(bat2, 'rb') as f2: bat2_bytes = f2.read()
+        with zipfile.ZipFile(portable_zip, 'r') as zin, zipfile.ZipFile(zip_temp, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
+            skip_items = {
+                rel_in_zip,
+                rel_desktopapp,
+                'Audix-Windows-Portable/app/resources/images/audix_bg.jpg',
+                'Audix-Windows-Portable/app/resources/images/music_notes_bg.jpg',
+                'Audix-Windows-Portable/app/resources/images/cosmic_clock_dial.png',
+                'Audix-Windows-Portable/Run-Audix.bat',
+                'Audix-Windows-Portable/Run-Audix-Debug.bat'
+            }
+            for name in extension_jars.keys():
+                skip_items.add(f'Audix-Windows-Portable/app/resources/extensions/{name}')
 
-    with open(zip_temp, 'rb') as f_in:
-        content = f_in.read()
-    with open(portable_zip, 'wb') as f_out:
-        f_out.write(content)
-    try:
-        os.remove(zip_temp)
-    except Exception:
-        pass
-    print(f'   Updated {portable_zip} successfully with all {len(extension_jars)} extensions.')
+            for item in zin.infolist():
+                if item.filename in skip_items:
+                    continue
+                zout.writestr(item, zin.read(item.filename))
+
+            zout.writestr(rel_in_zip, jar_bytes)
+            if desktop_jar_bytes is not None:
+                zout.writestr(rel_desktopapp, desktop_jar_bytes)
+            zout.writestr('Audix-Windows-Portable/app/resources/images/audix_bg.jpg', bg_bytes)
+            zout.writestr('Audix-Windows-Portable/app/resources/images/music_notes_bg.jpg', bg_bytes)
+            bg_32k_path = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\audix_bg_32k_master.jpg')
+            if os.path.exists(bg_32k_path):
+                with open(bg_32k_path, 'rb') as f_32k:
+                    zout.writestr('Audix-Windows-Portable/app/resources/images/audix_bg_32k_master.jpg', f_32k.read())
+            if os.path.exists(clock_img_path):
+                with open(clock_img_path, 'rb') as f_c:
+                    zout.writestr('Audix-Windows-Portable/app/resources/images/cosmic_clock_dial.png', f_c.read())
+            zout.writestr('Audix-Windows-Portable/Run-Audix.bat', bat1_bytes)
+            zout.writestr('Audix-Windows-Portable/Run-Audix-Debug.bat', bat2_bytes)
+            for name, data in extension_jars.items():
+                zout.writestr(f'Audix-Windows-Portable/app/resources/extensions/{name}', data)
+
+        with open(zip_temp, 'rb') as f_in:
+            content = f_in.read()
+        with open(portable_zip, 'wb') as f_out:
+            f_out.write(content)
+        try:
+            os.remove(zip_temp)
+        except Exception:
+            pass
+        print(f'   Updated {portable_zip} successfully with all {len(extension_jars)} extensions.')
 
 print("Injection complete!")

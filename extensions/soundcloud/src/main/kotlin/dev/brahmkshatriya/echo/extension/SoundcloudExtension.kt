@@ -43,6 +43,53 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
     // Public SoundCloud API credentials
     private val clientId = "T574VRKI5KSLMzLdUreWOpXss1R3Fzfx"
 
+    private fun isGarbageArtist(name: String?): Boolean {
+        if (name.isNullOrBlank()) return true
+        val low = name.lowercase().trim()
+        return low in setOf(
+            "song", "video", "episode", "podcast", "youtube music", "soundcloud artist",
+            "unknown artist", "t-series", "sony music india", "audix music",
+            "audix hi-res audio", "various artists"
+        ) || low.startsWith("user-")
+    }
+
+    private fun cleanTrackTitle(title: String, artist: String): String {
+        var t = title
+            .replace("&quot;", "\"")
+            .replace("&amp;", "&")
+            .replace("&#039;", "'")
+            .replace("&apos;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .trim()
+
+        if (t.contains("|")) {
+            val beforePipe = t.substringBefore("|").trim()
+            if (beforePipe.isNotBlank()) t = beforePipe
+        }
+        if (t.contains("//")) {
+            val beforeSlash = t.substringBefore("//").trim()
+            if (beforeSlash.isNotBlank()) t = beforeSlash
+        }
+        t = t.replace(Regex("""\s*[\(\[\{].*?(?:official|music\s*video|video|audio|lyrics|lyric\s*video|feat|ft\.|hd|4k|remaster|visualizer|live|full\s*song|from\s*["']|soundtrack|ost|free\s*download).*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s*[\(\[\{]\s*from\s+.*?[\)\]\}]""", RegexOption.IGNORE_CASE), "")
+        if (artist.isNotBlank() && !isGarbageArtist(artist)) {
+            val esc = Regex.escape(artist)
+            t = t.replace(Regex("""^$esc\s*[-–:]\s*""", RegexOption.IGNORE_CASE), "")
+            t = t.replace(Regex("""\s*[-–:]\s*$esc$""", RegexOption.IGNORE_CASE), "")
+        } else if (t.contains(" - ") || t.contains(" – ")) {
+            val parts = t.split(Regex("""\s+[-–]\s+"""))
+            if (parts.size >= 2 && parts[1].isNotBlank()) {
+                t = parts[1].trim()
+            }
+        }
+        t = t.replace(Regex("""\s*[-–:]\s*(?:official\s*video|official\s*audio|lyrics|lyric\s*video|from\s+["'].*?|soundtrack|ost)\s*$""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s+(?:feat|ft)\.?\s+.*$""", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("""\s*[\(\[\{]\s*[\)\]\}]"""), "")
+        t = t.replace(Regex("""\s+"""), " ").trim()
+        return if (t.isNotBlank()) t else title.trim()
+    }
+
     private suspend fun searchTracks(query: String, limit: Int = 20): List<Track> = withContext(Dispatchers.IO) {
         runCatching {
             val encoded = URLEncoder.encode(query, "UTF-8")
@@ -60,11 +107,27 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
                 runCatching {
                     val obj = elem.jsonObject
                     val id = obj["id"]?.jsonPrimitive?.content ?: return@runCatching null
-                    val title = obj["title"]?.jsonPrimitive?.content ?: "Track"
+                    val rawTitle = obj["title"]?.jsonPrimitive?.content ?: "Track"
 
                     val userObj = obj["user"]?.jsonObject
-                    val artistName = userObj?.get("username")?.jsonPrimitive?.content ?: "SoundCloud Artist"
-                    val artists = listOf(Artist(id = artistName, name = artistName))
+                    var artistName = userObj?.get("username")?.jsonPrimitive?.content ?: ""
+
+                    if ((isGarbageArtist(artistName) || artistName.isBlank()) && (rawTitle.contains(" - ") || rawTitle.contains(" – "))) {
+                        val left = rawTitle.split(Regex("""\s+[-–]\s+""")).first().trim()
+                        if (left.isNotBlank() && left.length < 50 && !isGarbageArtist(left)) {
+                            artistName = left
+                        }
+                    }
+
+                    val cleanTitle = cleanTrackTitle(rawTitle, artistName)
+
+                    val artistList = if (artistName.contains(",") || artistName.contains("&")) {
+                        artistName.split(Regex("""[,&]""")).map { it.trim() }.filter { it.isNotBlank() && !isGarbageArtist(it) }.map { Artist(id = it, name = it) }
+                    } else if (artistName.isNotBlank() && !isGarbageArtist(artistName)) {
+                        listOf(Artist(id = artistName, name = artistName))
+                    } else emptyList()
+
+                    val finalArtists = if (artistList.isNotEmpty()) artistList else listOf(Artist(id = "Audix Hi-Res Audio", name = "Audix Hi-Res Audio"))
 
                     val rawArtwork = obj["artwork_url"]?.jsonPrimitive?.content
                         ?: userObj?.get("avatar_url")?.jsonPrimitive?.content
@@ -97,8 +160,12 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
                         extras["stream_url"] = streamTranscodingUrl
                     }
                     extras["extension_id"] = "soundcloud_music"
-                    extras["track_title"] = title
-                    extras["artist_name"] = artistName
+                    extras["track_title"] = cleanTitle
+                    extras["raw_title"] = rawTitle
+                    if (artistName.isNotBlank() && !isGarbageArtist(artistName)) {
+                        extras["artist_name"] = artistName
+                    }
+                    extras["cover_url"] = highResArtwork
 
                     val streamable = Streamable.server(
                         id = "sc_$id",
@@ -109,9 +176,9 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
 
                     Track(
                         id = "sc_$id",
-                        title = title,
-                        artists = artists,
-                        album = Album(id = "SoundCloud", title = "SoundCloud Single"),
+                        title = cleanTitle,
+                        artists = finalArtists,
+                        album = null,
                         cover = highResArtwork.toImageHolder(),
                         duration = duration,
                         streamables = listOf(streamable),
@@ -310,6 +377,55 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
         shelves.toFeed()
     }
 
+    private fun scoreTrackCandidate(candidateTitle: String, candidateArtist: String, targetTitle: String, targetArtist: String): Int {
+        val cTitle = candidateTitle.lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val cArtist = candidateArtist.lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val tTitle = targetTitle.lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+        val tArtist = targetArtist.lowercase().trim().replace(Regex("""[^\p{L}\p{Nd}\s]"""), " ")
+
+        val normCTitle = cTitle.replace(Regex("""\s+"""), " ").trim()
+        val normTTitle = tTitle.replace(Regex("""\s+"""), " ").trim()
+        if (normCTitle.isBlank() || normTTitle.isBlank()) return 0
+
+        var score = 0
+        if (normCTitle == normTTitle) {
+            score += 60
+        } else if (normCTitle.startsWith(normTTitle) || normTTitle.startsWith(normCTitle)) {
+            score += 45
+        } else if (normCTitle.contains(normTTitle) || normTTitle.contains(normCTitle)) {
+            score += 30
+        } else {
+            val tWords = normTTitle.split(" ").filter { it.length > 2 }
+            if (tWords.isNotEmpty()) {
+                val matches = tWords.count { normCTitle.contains(it) }
+                val ratio = matches.toFloat() / tWords.size
+                if (ratio >= 0.75f) score += (30 * ratio).toInt() else return 0
+            } else return 0
+        }
+
+        val isTargetRemix = normTTitle.contains("remix") || normTTitle.contains("cover") || normTTitle.contains("live")
+        val isCandRemix = normCTitle.contains("remix") || normCTitle.contains("cover") || normCTitle.contains("live") || normCTitle.contains("karaoke")
+        if (isCandRemix && !isTargetRemix) {
+            score -= 40
+        }
+
+        if (tArtist.isNotBlank() && !isGarbageArtist(tArtist)) {
+            val normCArtist = cArtist.replace(Regex("""\s+"""), " ").trim()
+            val normTArtist = tArtist.replace(Regex("""\s+"""), " ").trim()
+            if (normCArtist.contains(normTArtist) || normTArtist.contains(normCArtist)) {
+                score += 40
+            } else {
+                val firstWord = normTArtist.split(" ").firstOrNull { it.length > 2 }
+                if (firstWord != null && normCArtist.contains(firstWord)) {
+                    score += 25
+                } else {
+                    score -= 30
+                }
+            }
+        }
+        return score.coerceAtLeast(0)
+    }
+
     override suspend fun loadTrack(track: Track, isDownload: Boolean): Track {
         if (track.servers.isNotEmpty() && track.servers.first().extras.containsKey("stream_url")) {
             return track
@@ -329,11 +445,27 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
             )
             return track.copy(streamables = listOf(s))
         }
-        val query = "${track.title} ${track.artists.firstOrNull()?.name ?: ""}".trim()
+        val targetArtist = track.artists.firstOrNull()?.name?.takeIf { !isGarbageArtist(it) } ?: ""
+        val query = "${track.title} $targetArtist".trim()
         if (query.isNotBlank()) {
-            val matches = searchTracks(query, 1)
-            if (matches.isNotEmpty()) {
-                return matches.first()
+            val matches = searchTracks(query, 6)
+            var bestMatch: Track? = null
+            var bestScore = -1
+            for (m in matches) {
+                val cArtist = m.artists.firstOrNull()?.name ?: ""
+                val score = scoreTrackCandidate(m.title, cArtist, track.title, targetArtist)
+                if (score > bestScore) {
+                    bestScore = score
+                    bestMatch = m
+                }
+            }
+            if (bestScore >= 45 && bestMatch != null) {
+                return track.copy(
+                    cover = track.cover ?: bestMatch.cover,
+                    duration = if ((track.duration ?: 0L) > 0L) track.duration else bestMatch.duration,
+                    streamables = bestMatch.streamables,
+                    extras = track.extras + bestMatch.extras
+                )
             }
         }
         return track
@@ -356,12 +488,23 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
         // If missing or expired, search for track by title
         if (transcodingUrl.isNullOrBlank()) {
             val trackTitle = streamable.extras["track_title"] ?: streamable.title ?: ""
-            val artistName = streamable.extras["artist_name"] ?: ""
+            val rawArtist = streamable.extras["artist_name"] ?: ""
+            val artistName = if (isGarbageArtist(rawArtist)) "" else rawArtist
             val query = "$trackTitle $artistName".trim()
             if (query.isNotBlank()) {
-                val matches = searchTracks(query, 1)
-                if (matches.isNotEmpty()) {
-                    transcodingUrl = matches.first().extras["stream_url"]
+                val matches = searchTracks(query, 6)
+                var bestMatch: Track? = null
+                var bestScore = -1
+                for (m in matches) {
+                    val cArtist = m.artists.firstOrNull()?.name ?: ""
+                    val score = scoreTrackCandidate(m.title, cArtist, trackTitle, artistName)
+                    if (score > bestScore) {
+                        bestScore = score
+                        bestMatch = m
+                    }
+                }
+                if (bestScore >= 45 && bestMatch != null) {
+                    transcodingUrl = bestMatch.extras["stream_url"]
                 }
             }
         }

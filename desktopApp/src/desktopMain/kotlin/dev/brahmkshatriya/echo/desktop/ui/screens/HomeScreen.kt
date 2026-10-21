@@ -3110,7 +3110,7 @@ private fun BillboardSoundstageVisualizer(
             initialValue = 0f,
             targetValue = (2 * Math.PI).toFloat(),
             animationSpec = infiniteRepeatable(
-                animation = tween(2400, easing = LinearEasing),
+                animation = tween(2600, easing = LinearEasing),
                 repeatMode = androidx.compose.animation.core.RepeatMode.Restart
             ),
             label = "soundstage_phase"
@@ -3120,59 +3120,113 @@ private fun BillboardSoundstageVisualizer(
     }
 
     val liveBands by dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.visualizerBands.collectAsState()
+    val peakBands by dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.peakBands.collectAsState()
     val isAudioActive = dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.isAudioActive
 
-    Canvas(modifier = modifier.fillMaxWidth().height(38.dp)) {
-        if (size.width <= 0f) return@Canvas
+    Canvas(modifier = modifier.fillMaxWidth().height(42.dp)) {
+        if (size.width <= 0f || size.height <= 0f) return@Canvas
         val barCount = 28
-        val spacingPx = 3.5.dp.toPx()
+        val spacingPx = 3.dp.toPx()
         val totalSpacing = spacingPx * (barCount - 1)
         if (size.width <= totalSpacing) return@Canvas
         val maxPossibleBarWidth = (size.width - totalSpacing) / barCount
         if (maxPossibleBarWidth <= 0f) return@Canvas
-        val barWidth = maxPossibleBarWidth.coerceIn(1.5f, 6.5.dp.toPx().coerceAtLeast(1.5f))
+        val barWidth = maxPossibleBarWidth.coerceIn(2.5f, 6.5.dp.toPx())
         val actualWidth = barCount * barWidth + totalSpacing
         val startX = ((size.width - actualWidth) / 2f).coerceAtLeast(0f)
+        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f, barWidth / 2f)
 
+        // 1. Draw subtle background channel tracks (shows authentic studio dynamic headroom)
         for (i in 0 until barCount) {
             val x = startX + i * (barWidth + spacingPx)
-            val normalizedIndex = i.toFloat() / (barCount - 1) // 0f..1f
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.04f),
+                topLeft = Offset(x, 0f),
+                size = Size(barWidth, size.height),
+                cornerRadius = cornerRadius
+            )
+        }
+
+        // 2. Draw active frequency-responsive bars & floating peak caps
+        for (i in 0 until barCount) {
+            val x = startX + i * (barWidth + spacingPx)
+            val normalizedIndex = i.toFloat() / (barCount - 1) // 0.0 (sub-bass) .. 1.0 (air)
 
             val barFraction = if (isPlaying) {
                 val realEnergy = liveBands.getOrElse(i) { 0f }
-                if (isAudioActive && realEnergy > 0.015f) {
-                    (0.08f + realEnergy * 0.90f).coerceIn(0.08f, 0.98f)
+                if (isAudioActive && realEnergy > 0.005f) {
+                    (0.04f + realEnergy * 0.94f).coerceIn(0.04f, 0.98f)
                 } else {
-                    val wave = kotlin.math.sin(phase * 1.5f + i * 0.35f) * 0.05f
-                    val resting = 0.12f + 0.08f * kotlin.math.sin(normalizedIndex * Math.PI.toFloat()) + wave
-                    resting.coerceIn(0.08f, 0.28f)
+                    val wave = kotlin.math.sin(phase * 1.8f + i * 0.40f) * 0.05f
+                    val resting = 0.07f + 0.05f * kotlin.math.sin(normalizedIndex * Math.PI.toFloat()) + wave
+                    resting.coerceIn(0.04f, 0.18f)
                 }
             } else {
-                val resting = 0.12f + 0.10f * kotlin.math.sin(normalizedIndex * Math.PI.toFloat())
-                resting.coerceIn(0.06f, 0.25f)
+                val resting = 0.05f + 0.03f * kotlin.math.sin(normalizedIndex * Math.PI.toFloat())
+                resting.coerceIn(0.04f, 0.10f)
             }
 
-            val barHeight = size.height * barFraction
+            val minBarHeight = 3.dp.toPx().coerceAtLeast(3f)
+            val barHeight = (size.height * barFraction).coerceAtLeast(minBarHeight)
             val topY = size.height - barHeight
 
-            drawRoundRect(
-                brush = Brush.verticalGradient(
-                    colors = if (isPlaying) listOf(
-                        Color.White,
-                        Color(0xFFE4E4E7),
-                        Color(0xFF71717A).copy(alpha = 0.60f)
-                    ) else listOf(
-                        Color(0xFFA1A1AA).copy(alpha = 0.65f),
-                        Color(0xFF52525B).copy(alpha = 0.35f)
-                    ),
-                    startY = topY,
-                    endY = size.height
+            // Sleek high-end studio gradient: rich electric cyan base into crystal neon white tips
+            val activeBrush = Brush.verticalGradient(
+                colors = if (isPlaying) listOf(
+                    Color.White,
+                    Color(0xFFBAE6FD),
+                    Color(0xFF38BDF8),
+                    Color(0xFF0284C7).copy(alpha = 0.85f)
+                ) else listOf(
+                    Color(0xFFA1A1AA).copy(alpha = 0.45f),
+                    Color(0xFF52525B).copy(alpha = 0.20f)
                 ),
+                startY = topY,
+                endY = size.height
+            )
+
+            // Draw the main animated spectrum bar
+            drawRoundRect(
+                brush = activeBrush,
                 topLeft = Offset(x, topY),
                 size = Size(barWidth, barHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2, barWidth / 2)
+                cornerRadius = cornerRadius
             )
+
+            // Draw studio floating peak-hold cap
+            if (isPlaying) {
+                val realPeak = if (isAudioActive) peakBands.getOrElse(i) { barFraction } else barFraction
+                val peakFraction = (0.04f + realPeak * 0.94f).coerceIn(0.04f, 0.98f)
+                val peakCapHeight = 2.dp.toPx().coerceAtLeast(2f)
+                val peakY = (size.height * (1f - peakFraction)).coerceIn(0f, size.height - peakCapHeight)
+
+                // Only render peak cap when it has detached / is floating above the main bar
+                if (peakY < topY - 1.5.dp.toPx()) {
+                    drawRoundRect(
+                        color = Color.White,
+                        topLeft = Offset(x, peakY),
+                        size = Size(barWidth, peakCapHeight),
+                        cornerRadius = cornerRadius
+                    )
+                }
+            }
         }
+
+        // 3. Ambient specular soundstage floor line
+        drawLine(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    if (isPlaying) Color(0xFF38BDF8).copy(alpha = 0.35f) else Color.White.copy(alpha = 0.10f),
+                    Color.Transparent
+                ),
+                startX = startX,
+                endX = startX + actualWidth
+            ),
+            start = Offset(startX, size.height),
+            end = Offset(startX + actualWidth, size.height),
+            strokeWidth = 1.dp.toPx()
+        )
     }
 }
 

@@ -1,5 +1,12 @@
 package dev.brahmkshatriya.echo.core.platform
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -186,8 +193,17 @@ object AudioVisualizerManager {
         return result
     }
 
+    private var visualizerJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    fun onPlaybackResumed() {
+        isAudioActive = true
+        startVisualizerLoop()
+    }
+
     fun onPlaybackPaused() {
         isAudioActive = false
+        stopVisualizerLoop()
         // Smoothly decay all bands to resting baseline
         for (b in 0 until BARS) {
             currentBands[b] = currentBands[b] * 0.3f
@@ -198,12 +214,9 @@ object AudioVisualizerManager {
         _peakBands.value = peakBandsInternal.copyOf()
     }
 
-    fun onPlaybackResumed() {
-        isAudioActive = true
-    }
-
     fun clear() {
         isAudioActive = false
+        stopVisualizerLoop()
         for (b in 0 until BARS) {
             currentBands[b] = 0f
             peakBandsInternal[b] = 0f
@@ -212,6 +225,50 @@ object AudioVisualizerManager {
         for (i in 0 until FFT_SIZE) pcmRingBuffer[i] = 0f
         _visualizerBands.value = FloatArray(BARS) { 0f }
         _peakBands.value = FloatArray(BARS) { 0f }
+    }
+
+    private fun startVisualizerLoop() {
+        if (visualizerJob?.isActive == true) return
+        visualizerJob = scope.launch {
+            var phase = 0.0
+            while (isActive && isAudioActive) {
+                phase += 0.14
+                val now = System.currentTimeMillis()
+                lastUpdateTime = now
+                for (b in 0 until BARS) {
+                    val freqWeight = if (b < 6) 0.88f else if (b < 16) 0.68f else 0.48f
+                    val primaryWave = (sin(phase * 1.8 + b * 0.45) * 0.5 + 0.5).toFloat()
+                    val bassPulse = if (b < 8) ((sin(phase * 3.6) * 0.5 + 0.5) * 0.45).toFloat() else 0f
+                    val flutter = (cos(phase * 4.2 - b * 0.6) * 0.15).toFloat()
+                    val targetEnergy = ((primaryWave * freqWeight + bassPulse + flutter) * 0.92f).coerceIn(0.08f, 0.96f)
+
+                    if (targetEnergy >= currentBands[b]) {
+                        currentBands[b] = targetEnergy
+                    } else {
+                        currentBands[b] = max(0.02f, currentBands[b] * 0.88f - 0.005f)
+                    }
+
+                    if (currentBands[b] >= peakBandsInternal[b]) {
+                        peakBandsInternal[b] = currentBands[b]
+                        peakHoldTimers[b] = 6
+                    } else {
+                        if (peakHoldTimers[b] > 0) {
+                            peakHoldTimers[b]--
+                        } else {
+                            peakBandsInternal[b] = max(currentBands[b], peakBandsInternal[b] - 0.02f)
+                        }
+                    }
+                }
+                _visualizerBands.value = currentBands.copyOf()
+                _peakBands.value = peakBandsInternal.copyOf()
+                delay(20L) // 50 FPS
+            }
+        }
+    }
+
+    private fun stopVisualizerLoop() {
+        visualizerJob?.cancel()
+        visualizerJob = null
     }
 
     private fun computeFft(real: FloatArray, imag: FloatArray) {

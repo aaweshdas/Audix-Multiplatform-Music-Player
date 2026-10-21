@@ -3110,122 +3110,199 @@ private fun BillboardSoundstageVisualizer(
             initialValue = 0f,
             targetValue = (2 * Math.PI).toFloat(),
             animationSpec = infiniteRepeatable(
-                animation = tween(2600, easing = LinearEasing),
+                animation = tween(2800, easing = LinearEasing),
                 repeatMode = androidx.compose.animation.core.RepeatMode.Restart
             ),
             label = "soundstage_phase"
         )
     } else {
-        remember { mutableFloatStateOf(0f) }
+        val infiniteTransition = rememberInfiniteTransition(label = "soundstage_idle")
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = (2 * Math.PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(6000, easing = LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+            ),
+            label = "soundstage_idle_phase"
+        )
     }
 
     val liveBands by dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.visualizerBands.collectAsState()
-    val peakBands by dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.peakBands.collectAsState()
     val isAudioActive = dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.isAudioActive
 
-    Canvas(modifier = modifier.fillMaxWidth().height(42.dp)) {
-        if (size.width <= 0f || size.height <= 0f) return@Canvas
-        val barCount = 28
-        val spacingPx = 3.dp.toPx()
-        val totalSpacing = spacingPx * (barCount - 1)
-        if (size.width <= totalSpacing) return@Canvas
-        val maxPossibleBarWidth = (size.width - totalSpacing) / barCount
-        if (maxPossibleBarWidth <= 0f) return@Canvas
-        val barWidth = maxPossibleBarWidth.coerceIn(2.5f, 6.5.dp.toPx())
-        val actualWidth = barCount * barWidth + totalSpacing
-        val startX = ((size.width - actualWidth) / 2f).coerceAtLeast(0f)
-        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f, barWidth / 2f)
-
-        // 1. Draw subtle background channel tracks (shows authentic studio dynamic headroom)
-        for (i in 0 until barCount) {
-            val x = startX + i * (barWidth + spacingPx)
-            drawRoundRect(
-                color = Color.White.copy(alpha = 0.04f),
-                topLeft = Offset(x, 0f),
-                size = Size(barWidth, size.height),
-                cornerRadius = cornerRadius
-            )
+    // Extract frequency energy registers from the 28 live FFT bands
+    val bassEnergy = remember(liveBands, isAudioActive) {
+        if (!isAudioActive || liveBands.isEmpty()) 0f
+        else {
+            var sum = 0f
+            for (i in 0..6) sum += liveBands.getOrElse(i) { 0f }
+            (sum / 7f).coerceIn(0f, 1f)
         }
-
-        // 2. Draw active frequency-responsive bars & floating peak caps
-        for (i in 0 until barCount) {
-            val x = startX + i * (barWidth + spacingPx)
-            val normalizedIndex = i.toFloat() / (barCount - 1) // 0.0 (sub-bass) .. 1.0 (air)
-
-            val barFraction = if (isPlaying) {
-                val realEnergy = liveBands.getOrElse(i) { 0f }
-                if (isAudioActive && realEnergy > 0.005f) {
-                    (0.04f + realEnergy * 0.94f).coerceIn(0.04f, 0.98f)
-                } else {
-                    val wave = kotlin.math.sin(phase * 1.8f + i * 0.40f) * 0.05f
-                    val resting = 0.07f + 0.05f * kotlin.math.sin(normalizedIndex * Math.PI.toFloat()) + wave
-                    resting.coerceIn(0.04f, 0.18f)
-                }
-            } else {
-                val resting = 0.05f + 0.03f * kotlin.math.sin(normalizedIndex * Math.PI.toFloat())
-                resting.coerceIn(0.04f, 0.10f)
-            }
-
-            val minBarHeight = 3.dp.toPx().coerceAtLeast(3f)
-            val barHeight = (size.height * barFraction).coerceAtLeast(minBarHeight)
-            val topY = size.height - barHeight
-
-            // Sleek high-end studio gradient: rich electric cyan base into crystal neon white tips
-            val activeBrush = Brush.verticalGradient(
-                colors = if (isPlaying) listOf(
-                    Color.White,
-                    Color(0xFFBAE6FD),
-                    Color(0xFF38BDF8),
-                    Color(0xFF0284C7).copy(alpha = 0.85f)
-                ) else listOf(
-                    Color(0xFFA1A1AA).copy(alpha = 0.45f),
-                    Color(0xFF52525B).copy(alpha = 0.20f)
-                ),
-                startY = topY,
-                endY = size.height
-            )
-
-            // Draw the main animated spectrum bar
-            drawRoundRect(
-                brush = activeBrush,
-                topLeft = Offset(x, topY),
-                size = Size(barWidth, barHeight),
-                cornerRadius = cornerRadius
-            )
-
-            // Draw studio floating peak-hold cap
-            if (isPlaying) {
-                val realPeak = if (isAudioActive) peakBands.getOrElse(i) { barFraction } else barFraction
-                val peakFraction = (0.04f + realPeak * 0.94f).coerceIn(0.04f, 0.98f)
-                val peakCapHeight = 2.dp.toPx().coerceAtLeast(2f)
-                val peakY = (size.height * (1f - peakFraction)).coerceIn(0f, size.height - peakCapHeight)
-
-                // Only render peak cap when it has detached / is floating above the main bar
-                if (peakY < topY - 1.5.dp.toPx()) {
-                    drawRoundRect(
-                        color = Color.White,
-                        topLeft = Offset(x, peakY),
-                        size = Size(barWidth, peakCapHeight),
-                        cornerRadius = cornerRadius
-                    )
-                }
-            }
+    }
+    val midEnergy = remember(liveBands, isAudioActive) {
+        if (!isAudioActive || liveBands.isEmpty()) 0f
+        else {
+            var sum = 0f
+            for (i in 7..17) sum += liveBands.getOrElse(i) { 0f }
+            (sum / 11f).coerceIn(0f, 1f)
         }
+    }
+    val trebleEnergy = remember(liveBands, isAudioActive) {
+        if (!isAudioActive || liveBands.isEmpty()) 0f
+        else {
+            var sum = 0f
+            for (i in 18..27) sum += liveBands.getOrElse(i) { 0f }
+            (sum / 10f).coerceIn(0f, 1f)
+        }
+    }
 
-        // 3. Ambient specular soundstage floor line
-        drawLine(
-            brush = Brush.horizontalGradient(
+    Canvas(modifier = modifier.fillMaxWidth().height(48.dp)) {
+        if (size.width <= 20f || size.height <= 10f) return@Canvas
+        val w = size.width
+        val h = size.height
+        val centerY = h / 2f
+
+        val padX = 12.dp.toPx()
+        val usableWidth = w - padX * 2f
+        if (usableWidth <= 10f) return@Canvas
+
+        // 1. Ambient Specular Aura Glow behind the harmonic ribbon
+        val auraRadius = (usableWidth / 2f).coerceAtLeast(40f)
+        drawCircle(
+            brush = Brush.radialGradient(
                 colors = listOf(
-                    Color.Transparent,
-                    if (isPlaying) Color(0xFF38BDF8).copy(alpha = 0.35f) else Color.White.copy(alpha = 0.10f),
+                    if (isPlaying) Color(0xFF38BDF8).copy(alpha = 0.12f) else Color(0xFF38BDF8).copy(alpha = 0.04f),
+                    if (isPlaying) Color(0xFFEC4899).copy(alpha = 0.08f) else Color(0xFFEC4899).copy(alpha = 0.02f),
                     Color.Transparent
                 ),
-                startX = startX,
-                endX = startX + actualWidth
+                center = Offset(w / 2f, centerY),
+                radius = auraRadius
             ),
-            start = Offset(startX, size.height),
-            end = Offset(startX + actualWidth, size.height),
-            strokeWidth = 1.dp.toPx()
+            radius = auraRadius,
+            center = Offset(w / 2f, centerY)
+        )
+
+        // 2. Harmonic Ribbon Geometry & Strands
+        val strandCount = 18
+        val samplePoints = 70
+        val maxAmplitude = (h / 2f - 3.dp.toPx()).coerceAtLeast(6f)
+
+        val dynamicScale = if (isPlaying) {
+            if (isAudioActive) {
+                (0.24f + bassEnergy * 0.54f + midEnergy * 0.28f).coerceIn(0.22f, 0.95f)
+            } else {
+                0.28f + 0.05f * kotlin.math.sin(phase)
+            }
+        } else {
+            0.18f + 0.03f * kotlin.math.sin(phase)
+        }
+        val amp = maxAmplitude * (dynamicScale / 1.06f)
+
+        val twistMod = if (isPlaying && isAudioActive) (0.60f + midEnergy * 0.65f) else 0.65f
+        val rippleMod = if (isPlaying && isAudioActive) (0.12f + trebleEnergy * 0.22f) else 0.14f
+
+        val cyanGradient = Brush.horizontalGradient(
+            colors = listOf(
+                Color(0xFF0284C7).copy(alpha = 0.70f),
+                Color(0xFF06B6D4),
+                Color(0xFF38BDF8),
+                Color.White,
+                Color(0xFFC084FC),
+                Color(0xFFEC4899).copy(alpha = 0.85f)
+            ),
+            startX = padX,
+            endX = padX + usableWidth
+        )
+
+        val magentaGradient = Brush.horizontalGradient(
+            colors = listOf(
+                Color(0xFFF43F5E).copy(alpha = 0.85f),
+                Color(0xFFEC4899),
+                Color(0xFFA855F7),
+                Color.White,
+                Color(0xFF38BDF8),
+                Color(0xFF0284C7).copy(alpha = 0.70f)
+            ),
+            startX = padX,
+            endX = padX + usableWidth
+        )
+
+        val path = androidx.compose.ui.graphics.Path()
+
+        for (sIdx in 0 until strandCount) {
+            val sNorm = (sIdx.toFloat() / (strandCount - 1).coerceAtLeast(1)) // 0.0 to 1.0
+            val sOffset = (sNorm - 0.5f) * 2.0f // -1.0 to 1.0
+
+            val isCyanDominant = sIdx % 2 == 0
+            val brush = if (isCyanDominant) cyanGradient else magentaGradient
+            val strandAlpha = (0.42f + 0.54f * (1f - kotlin.math.abs(sOffset) * 0.40f)).coerceIn(0.35f, 1.0f)
+            val strokeWidthPx = if (kotlin.math.abs(sOffset) < 0.35f) 1.8.dp.toPx() else 1.25.dp.toPx()
+
+            path.reset()
+
+            for (p in 0..samplePoints) {
+                val u = p.toFloat() / samplePoints.toFloat() // 0.0 to 1.0
+                val px = padX + u * usableWidth
+
+                // Hann-style envelope with soft power taper to guarantee ends pinch to 0
+                val env = kotlin.math.sin(u * Math.PI.toFloat()).let { if (it > 0f) Math.pow(it.toDouble(), 1.22).toFloat() else 0f }
+
+                // Multi-harmonic standing waves + braided twist
+                val w1 = kotlin.math.sin(2.0 * Math.PI * 1.45 * u + phase + sOffset * 0.90f).toFloat()
+                val w2 = 0.42f * kotlin.math.sin(2.0 * Math.PI * 2.90 * u - phase * 0.85f - sOffset * 0.65f).toFloat()
+                val w3 = rippleMod * kotlin.math.cos(2.0 * Math.PI * 4.35 * u + phase * 1.50f + sOffset * 1.15f).toFloat()
+                val twist = sOffset * 0.65f * kotlin.math.cos(Math.PI * u).toFloat() * twistMod
+
+                val disp = env * (0.65f * w1 + w2 + w3 + twist)
+                val py = centerY + disp * amp
+
+                if (p == 0) {
+                    path.moveTo(px, py)
+                } else {
+                    path.lineTo(px, py)
+                }
+            }
+
+            drawPath(
+                path = path,
+                brush = brush,
+                alpha = strandAlpha,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = strokeWidthPx,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                    join = androidx.compose.ui.graphics.StrokeJoin.Round
+                )
+            )
+        }
+
+        // 3. Anchor Pins at left and right boundaries (matching the reference image)
+        val pinHeight = 10.dp.toPx()
+        val pinWidth = 2.5.dp.toPx()
+        val pinCorner = androidx.compose.ui.geometry.CornerRadius(pinWidth / 2f, pinWidth / 2f)
+
+        // Left anchor: Neon Magenta
+        drawRoundRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color(0xFFF43F5E), Color(0xFFEC4899), Color(0xFFA855F7)),
+                startY = centerY - pinHeight / 2f,
+                endY = centerY + pinHeight / 2f
+            ),
+            topLeft = Offset(padX - pinWidth / 2f, centerY - pinHeight / 2f),
+            size = Size(pinWidth, pinHeight),
+            cornerRadius = pinCorner
+        )
+
+        // Right anchor: Electric Cyan
+        drawRoundRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color(0xFF00F2FE), Color(0xFF38BDF8), Color(0xFF0284C7)),
+                startY = centerY - pinHeight / 2f,
+                endY = centerY + pinHeight / 2f
+            ),
+            topLeft = Offset(padX + usableWidth - pinWidth / 2f, centerY - pinHeight / 2f),
+            size = Size(pinWidth, pinHeight),
+            cornerRadius = pinCorner
         )
     }
 }

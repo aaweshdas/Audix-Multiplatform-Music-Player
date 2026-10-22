@@ -29,6 +29,9 @@ import dev.brahmkshatriya.echo.common.clients.TrackerClient
 import dev.brahmkshatriya.echo.common.models.TrackDetails
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.coroutines.delay
 
 class PlayerViewModel(
     private val player: AudioPlayer,
@@ -45,11 +48,16 @@ class PlayerViewModel(
     val repeatMode: StateFlow<RepeatMode> get() = player.repeatMode
     val shuffleEnabled: StateFlow<Boolean> get() = player.shuffleEnabled
     private val failedTracks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private var loadingWatchdogJob: Job? = null
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     init {
         var consecutiveErrors = 0
         scope.launch {
             player.state.collect { st ->
+                if (st.status == PlayerState.Status.PLAYING || st.status == PlayerState.Status.PAUSED || st.status == PlayerState.Status.ERROR || st.status == PlayerState.Status.IDLE) {
+                    loadingWatchdogJob?.cancel()
+                }
                 if (st.status == PlayerState.Status.PLAYING) {
                     consecutiveErrors = 0
                 }
@@ -703,6 +711,115 @@ class PlayerViewModel(
         return sources
     }
 
+    suspend fun resolveYouTubeDirectStream(videoId: String): List<Streamable.Source.Http>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = "https://www.youtube.com/youtubei/v1/player"
+            val payload = "{\"context\":{\"client\":{\"clientName\":\"ANDROID\",\"clientVersion\":\"20.10.38\",\"hl\":\"en\",\"gl\":\"US\"}},\"videoId\":\"" + videoId + "\"}"
+
+            val req = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .header("User-Agent", "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip")
+                .post(payload.toRequestBody(jsonMediaType))
+                .build()
+
+            val body = okHttpClient.newCall(req).execute().use { it.body?.string() } ?: return@runCatching null
+            val root = jsonParser.parseToJsonElement(body).jsonObject
+            val streamingData = root["streamingData"]?.jsonObject ?: return@runCatching null
+            val adaptiveFormats = streamingData["adaptiveFormats"]?.jsonArray ?: return@runCatching null
+
+            val sources = mutableListOf<Streamable.Source.Http>()
+            val uaHeader = mapOf("User-Agent" to "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip")
+            for (fmt in adaptiveFormats) {
+                val fObj = fmt.jsonObject
+                val mime = fObj["mimeType"]?.jsonPrimitive?.content ?: ""
+                val directUrl = fObj["url"]?.jsonPrimitive?.content
+                val bitrate = fObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull() ?: 128000
+                if (mime.contains("audio") && !directUrl.isNullOrBlank()) {
+                    val qualityKbps = (bitrate / 1000).coerceAtLeast(64)
+                    val title = if (mime.contains("opus", ignoreCase = true)) "$qualityKbps kbps (YouTube Opus HQ)" else "$qualityKbps kbps (YouTube AAC)"
+                    sources.add(
+                        Streamable.Source.Http(
+                            request = directUrl.toGetRequest(headers = uaHeader),
+                            quality = qualityKbps,
+                            title = title,
+                            isLive = false
+                        )
+                    )
+                }
+            }
+            if (sources.isNotEmpty()) sources.sortedByDescending { it.quality } else null
+        }.getOrNull()
+    }
+
+    suspend fun searchAndResolveYouTubeStream(title: String, artist: String): Pair<Track, List<Streamable.Source.Http>>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val query = if (artist.isNotBlank() && !isGarbageArtist(artist)) "$title $artist" else title
+            val sUrl = "https://music.youtube.com/youtubei/v1/search"
+            val cleanQuery = query.replace("\"", "").replace("\\", "")
+            val sPayload = "{\"context\":{\"client\":{\"clientName\":\"WEB_REMIX\",\"clientVersion\":\"1.20240101.01.00\",\"hl\":\"en\",\"gl\":\"US\"}},\"query\":\"" + cleanQuery + "\",\"params\":\"EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D\"}"
+
+            val sReq = Request.Builder()
+                .url(sUrl)
+                .header("Content-Type", "application/json")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Referer", "https://music.youtube.com/")
+                .post(sPayload.toRequestBody(jsonMediaType))
+                .build()
+
+            val sBody = okHttpClient.newCall(sReq).execute().use { it.body?.string() } ?: return@runCatching null
+            val sRoot = jsonParser.parseToJsonElement(sBody)
+
+            fun findVideoId(element: kotlinx.serialization.json.JsonElement): String? {
+                when (element) {
+                    is kotlinx.serialization.json.JsonObject -> {
+                        val item = element["musicResponsiveListItemRenderer"]?.jsonObject
+                        if (item != null) {
+                            val nav = item["overlay"]?.jsonObject?.get("musicItemThumbnailOverlayRenderer")?.jsonObject
+                                ?.get("content")?.jsonObject?.get("musicPlayButtonRenderer")?.jsonObject
+                                ?.get("playNavigationEndpoint")?.jsonObject?.get("watchEndpoint")?.jsonObject
+                            val vid = nav?.get("videoId")?.jsonPrimitive?.content
+                            if (!vid.isNullOrBlank()) return vid
+                        }
+                        for (v in element.values) {
+                            val res = findVideoId(v)
+                            if (res != null) return res
+                        }
+                    }
+                    is kotlinx.serialization.json.JsonArray -> {
+                        for (it in element) {
+                            val res = findVideoId(it)
+                            if (res != null) return res
+                        }
+                    }
+                    else -> {}
+                }
+                return null
+            }
+
+            val vid = findVideoId(sRoot) ?: return@runCatching null
+            val sources = resolveYouTubeDirectStream(vid) ?: return@runCatching null
+
+            val coverHolder = ImageHolder.NetworkRequestImageHolder(request = "https://i.ytimg.com/vi/$vid/hqdefault.jpg".toGetRequest(), crop = false)
+            val resolvedTrack = Track(
+                id = vid,
+                title = title,
+                artists = listOf(Artist(id = artist.ifBlank { "YouTube Music" }, name = artist.ifBlank { "YouTube Music" })),
+                album = null,
+                cover = coverHolder,
+                duration = null,
+                extras = mapOf(
+                    "source" to "youtube",
+                    "video_id" to vid,
+                    "extension_id" to "youtube_music",
+                    "track_title" to title,
+                    "artist_name" to artist
+                )
+            )
+            Pair(resolvedTrack, sources)
+        }.getOrNull()
+    }
+
     private suspend fun resolveSaavnStudioStream(
         query: String,
         targetTitle: String,
@@ -1252,6 +1369,21 @@ class PlayerViewModel(
         val currentToken = playRequestId.incrementAndGet()
         failedTracks.remove(track.id)
         currentPlayJob?.cancel()
+        loadingWatchdogJob?.cancel()
+
+        loadingWatchdogJob = scope.launch {
+            delay(12_000L)
+            if (player.state.value.status == PlayerState.Status.LOADING) {
+                println("[PlayerViewModel] Loading timeout (12s) for '${track.title}'. Auto-advancing...")
+                val q = queue.value
+                if (q.size > 1) {
+                    skipNext()
+                } else {
+                    runCatching { (player as? dev.brahmkshatriya.echo.core.platform.VlcAudioPlayer)?.setError("Playback timed out for '${track.title}'") }
+                }
+            }
+        }
+
         currentPlayJob = scope.launch {
             runCatching {
                 if (currentToken != playRequestId.get() || !isActive) return@runCatching
@@ -1287,6 +1419,18 @@ class PlayerViewModel(
                         isLive = isLive
                     )
                     mediaToPlay = Streamable.Media.Server(listOf(source), merged = false)
+                }
+
+                // 3.5 Direct YouTube fast path
+                if (mediaToPlay == null) {
+                    val vid = workingTrack.extras["video_id"] ?: if (workingTrack.id.matches(REGEX_YOUTUBE_ID)) workingTrack.id else null
+                    if (!vid.isNullOrBlank() && (workingTrack.extras["source"]?.equals("youtube", ignoreCase = true) == true || workingTrack.id.matches(REGEX_YOUTUBE_ID))) {
+                        val ytDirect = resolveYouTubeDirectStream(vid)
+                        if (!ytDirect.isNullOrEmpty()) {
+                            println("[PlayerViewModel] Resolved direct YouTube stream for '${workingTrack.title}' (videoId: $vid, sources: ${ytDirect.size})")
+                            mediaToPlay = Streamable.Media.Server(ytDirect, merged = false)
+                        }
+                    }
                 }
 
                 // 4. Extension origin resolution
@@ -1406,11 +1550,36 @@ class PlayerViewModel(
                     }
                 }
 
+                // 5.5 Universal YouTube Search Fallback
+                if (mediaToPlay == null) {
+                    val rawArtist = loadedTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
+                    val cleanTitle = cleanTrackTitle(loadedTrack.title, rawArtist)
+                    val vid = loadedTrack.extras["video_id"] ?: if (loadedTrack.id.matches(REGEX_YOUTUBE_ID)) loadedTrack.id else null
+                    val ytDirect = if (!vid.isNullOrBlank()) resolveYouTubeDirectStream(vid) else null
+                    if (!ytDirect.isNullOrEmpty()) {
+                        println("[PlayerViewModel] Universal YouTube direct match for '$cleanTitle' ($vid)")
+                        mediaToPlay = Streamable.Media.Server(ytDirect, merged = false)
+                    } else {
+                        val ytSearchResult = searchAndResolveYouTubeStream(cleanTitle, rawArtist)
+                        if (ytSearchResult != null) {
+                            val (resolvedYtTrack, ytSources) = ytSearchResult
+                            println("[PlayerViewModel] Universal YouTube search match for '$cleanTitle' ($rawArtist) -> ${resolvedYtTrack.id}")
+                            loadedTrack = loadedTrack.copy(
+                                cover = loadedTrack.cover ?: resolvedYtTrack.cover,
+                                duration = if ((loadedTrack.duration ?: 0L) > 0L) loadedTrack.duration else resolvedYtTrack.duration,
+                                extras = loadedTrack.extras + resolvedYtTrack.extras
+                            )
+                            mediaToPlay = Streamable.Media.Server(ytSources, merged = false)
+                        }
+                    }
+                }
+
                 // 6. Start Playback & Record Clean History
                 if (mediaToPlay != null) {
                     if (!isActive || currentToken != playRequestId.get()) return@runCatching
                     val finalSanitized = sanitizeTrackLocally(loadedTrack)
                     println("[PlayerViewModel] Starting playback: '${finalSanitized.title}' by '${finalSanitized.artists.joinToString { it.name }}' (sources: ${mediaToPlay.sources.size})")
+                    loadingWatchdogJob?.cancel()
                     player.play(finalSanitized, mediaToPlay)
 
                     runCatching {
@@ -1418,10 +1587,27 @@ class PlayerViewModel(
                     }
                 } else {
                     println("[PlayerViewModel] Error: Unable to resolve playable media for '${track.title}'")
+                    loadingWatchdogJob?.cancel()
+                    runCatching { (player as? dev.brahmkshatriya.echo.core.platform.VlcAudioPlayer)?.setError("Unable to play '${track.title}'") }
+                    val q = player.queue.value
+                    val currentIdx = q.indexOfFirst { it.id == track.id }
+                    if (currentIdx >= 0 && q.size > 1) {
+                        println("[PlayerViewModel] Automatically advancing to next track in queue after resolution failure...")
+                        delay(1200L)
+                        skipNext()
+                    }
                 }
             }.onFailure { e ->
                 println("[PlayerViewModel] Fatal error in play(): ${e.message}")
                 e.printStackTrace()
+                loadingWatchdogJob?.cancel()
+                runCatching { (player as? dev.brahmkshatriya.echo.core.platform.VlcAudioPlayer)?.setError("Playback error: ${e.message}") }
+                val q = player.queue.value
+                val currentIdx = q.indexOfFirst { it.id == track.id }
+                if (currentIdx >= 0 && q.size > 1) {
+                    delay(1200L)
+                    skipNext()
+                }
             }
         }
     }

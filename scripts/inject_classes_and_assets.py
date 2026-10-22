@@ -237,6 +237,11 @@ for portable_zip in portable_zips:
                 desktop_jar_bytes = f_djar.read()
         with open(bg_img_path, 'rb') as f_bg:
             bg_bytes = f_bg.read()
+        cfg_path = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\Audix.cfg')
+        cfg_bytes = None
+        if os.path.exists(cfg_path):
+            with open(cfg_path, 'rb') as f_cfg:
+                cfg_bytes = f_cfg.read()
         bat1 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Audix.bat')
         bat2 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Audix-Debug.bat')
         with open(bat1, 'rb') as f1: bat1_bytes = f1.read()
@@ -245,8 +250,10 @@ for portable_zip in portable_zips:
             skip_items = {
                 rel_in_zip,
                 rel_desktopapp,
+                'Audix-Windows-Portable/app/Audix.cfg',
                 'Audix-Windows-Portable/app/resources/images/audix_bg.jpg',
                 'Audix-Windows-Portable/app/resources/images/music_notes_bg.jpg',
+                'Audix-Windows-Portable/app/resources/images/audix_bg_32k_master.jpg',
                 'Audix-Windows-Portable/app/resources/images/cosmic_clock_dial.png',
                 'Audix-Windows-Portable/Run-Audix.bat',
                 'Audix-Windows-Portable/Run-Audix-Debug.bat'
@@ -262,6 +269,8 @@ for portable_zip in portable_zips:
             zout.writestr(rel_in_zip, jar_bytes)
             if desktop_jar_bytes is not None:
                 zout.writestr(rel_desktopapp, desktop_jar_bytes)
+            if cfg_bytes is not None:
+                zout.writestr('Audix-Windows-Portable/app/Audix.cfg', cfg_bytes)
             zout.writestr('Audix-Windows-Portable/app/resources/images/audix_bg.jpg', bg_bytes)
             zout.writestr('Audix-Windows-Portable/app/resources/images/music_notes_bg.jpg', bg_bytes)
             bg_32k_path = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\audix_bg_32k_master.jpg')

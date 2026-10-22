@@ -58,6 +58,30 @@ private object EchoTrayPainter : Painter() {
 private var activeWindow: java.awt.Window? = null
 private var cachedLogoPainter: Painter? = null
 
+private interface WindowsKernel32MemoryTrimmer : com.sun.jna.Library {
+    fun GetCurrentProcess(): com.sun.jna.Pointer
+    fun SetProcessWorkingSetSize(hProcess: com.sun.jna.Pointer, dwMinimumWorkingSetSize: Long, dwMaximumWorkingSetSize: Long): Boolean
+
+    companion object {
+        val INSTANCE: WindowsKernel32MemoryTrimmer? by lazy {
+            runCatching {
+                if (System.getProperty("os.name")?.contains("Windows", ignoreCase = true) == true) {
+                    com.sun.jna.Native.load("kernel32", WindowsKernel32MemoryTrimmer::class.java)
+                } else null
+            }.getOrNull()
+        }
+
+        fun trimMemory() {
+            runCatching {
+                val trimmer = INSTANCE ?: return
+                val handle = trimmer.GetCurrentProcess()
+                trimmer.SetProcessWorkingSetSize(handle, -1L, -1L)
+            }
+        }
+    }
+}
+
+
 fun main() {
     val logFile = File(System.getProperty("user.home"), "audix_desktop.log")
     runCatching {
@@ -219,7 +243,7 @@ fun main() {
                 }
                 .memoryCache {
                     MemoryCache.Builder()
-                        .maxSizeBytes(134_217_728L) // 128MB
+                        .maxSizeBytes(67_108_864L) // 128MB
                         .build()
                 }
                 .diskCache {
@@ -436,7 +460,7 @@ fun main() {
                     kotlin.system.exitProcess(0)
                 }
             },
-            title = "Audix v1.0.2-UNIFIED",
+            title = "Audix v1.0.3-UNIFIED",
             icon = logoPainter,
             state = windowState,
             resizable = false,
@@ -578,6 +602,14 @@ fun main() {
                         currentFrame.removeWindowStateListener(listener)
                     }
                     activeWindow = null
+                }
+            }
+                        LaunchedEffect(Unit) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    while (true) {
+                        kotlinx.coroutines.delay(45_000L)
+                        WindowsKernel32MemoryTrimmer.trimMemory()
+                    }
                 }
             }
             log("Inside Window { } content lambda - rendering EchoDesktopApp")

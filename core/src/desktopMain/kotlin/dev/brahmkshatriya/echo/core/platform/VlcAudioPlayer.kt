@@ -178,7 +178,7 @@ class VlcAudioPlayer(
             println("[VlcAudioPlayer] Event: PLAYING for ${_currentTrack.value?.title}")
             _state.value = PlayerState.PLAYING
             _isPlaying.value = true
-            runCatching { sourceDataLine?.start() }
+            AudioVisualizerManager.onPlaybackResumed()
             scope.launch(Dispatchers.IO) {
                 val targetVol = (_volume.value * 100).toInt().coerceIn(1, 100)
                 // Immediate enforcement upon device open
@@ -212,10 +212,7 @@ class VlcAudioPlayer(
             println("[VlcAudioPlayer] Event: PAUSED")
             _state.value = PlayerState.PAUSED
             _isPlaying.value = false
-            runCatching {
-                sourceDataLine?.stop()
-                AudioVisualizerManager.onPlaybackPaused()
-            }
+            AudioVisualizerManager.onPlaybackPaused()
         }
 
         override fun stopped(mp: MediaPlayer) {
@@ -224,11 +221,7 @@ class VlcAudioPlayer(
                 _state.value = PlayerState.IDLE
             }
             _isPlaying.value = false
-            runCatching {
-                sourceDataLine?.stop()
-                sourceDataLine?.flush()
-                AudioVisualizerManager.clear()
-            }
+            AudioVisualizerManager.clear()
         }
 
         override fun finished(mp: MediaPlayer) {
@@ -247,11 +240,7 @@ class VlcAudioPlayer(
             }
             _state.value = PlayerState.ENDED
             _isPlaying.value = false
-            runCatching {
-                sourceDataLine?.stop()
-                sourceDataLine?.flush()
-                AudioVisualizerManager.clear()
-            }
+            AudioVisualizerManager.clear()
         }
 
         override fun buffering(mp: MediaPlayer, newCache: Float) {
@@ -276,96 +265,6 @@ class VlcAudioPlayer(
         }
     }
 
-    @Volatile
-    private var sourceDataLine: SourceDataLine? = null
-    @Volatile
-    private var isUsingAudioCallback: Boolean = false
-
-    private val audioCallback = object : AudioCallback {
-        private var pcmBuffer = ByteArray(16384)
-        private var outputBuffer = ByteArray(16384)
-
-        override fun play(mediaPlayer: MediaPlayer, samples: Pointer, sampleCount: Int, pts: Long) {
-            val line = sourceDataLine
-            val byteCount = sampleCount * 4
-            if (byteCount <= 0) return
-
-            if (pcmBuffer.size < byteCount) {
-                pcmBuffer = ByteArray(byteCount)
-                outputBuffer = ByteArray(byteCount)
-            }
-
-            samples.read(0, pcmBuffer, 0, byteCount)
-
-            // Feed raw 16-bit stereo PCM audio to AudioVisualizerManager for real-time FFT spectrum analysis
-            AudioVisualizerManager.processPcmSamples(pcmBuffer, sampleCount)
-
-            // Forward to Java Sound SourceDataLine for crystal-clear playback on Windows speakers
-            if (line != null && line.isOpen) {
-                val vol = _volume.value.coerceIn(0f, 1f)
-                if (vol >= 0.99f) {
-                    line.write(pcmBuffer, 0, byteCount)
-                } else if (vol <= 0.001f) {
-                    java.util.Arrays.fill(outputBuffer, 0, byteCount, 0.toByte())
-                    line.write(outputBuffer, 0, byteCount)
-                } else {
-                    // Precise software volume scaling for 16-bit little-endian stereo PCM
-                    var i = 0
-                    while (i < byteCount) {
-                        val low = pcmBuffer[i].toInt() and 0xFF
-                        val high = pcmBuffer[i + 1].toInt()
-                        val sample = (high shl 8) or low
-                        val scaled = (sample * vol).toInt().coerceIn(-32768, 32767)
-                        outputBuffer[i] = (scaled and 0xFF).toByte()
-                        outputBuffer[i + 1] = ((scaled shr 8) and 0xFF).toByte()
-                        i += 2
-                    }
-                    line.write(outputBuffer, 0, byteCount)
-                }
-            }
-        }
-
-        override fun pause(mediaPlayer: MediaPlayer, pts: Long) {
-            runCatching { sourceDataLine?.stop() }
-            AudioVisualizerManager.onPlaybackPaused()
-        }
-
-        override fun resume(mediaPlayer: MediaPlayer, pts: Long) {
-            runCatching { sourceDataLine?.start() }
-            AudioVisualizerManager.onPlaybackResumed()
-        }
-
-        override fun flush(mediaPlayer: MediaPlayer, pts: Long) {
-            runCatching { sourceDataLine?.flush() }
-            AudioVisualizerManager.clear()
-        }
-
-        override fun drain(mediaPlayer: MediaPlayer) {
-            runCatching { sourceDataLine?.drain() }
-        }
-
-        override fun setVolume(volume: Float, mute: Boolean) {
-        }
-    }
-
-    private fun setupAudioVisualizerCallback(mp: MediaPlayer) {
-        try {
-            val format = AudioFormat(44100f, 16, 2, true, false)
-            val info = DataLine.Info(SourceDataLine::class.java, format)
-            val line = AudioSystem.getLine(info) as SourceDataLine
-            line.open(format, 44100 * 4 / 5) // 200ms buffer for seamless jitter-free audio
-            line.start()
-            sourceDataLine = line
-            mp.audio().callback("S16N", 44100, 2, audioCallback)
-            isUsingAudioCallback = true
-            println("[VlcAudioPlayer] Audio visualizer callback and SourceDataLine initialized successfully.")
-        } catch (t: Throwable) {
-            println("[VlcAudioPlayer] Warning: Failed initializing SourceDataLine audio callback: ${t.message}. Falling back to native VLC audio output.")
-            sourceDataLine = null
-            isUsingAudioCallback = false
-        }
-    }
-
     private val audioComponent: AudioPlayerComponent? by lazy {
         if (vlcAvailable) {
             try {
@@ -386,7 +285,6 @@ class VlcAudioPlayer(
 
                 component.apply {
                     mediaPlayer().events().addMediaPlayerEventListener(vlcEventListener)
-                    setupAudioVisualizerCallback(mediaPlayer())
                 }
             } catch (t: Throwable) {
                 System.err.println("[VlcAudioPlayer] Failed creating AudioPlayerComponent: ${t.message}")
@@ -420,14 +318,16 @@ class VlcAudioPlayer(
         }
     }
 
+    fun setError(message: String) {
+        _state.value = PlayerState.error(Exception(message))
+        _isPlaying.value = false
+        AudioVisualizerManager.clear()
+    }
+
     override fun prepareTrack(track: Track) {
         // Immediately halt current audio output so old song stops playing in 0ms
         runCatching { player?.controls()?.stop() }
-        runCatching {
-            sourceDataLine?.stop()
-            sourceDataLine?.flush()
-            AudioVisualizerManager.clear()
-        }
+        AudioVisualizerManager.clear()
         _isPlaying.value = false
         _currentTrack.value = track
         _state.value = PlayerState.LOADING
@@ -535,17 +435,11 @@ class VlcAudioPlayer(
 
     override fun pause() {
         runCatching { player?.controls()?.pause() }
-        runCatching {
-            sourceDataLine?.stop()
-            AudioVisualizerManager.onPlaybackPaused()
-        }
+        AudioVisualizerManager.onPlaybackPaused()
     }
 
     override fun resume() {
-        runCatching {
-            sourceDataLine?.start()
-            AudioVisualizerManager.onPlaybackResumed()
-        }
+        AudioVisualizerManager.onPlaybackResumed()
         runCatching { player?.controls()?.play() }
     }
 
@@ -559,17 +453,12 @@ class VlcAudioPlayer(
 
     override fun seekTo(positionMs: Long) {
         runCatching { player?.controls()?.setTime(positionMs) }
-        runCatching { sourceDataLine?.flush() }
         _positionMs.value = positionMs
     }
 
     override fun stop() {
         runCatching { player?.controls()?.stop() }
-        runCatching {
-            sourceDataLine?.stop()
-            sourceDataLine?.flush()
-            AudioVisualizerManager.clear()
-        }
+        AudioVisualizerManager.clear()
         _currentTrack.value = null
         _positionMs.value = 0L
         _durationMs.value = 0L
@@ -735,9 +624,6 @@ class VlcAudioPlayer(
         runCatching { scope.coroutineContext.cancelChildren() }
         runCatching { player?.controls()?.stop() }
         runCatching {
-            sourceDataLine?.stop()
-            sourceDataLine?.close()
-            sourceDataLine = null
             AudioVisualizerManager.clear()
         }
         runCatching { audioComponent?.release() }

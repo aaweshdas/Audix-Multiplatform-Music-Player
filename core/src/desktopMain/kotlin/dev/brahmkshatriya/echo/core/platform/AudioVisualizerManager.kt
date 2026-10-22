@@ -232,30 +232,46 @@ object AudioVisualizerManager {
         visualizerJob = scope.launch {
             var phase = 0.0
             while (isActive && isAudioActive) {
-                phase += 0.14
+                phase += 0.10
                 val now = System.currentTimeMillis()
                 lastUpdateTime = now
-                for (b in 0 until BARS) {
-                    val freqWeight = if (b < 6) 0.88f else if (b < 16) 0.68f else 0.48f
-                    val primaryWave = (sin(phase * 1.8 + b * 0.45) * 0.5 + 0.5).toFloat()
-                    val bassPulse = if (b < 8) ((sin(phase * 3.6) * 0.5 + 0.5) * 0.45).toFloat() else 0f
-                    val flutter = (cos(phase * 4.2 - b * 0.6) * 0.15).toFloat()
-                    val targetEnergy = ((primaryWave * freqWeight + bassPulse + flutter) * 0.92f).coerceIn(0.08f, 0.96f)
 
+                // Rhythmic acoustic transient generator (kick drum, snare, hi-hats, and melodic phrases)
+                val beatProgress = ((phase * 1.55) % (2.0 * PI)).toFloat()
+                val kickImpulse = if (beatProgress < 0.55f) exp(-beatProgress * 7.5f) else 0f
+                val kickHit = (kickImpulse * 0.94f).coerceIn(0f, 1f)
+
+                val backbeatProgress = (((phase * 1.55) + PI) % (2.0 * PI)).toFloat()
+                val snareImpulse = if (backbeatProgress < 0.50f) exp(-backbeatProgress * 8.0f) else 0f
+                val snareHit = (snareImpulse * 0.88f).coerceIn(0f, 1f)
+
+                val hihatTick = abs(sin(phase * 6.2).toFloat()).pow(3.5f) * 0.72f
+                val macroEnvelope = (0.55f + 0.42f * sin(phase * 0.16).toFloat()).coerceIn(0.18f, 0.98f)
+
+                for (b in 0 until BARS) {
+                    val melodicWave = (sin(phase * 0.80 + b * 0.35).toFloat() * 0.24f + 0.24f)
+                    val rawEnergy = when {
+                        b < 7 -> (kickHit * 0.88f + melodicWave * 0.22f) * macroEnvelope
+                        b < 18 -> (snareHit * 0.78f + melodicWave * 0.48f + kickHit * 0.18f) * macroEnvelope
+                        else -> (hihatTick * 0.82f + melodicWave * 0.25f) * macroEnvelope
+                    }
+                    val targetEnergy = rawEnergy.coerceIn(0.04f, 0.96f)
+
+                    // Instant attack (0ms), crisp exponential decay
                     if (targetEnergy >= currentBands[b]) {
                         currentBands[b] = targetEnergy
                     } else {
-                        currentBands[b] = max(0.02f, currentBands[b] * 0.88f - 0.005f)
+                        currentBands[b] = max(0.03f, currentBands[b] * 0.81f - 0.006f)
                     }
 
                     if (currentBands[b] >= peakBandsInternal[b]) {
                         peakBandsInternal[b] = currentBands[b]
-                        peakHoldTimers[b] = 6
+                        peakHoldTimers[b] = 7
                     } else {
                         if (peakHoldTimers[b] > 0) {
                             peakHoldTimers[b]--
                         } else {
-                            peakBandsInternal[b] = max(currentBands[b], peakBandsInternal[b] - 0.02f)
+                            peakBandsInternal[b] = max(currentBands[b], peakBandsInternal[b] - 0.022f)
                         }
                     }
                 }

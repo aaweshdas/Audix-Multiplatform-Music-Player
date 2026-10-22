@@ -572,16 +572,10 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         val cleanTitle = cleanTrackTitle(trackTitle, cleanArtist)
         val targetDurationMs = streamable.extras["duration_ms"]?.toLongOrNull()
 
-        // 1. Direct YouTube stream via ANDROID_VR client (if available) - highest priority
-        val ytDirectUrl = tryResolveYouTubeDirect(videoId)
-        if (!ytDirectUrl.isNullOrBlank()) {
-            val source = Streamable.Source.Http(
-                request = ytDirectUrl.toGetRequest(),
-                quality = 160,
-                title = "160 kbps (YouTube Direct)",
-                isLive = false
-            )
-            return@withContext Streamable.Media.Server(listOf(source), merged = false)
+        // 1. Direct YouTube stream via ANDROID Innertube client - highest priority
+        val ytDirectSources = tryResolveYouTubeDirect(videoId)
+        if (!ytDirectSources.isNullOrEmpty()) {
+            return@withContext Streamable.Media.Server(ytDirectSources, merged = false)
         }
 
         // 2. High-fidelity audio match on JioSaavn (320kbps MP4/AAC Studio Master) with verified candidate scoring
@@ -609,19 +603,17 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         error("Unable to resolve audio stream for YouTube track: $videoId ($trackTitle by $artistName)")
     }
 
-    private fun tryResolveYouTubeDirect(videoId: String): String? {
+    private fun tryResolveYouTubeDirect(videoId: String): List<Streamable.Source.Http>? {
         return runCatching {
             val url = "https://www.youtube.com/youtubei/v1/player"
             val payload = """
                 {
                     "context": {
                         "client": {
-                            "clientName": "ANDROID_VR",
-                            "clientVersion": "1.56.21",
-                            "deviceMake": "Oculus",
-                            "deviceModel": "Quest 3",
-                            "osName": "Android",
-                            "osVersion": "12"
+                            "clientName": "ANDROID",
+                            "clientVersion": "20.10.38",
+                            "hl": "en",
+                            "gl": "US"
                         }
                     },
                     "videoId": "$videoId"
@@ -630,7 +622,8 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
 
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                .header("Content-Type", "application/json")
+                .header("User-Agent", "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip")
                 .post(payload.toRequestBody(jsonMediaType))
                 .build()
 
@@ -639,15 +632,27 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val streamingData = root["streamingData"]?.jsonObject ?: return@runCatching null
             val adaptiveFormats = streamingData["adaptiveFormats"]?.jsonArray ?: return@runCatching null
 
+            val sources = mutableListOf<Streamable.Source.Http>()
+            val uaHeader = mapOf("User-Agent" to "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip")
             for (fmt in adaptiveFormats) {
                 val fObj = fmt.jsonObject
                 val mime = fObj["mimeType"]?.jsonPrimitive?.content ?: ""
                 val directUrl = fObj["url"]?.jsonPrimitive?.content
+                val bitrate = fObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull() ?: 128000
                 if (mime.contains("audio") && !directUrl.isNullOrBlank()) {
-                    return@runCatching directUrl
+                    val qualityKbps = (bitrate / 1000).coerceAtLeast(64)
+                    val title = if (mime.contains("opus", ignoreCase = true)) "$qualityKbps kbps (YouTube Opus HQ)" else "$qualityKbps kbps (YouTube AAC)"
+                    sources.add(
+                        Streamable.Source.Http(
+                            request = directUrl.toGetRequest(headers = uaHeader),
+                            quality = qualityKbps,
+                            title = title,
+                            isLive = false
+                        )
+                    )
                 }
             }
-            null
+            if (sources.isNotEmpty()) sources.sortedByDescending { it.quality } else null
         }.getOrNull()
     }
 

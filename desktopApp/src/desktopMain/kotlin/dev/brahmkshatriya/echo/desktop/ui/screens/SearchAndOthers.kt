@@ -86,6 +86,8 @@ import java.io.File
 import javax.swing.JFileChooser
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
@@ -2567,6 +2569,873 @@ fun SeniorShelfDetailModal(
     }
 }
 
+// =========================================================================
+// YOUTUBE PLAYLIST IMPORT & ENGINE
+// =========================================================================
+
+data class YouTubePlaylistInfo(
+    val id: String,
+    val title: String,
+    val description: String = "",
+    val author: String = "YouTube",
+    val coverUrl: String? = null,
+    val tracks: List<Track> = emptyList()
+)
+
+object YouTubePlaylistEngine {
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(18, java.util.concurrent.TimeUnit.SECONDS)
+        .followRedirects(true)
+        .build()
+
+    private val json = Json { ignoreUnknownKeys = true }
+    private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+    fun extractPlaylistId(input: String?): String? {
+        if (input.isNullOrBlank()) return null
+        val trimmed = input.trim()
+
+        val matchParam = Regex("""[?&]list=([a-zA-Z0-9_-]+)""").find(trimmed)
+        if (matchParam != null) return matchParam.groupValues[1]
+
+        val matchBrowse = Regex("""(?:browse/|browse\?id=)(?:VL)?([a-zA-Z0-9_-]+)""").find(trimmed)
+        if (matchBrowse != null) return matchBrowse.groupValues[1]
+
+        val matchDirect = Regex("""^(?:VL)?(PL[a-zA-Z0-9_-]+|OLAK5uy_[a-zA-Z0-9_-]+|RD[a-zA-Z0-9_-]+|UL[a-zA-Z0-9_-]+)$""").find(trimmed)
+        if (matchDirect != null) return matchDirect.groupValues[1]
+
+        val vMatch = extractVideoId(trimmed)
+        if (vMatch != null && (trimmed.contains("youtube.com") || trimmed.contains("youtu.be"))) {
+            return "RD$vMatch"
+        }
+
+        return null
+    }
+
+    fun extractVideoId(input: String?): String? {
+        if (input.isNullOrBlank()) return null
+        val trimmed = input.trim()
+
+        val matchV = Regex("""[?&]v=([a-zA-Z0-9_-]{11})""").find(trimmed)
+        if (matchV != null) return matchV.groupValues[1]
+
+        val matchShort = Regex("""(?:youtu\.be/|embed/|shorts/)([a-zA-Z0-9_-]{11})""").find(trimmed)
+        if (matchShort != null) return matchShort.groupValues[1]
+
+        val matchDirect = Regex("""^([a-zA-Z0-9_-]{11})$""").find(trimmed)
+        if (matchDirect != null) return matchDirect.groupValues[1]
+
+        val matchRD = Regex("""RD([a-zA-Z0-9_-]{11})""").find(trimmed)
+        if (matchRD != null) return matchRD.groupValues[1]
+
+        return null
+    }
+
+    private fun parseTimeStringToMs(timeStr: String?): Long {
+        if (timeStr.isNullOrBlank()) return 180000L
+        val parts = timeStr.trim().split(":").mapNotNull { it.toLongOrNull() }
+        return when (parts.size) {
+            1 -> parts[0] * 1000L
+            2 -> (parts[0] * 60L + parts[1]) * 1000L
+            3 -> (parts[0] * 3600L + parts[1] * 60L + parts[2]) * 1000L
+            else -> 180000L
+        }
+    }
+
+    suspend fun fetchPlaylist(
+        playlistId: String,
+        videoIdHint: String? = null,
+        extensionId: String? = null,
+        maxPages: Int = 5
+    ): YouTubePlaylistInfo = withContext(Dispatchers.IO) {
+        val cleanPlaylistId = if (playlistId.startsWith("VL")) playlistId.substring(2) else playlistId
+        val isMix = cleanPlaylistId.startsWith("RD") || cleanPlaylistId.startsWith("UL")
+
+        if (isMix) {
+            return@withContext fetchMixPlaylist(cleanPlaylistId, videoIdHint, extensionId, maxPages = 3)
+        }
+
+        try {
+            fetchBrowsePlaylist(cleanPlaylistId, extensionId, maxPages)
+        } catch (e: Throwable) {
+            val msg = e.message ?: ""
+            if (msg.contains("unviewable", ignoreCase = true) || msg.contains("does not exist", ignoreCase = true)) {
+                runCatching {
+                    fetchMixPlaylist(cleanPlaylistId, videoIdHint, extensionId, maxPages = 3)
+                }.getOrElse { throw e }
+            } else {
+                throw e
+            }
+        }
+    }
+
+    private suspend fun fetchMixPlaylist(
+        playlistId: String,
+        videoIdHint: String? = null,
+        extensionId: String? = null,
+        maxPages: Int = 3
+    ): YouTubePlaylistInfo = withContext(Dispatchers.IO) {
+        val nextUrl = "https://www.youtube.com/youtubei/v1/next"
+        val seedVid = videoIdHint
+            ?: extractVideoId(playlistId)
+            ?: playlistId.removePrefix("RD").removePrefix("AMVM").removePrefix("MM").take(11)
+
+        val collectedTracks = mutableListOf<Track>()
+        val seenVideoIds = mutableSetOf<String>()
+        var playlistTitle = "YouTube Mix"
+        var playlistAuthor = "YouTube Mix"
+        var playlistCover: String? = if (seedVid.isNotBlank()) "https://i.ytimg.com/vi/$seedVid/hqdefault.jpg" else null
+
+        var currVid = seedVid
+        var currIndex = 0
+        var currParams: String? = null
+
+        for (page in 0 until maxPages) {
+            val payloadObj = buildString {
+                append("""{"context":{"client":{"clientName":"WEB","clientVersion":"2.20240101.01.00","hl":"en","gl":"US"}},""")
+                append(""""videoId":"$currVid","playlistId":"$playlistId"""")
+                if (currIndex > 0) append(""","playlistIndex":$currIndex""")
+                if (!currParams.isNullOrBlank()) append(""","params":"$currParams"""")
+                append("}")
+            }
+
+            val req = Request.Builder()
+                .url(nextUrl)
+                .post(payloadObj.toRequestBody(JSON_MEDIA_TYPE))
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept", "application/json")
+                .build()
+
+            val respBody = runCatching {
+                client.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) null else resp.body?.string()
+                }
+            }.getOrNull() ?: break
+
+            val root = runCatching { json.parseToJsonElement(respBody).jsonObject }.getOrNull() ?: break
+            val tcb = root["contents"]?.jsonObject?.get("twoColumnWatchNextResults")?.jsonObject
+            val pl = tcb?.get("playlist")?.jsonObject?.get("playlist")?.jsonObject ?: break
+
+            val titleVal = pl["title"]?.jsonPrimitive?.content
+            if (!titleVal.isNullOrBlank()) playlistTitle = titleVal
+
+            val authorVal = pl["authorText"]?.jsonObject?.get("simpleText")?.jsonPrimitive?.content
+            if (!authorVal.isNullOrBlank()) playlistAuthor = authorVal
+
+            val items = pl["contents"]?.jsonArray ?: break
+            if (items.isEmpty()) break
+
+            var newCount = 0
+            var nextWatchEndpoint: JsonObject? = null
+
+            for (elem in items) {
+                val ppvr = elem.jsonObject["playlistPanelVideoRenderer"]?.jsonObject ?: continue
+                val vid = ppvr["videoId"]?.jsonPrimitive?.content ?: continue
+                if (!seenVideoIds.add(vid)) continue
+
+                val tTitle = ppvr["title"]?.jsonObject?.get("simpleText")?.jsonPrimitive?.content
+                    ?: ppvr["title"]?.jsonObject?.get("runs")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+                    ?: "Unknown Track"
+
+                var tArtist = playlistAuthor
+                val longRuns = ppvr["longBylineText"]?.jsonObject?.get("runs")?.jsonArray
+                val shortRuns = ppvr["shortBylineText"]?.jsonObject?.get("runs")?.jsonArray
+                val artistRun = longRuns?.firstOrNull() ?: shortRuns?.firstOrNull()
+                val artistText = artistRun?.jsonObject?.get("text")?.jsonPrimitive?.content
+                if (!artistText.isNullOrBlank()) tArtist = artistText
+
+                val durText = ppvr["lengthText"]?.jsonObject?.get("simpleText")?.jsonPrimitive?.content
+                    ?: ppvr["lengthText"]?.jsonObject?.get("runs")?.jsonArray?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+                val durationMs = parseTimeStringToMs(durText)
+
+                val thumbs = ppvr["thumbnail"]?.jsonObject?.get("thumbnails")?.jsonArray
+                val tCover = thumbs?.lastOrNull()?.jsonObject?.get("url")?.jsonPrimitive?.content
+                    ?: "https://i.ytimg.com/vi/$vid/hqdefault.jpg"
+                if (playlistCover.isNullOrBlank()) playlistCover = tCover
+
+                val extrasMap = mutableMapOf(
+                    "video_id" to vid,
+                    "cover_url" to tCover,
+                    "track_title" to tTitle,
+                    "artist_name" to tArtist,
+                    "source" to "youtube"
+                )
+                if (!extensionId.isNullOrBlank()) {
+                    extrasMap["extension_id"] = extensionId
+                }
+
+                collectedTracks.add(
+                    Track(
+                        id = vid,
+                        title = tTitle,
+                        artists = listOf(Artist(name = tArtist, id = tArtist)),
+                        album = Album(title = playlistTitle, id = playlistId),
+                        cover = ImageHolder.NetworkRequestImageHolder(
+                            dev.brahmkshatriya.echo.common.models.NetworkRequest(tCover),
+                            crop = false
+                        ),
+                        duration = durationMs,
+                        extras = extrasMap
+                    )
+                )
+                newCount++
+                nextWatchEndpoint = ppvr["navigationEndpoint"]?.jsonObject?.get("watchEndpoint")?.jsonObject
+            }
+
+            if (newCount == 0 || nextWatchEndpoint == null) break
+
+            val nextVid = nextWatchEndpoint["videoId"]?.jsonPrimitive?.content
+            if (!nextVid.isNullOrBlank()) currVid = nextVid
+            val nextIdx = nextWatchEndpoint["index"]?.jsonPrimitive?.content?.toIntOrNull()
+            if (nextIdx != null) currIndex = nextIdx else currIndex += items.size
+            val nextP = nextWatchEndpoint["params"]?.jsonPrimitive?.content
+            if (!nextP.isNullOrBlank()) currParams = nextP
+        }
+
+        if (collectedTracks.isEmpty()) {
+            throw Exception("Could not load any tracks from this YouTube Mix.")
+        }
+
+        YouTubePlaylistInfo(
+            id = playlistId,
+            title = playlistTitle,
+            description = "Auto-generated YouTube Mix based on $playlistAuthor",
+            author = playlistAuthor,
+            coverUrl = playlistCover,
+            tracks = collectedTracks
+        )
+    }
+
+    private suspend fun fetchBrowsePlaylist(
+        playlistId: String,
+        extensionId: String? = null,
+        maxPages: Int = 5
+    ): YouTubePlaylistInfo = withContext(Dispatchers.IO) {
+        val cleanPlaylistId = if (playlistId.startsWith("VL")) playlistId.substring(2) else playlistId
+        val browseId = "VL$cleanPlaylistId"
+        val browseUrl = "https://www.youtube.com/youtubei/v1/browse"
+
+        val initialPayload = """
+            {
+                "context": {
+                    "client": {
+                        "clientName": "WEB",
+                        "clientVersion": "2.20240101.01.00",
+                        "hl": "en",
+                        "gl": "US"
+                    }
+                },
+                "browseId": "$browseId"
+            }
+        """.trimIndent()
+
+        val req = Request.Builder()
+            .url(browseUrl)
+            .post(initialPayload.toRequestBody(JSON_MEDIA_TYPE))
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .header("Accept", "application/json")
+            .build()
+
+        val respBody = client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) throw Exception("YouTube returned HTTP ${resp.code}")
+            resp.body?.string() ?: throw Exception("Empty response from YouTube")
+        }
+
+        val root = json.parseToJsonElement(respBody).jsonObject
+
+        val alerts = root["alerts"]?.jsonArray
+        if (!alerts.isNullOrEmpty()) {
+            val alertText = alerts.firstOrNull()?.jsonObject
+                ?.get("alertRenderer")?.jsonObject
+                ?.get("text")?.jsonObject
+                ?.get("runs")?.jsonArray?.firstOrNull()?.jsonObject
+                ?.get("text")?.jsonPrimitive?.content
+            if (!alertText.isNullOrBlank() && (root["contents"] == null || root["contents"]?.jsonObject?.isEmpty() == true)) {
+                throw Exception("YouTube: $alertText")
+            }
+        }
+
+        val metadataRenderer = root["metadata"]?.jsonObject?.get("playlistMetadataRenderer")?.jsonObject
+        val pageHeader = root["header"]?.jsonObject?.get("pageHeaderRenderer")?.jsonObject
+        val microformat = root["microformat"]?.jsonObject?.get("microformatDataRenderer")?.jsonObject
+
+        val playlistTitle = metadataRenderer?.get("title")?.jsonPrimitive?.content
+            ?: pageHeader?.get("pageTitle")?.jsonPrimitive?.content
+            ?: microformat?.get("title")?.jsonPrimitive?.content
+            ?: "YouTube Playlist"
+
+        val playlistDesc = metadataRenderer?.get("description")?.jsonPrimitive?.content
+            ?: microformat?.get("description")?.jsonPrimitive?.content
+            ?: ""
+
+        var playlistAuthor = "YouTube"
+        val sidebarItems = root["sidebar"]?.jsonObject?.get("playlistSidebarRenderer")?.jsonObject?.get("items")?.jsonArray
+        if (sidebarItems != null) {
+            for (it in sidebarItems) {
+                val sec = it.jsonObject["playlistSidebarSecondaryInfoRenderer"]?.jsonObject
+                val runs = sec?.get("videoOwner")?.jsonObject?.get("videoOwnerRenderer")?.jsonObject?.get("title")?.jsonObject?.get("runs")?.jsonArray
+                val runText = runs?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+                if (!runText.isNullOrBlank()) {
+                    playlistAuthor = runText.replace(Regex("""^by\s+""", RegexOption.IGNORE_CASE), "").trim()
+                    break
+                }
+            }
+        }
+
+        var playlistCover: String? = null
+        val thumbs = microformat?.get("thumbnail")?.jsonObject?.get("thumbnails")?.jsonArray
+        if (thumbs != null && thumbs.isNotEmpty()) {
+            playlistCover = thumbs.last().jsonObject["url"]?.jsonPrimitive?.content
+        }
+
+        val collectedTracks = mutableListOf<Track>()
+        val seenVideoIds = mutableSetOf<String>()
+        var continuationToken: String? = null
+
+        fun parseItems(items: JsonArray) {
+            for (elem in items) {
+                val itObj = elem.jsonObject
+
+                // lockupViewModel
+                if (itObj.containsKey("lockupViewModel")) {
+                    val lvm = itObj["lockupViewModel"]?.jsonObject ?: continue
+                    var vid = lvm["contentId"]?.jsonPrimitive?.content
+                    if (vid.isNullOrBlank()) {
+                        val onTap = lvm["rendererContext"]?.jsonObject
+                            ?.get("commandContext")?.jsonObject
+                            ?.get("onTap")?.jsonObject
+                            ?.get("innertubeCommand")?.jsonObject
+                            ?.get("watchEndpoint")?.jsonObject
+                        vid = onTap?.get("videoId")?.jsonPrimitive?.content
+                    }
+                    if (vid.isNullOrBlank() || !seenVideoIds.add(vid)) continue
+
+                    val meta = lvm["metadata"]?.jsonObject?.get("lockupMetadataViewModel")?.jsonObject
+                    val titleText = meta?.get("title")?.jsonObject?.get("content")?.jsonPrimitive?.content ?: "Unknown Track"
+
+                    var artistName = playlistAuthor
+                    val rows = meta?.get("metadata")?.jsonObject?.get("contentMetadataViewModel")?.jsonObject?.get("metadataRows")?.jsonArray
+                    if (!rows.isNullOrEmpty()) {
+                        val parts = rows[0].jsonObject["metadataParts"]?.jsonArray
+                        if (!parts.isNullOrEmpty()) {
+                            val partContent = parts[0].jsonObject["text"]?.jsonObject?.get("content")?.jsonPrimitive?.content
+                            if (!partContent.isNullOrBlank()) artistName = partContent
+                        }
+                    }
+
+                    var trackCover = "https://i.ytimg.com/vi/$vid/hqdefault.jpg"
+                    val sources = lvm["contentImage"]?.jsonObject?.get("thumbnailViewModel")?.jsonObject?.get("image")?.jsonObject?.get("sources")?.jsonArray
+                    if (!sources.isNullOrEmpty()) {
+                        trackCover = sources.last().jsonObject["url"]?.jsonPrimitive?.content ?: trackCover
+                    }
+                    if (playlistCover.isNullOrBlank()) playlistCover = trackCover
+
+                    var durationMs = 180000L
+                    val overlays = lvm["contentImage"]?.jsonObject?.get("thumbnailViewModel")?.jsonObject?.get("overlays")?.jsonArray
+                    if (!overlays.isNullOrEmpty()) {
+                        for (ov in overlays) {
+                            val badges = ov.jsonObject["thumbnailBottomOverlayViewModel"]?.jsonObject?.get("badges")?.jsonArray
+                            if (!badges.isNullOrEmpty()) {
+                                val timeText = badges[0].jsonObject["thumbnailBadgeViewModel"]?.jsonObject?.get("text")?.jsonPrimitive?.content
+                                if (!timeText.isNullOrBlank()) {
+                                    durationMs = parseTimeStringToMs(timeText)
+                                    break
+                                }
+                            }
+                        }
+                    }
+
+                    val extrasMap = mutableMapOf(
+                        "video_id" to vid,
+                        "cover_url" to trackCover,
+                        "track_title" to titleText,
+                        "artist_name" to artistName,
+                        "source" to "youtube"
+                    )
+                    if (!extensionId.isNullOrBlank()) {
+                        extrasMap["extension_id"] = extensionId
+                    }
+
+                    collectedTracks.add(
+                        Track(
+                            id = vid,
+                            title = titleText,
+                            artists = listOf(Artist(name = artistName, id = artistName)),
+                            album = Album(title = playlistTitle, id = cleanPlaylistId),
+                            cover = ImageHolder.NetworkRequestImageHolder(
+                                dev.brahmkshatriya.echo.common.models.NetworkRequest(trackCover),
+                                crop = false
+                            ),
+                            duration = durationMs,
+                            extras = extrasMap
+                        )
+                    )
+                }
+
+                // playlistVideoRenderer
+                if (itObj.containsKey("playlistVideoRenderer")) {
+                    val pvr = itObj["playlistVideoRenderer"]?.jsonObject ?: continue
+                    val vid = pvr["videoId"]?.jsonPrimitive?.content
+                    if (vid.isNullOrBlank() || !seenVideoIds.add(vid)) continue
+
+                    val runs = pvr["title"]?.jsonObject?.get("runs")?.jsonArray
+                    val titleText = runs?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+                        ?: pvr["title"]?.jsonObject?.get("simpleText")?.jsonPrimitive?.content
+                        ?: "Unknown Track"
+
+                    val bylineRuns = pvr["shortBylineText"]?.jsonObject?.get("runs")?.jsonArray
+                    val artistName = bylineRuns?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.content
+                        ?: pvr["shortBylineText"]?.jsonObject?.get("simpleText")?.jsonPrimitive?.content
+                        ?: playlistAuthor
+
+                    var trackCover = "https://i.ytimg.com/vi/$vid/hqdefault.jpg"
+                    val pvrThumbs = pvr["thumbnail"]?.jsonObject?.get("thumbnails")?.jsonArray
+                    if (!pvrThumbs.isNullOrEmpty()) {
+                        trackCover = pvrThumbs.last().jsonObject["url"]?.jsonPrimitive?.content ?: trackCover
+                    }
+                    if (playlistCover.isNullOrBlank()) playlistCover = trackCover
+
+                    val lengthSec = pvr["lengthSeconds"]?.jsonPrimitive?.content?.toLongOrNull() ?: 180L
+                    val durationMs = lengthSec * 1000L
+
+                    val extrasMap = mutableMapOf(
+                        "video_id" to vid,
+                        "cover_url" to trackCover,
+                        "track_title" to titleText,
+                        "artist_name" to artistName,
+                        "source" to "youtube"
+                    )
+                    if (!extensionId.isNullOrBlank()) {
+                        extrasMap["extension_id"] = extensionId
+                    }
+
+                    collectedTracks.add(
+                        Track(
+                            id = vid,
+                            title = titleText,
+                            artists = listOf(Artist(name = artistName, id = artistName)),
+                            album = Album(title = playlistTitle, id = cleanPlaylistId),
+                            cover = ImageHolder.NetworkRequestImageHolder(
+                                dev.brahmkshatriya.echo.common.models.NetworkRequest(trackCover),
+                                crop = false
+                            ),
+                            duration = durationMs,
+                            extras = extrasMap
+                        )
+                    )
+                }
+
+                // continuationItemViewModel
+                if (itObj.containsKey("continuationItemViewModel")) {
+                    val civ = itObj["continuationItemViewModel"]?.jsonObject
+                    val cmd = civ?.get("continuationCommand")?.jsonObject?.get("innertubeCommand")?.jsonObject?.get("continuationCommand")?.jsonObject
+                        ?: civ?.get("continuationEndpoint")?.jsonObject?.get("continuationCommand")?.jsonObject
+                    val token = cmd?.get("token")?.jsonPrimitive?.content
+                    if (!token.isNullOrBlank()) continuationToken = token
+                }
+
+                // continuationItemRenderer
+                if (itObj.containsKey("continuationItemRenderer")) {
+                    val cir = itObj["continuationItemRenderer"]?.jsonObject
+                    val cmd = cir?.get("continuationEndpoint")?.jsonObject?.get("continuationCommand")?.jsonObject
+                    val token = cmd?.get("token")?.jsonPrimitive?.content
+                    if (!token.isNullOrBlank()) continuationToken = token
+                }
+            }
+        }
+
+        val tcb = root["contents"]?.jsonObject?.get("twoColumnBrowseResultsRenderer")?.jsonObject
+        val tabs = tcb?.get("tabs")?.jsonArray
+        if (tabs != null && tabs.isNotEmpty()) {
+            val secList = tabs[0].jsonObject["tabRenderer"]?.jsonObject
+                ?.get("content")?.jsonObject
+                ?.get("sectionListRenderer")?.jsonObject
+            val secContents = secList?.get("contents")?.jsonArray
+            if (secContents != null) {
+                for (sc in secContents) {
+                    val itemSec = sc.jsonObject["itemSectionRenderer"]?.jsonObject
+                    val plRenderer = itemSec?.get("contents")?.jsonArray ?: continue
+                    for (sub in plRenderer) {
+                        val subObj = sub.jsonObject
+                        if (subObj.containsKey("playlistVideoListRenderer")) {
+                            val vids = subObj["playlistVideoListRenderer"]?.jsonObject?.get("contents")?.jsonArray
+                            if (vids != null) parseItems(vids)
+                        }
+                    }
+                    parseItems(plRenderer)
+                }
+            }
+        }
+
+        var pageCount = 1
+        while (!continuationToken.isNullOrBlank() && pageCount < maxPages) {
+            pageCount++
+            val currToken = continuationToken
+            continuationToken = null
+
+            val contPayload = """
+                {
+                    "context": {
+                        "client": {
+                            "clientName": "WEB",
+                            "clientVersion": "2.20240101.01.00",
+                            "hl": "en",
+                            "gl": "US"
+                        }
+                    },
+                    "continuation": "$currToken"
+                }
+            """.trimIndent()
+
+            val contReq = Request.Builder()
+                .url(browseUrl)
+                .post(contPayload.toRequestBody(JSON_MEDIA_TYPE))
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept", "application/json")
+                .build()
+
+            val contBody = runCatching {
+                client.newCall(contReq).execute().use { it.body?.string() }
+            }.getOrNull() ?: break
+
+            val contRoot = runCatching { json.parseToJsonElement(contBody).jsonObject }.getOrNull() ?: break
+            val actions = contRoot["onResponseReceivedActions"]?.jsonArray
+            if (actions.isNullOrEmpty()) break
+
+            val contItems = actions[0].jsonObject["appendContinuationItemsAction"]?.jsonObject?.get("continuationItems")?.jsonArray
+            if (contItems.isNullOrEmpty()) break
+
+            parseItems(contItems)
+        }
+
+        YouTubePlaylistInfo(
+            id = cleanPlaylistId,
+            title = playlistTitle,
+            description = playlistDesc,
+            author = playlistAuthor,
+            coverUrl = playlistCover,
+            tracks = collectedTracks
+        )
+    }
+}
+
+@Composable
+fun YouTubePlaylistImportingView(onCancel: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        LiquidGlassCard(
+            modifier = Modifier.width(420.dp).padding(24.dp),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
+                Text(
+                    text = "Importing YouTube Playlist",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = Color.White
+                )
+                Text(
+                    text = "Fetching all songs and playlist metadata from YouTube...",
+                    fontSize = 13.sp,
+                    color = TextMuted,
+                    textAlign = TextAlign.Center
+                )
+                OutlinedButton(
+                    onClick = onCancel,
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f))
+                ) {
+                    Text("Cancel", color = TextSecondary, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun YouTubePlaylistErrorView(
+    error: String,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        LiquidGlassCard(
+            modifier = Modifier.width(440.dp).padding(24.dp),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Icon(
+                    Icons.Default.ErrorOutline,
+                    contentDescription = null,
+                    tint = Color(0xFFEF4444),
+                    modifier = Modifier.size(42.dp)
+                )
+                Text(
+                    text = "Playlist Import Failed",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = Color.White
+                )
+                Text(
+                    text = error,
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Retry", fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                    }
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                    ) {
+                        Text("Dismiss", color = Color.White, fontSize = 12.5.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun YouTubePlaylistDetailView(
+    playlistInfo: YouTubePlaylistInfo,
+    isSavedLocally: Boolean,
+    onSaveToggle: () -> Unit,
+    onPlayAll: () -> Unit,
+    onShuffle: () -> Unit,
+    onTrackSelect: (Track) -> Unit,
+    onAddToPlaylist: (Track) -> Unit,
+    onDownloadTrack: (Track) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        // TOP HERO CARD
+        LiquidGlassBox(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            backgroundColor = Color(0xFF0F1117).copy(alpha = 0.70f),
+            borderColor = Color.White.copy(alpha = 0.18f)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(22.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Large Thumbnail
+                Box(
+                    modifier = Modifier
+                        .size(140.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(16.dp))
+                        .shadow(12.dp, RoundedCornerShape(16.dp))
+                ) {
+                    if (!playlistInfo.coverUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = playlistInfo.coverUrl,
+                            contentDescription = playlistInfo.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize().background(Color(0xFF1E222D)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.LibraryMusic, contentDescription = null, tint = TextMuted, modifier = Modifier.size(48.dp))
+                        }
+                    }
+                }
+
+                // Info & Action Buttons
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        LiquidGlassBox(
+                            shape = RoundedCornerShape(8.dp),
+                            backgroundColor = Color(0xFFE50914).copy(alpha = 0.18f),
+                            borderColor = Color(0xFFFF4D4D).copy(alpha = 0.40f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFFF3333))
+                                )
+                                Text(
+                                    text = "YOUTUBE PLAYLIST",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFF6666)
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = onClose,
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.10f))
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close Playlist", tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    Text(
+                        text = playlistInfo.title,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Text(
+                        text = "by ${playlistInfo.author} • ${playlistInfo.tracks.size} Songs",
+                        fontSize = 13.5.sp,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Actions Row
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (playlistInfo.tracks.isNotEmpty()) {
+                            Button(
+                                onClick = onPlayAll,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Play All", fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = onShuffle,
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Shuffle", color = Color.White, fontSize = 12.5.sp)
+                            }
+                        }
+
+                        Button(
+                            onClick = onSaveToggle,
+                            colors = if (isSavedLocally) {
+                                ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981).copy(alpha = 0.25f), contentColor = Color(0xFF34D399))
+                            } else {
+                                ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.12f), contentColor = Color.White)
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, if (isSavedLocally) Color(0xFF10B981).copy(alpha = 0.60f) else Color.White.copy(alpha = 0.25f)),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isSavedLocally) Icons.Default.Check else Icons.AutoMirrored.Filled.PlaylistAdd,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = if (isSavedLocally) "Saved to Library" else "Save Playlist",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // TRACKLIST HEADER
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Playlist Tracks (${playlistInfo.tracks.size})",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = "Click song to play with full queue context",
+                fontSize = 12.sp,
+                color = TextMuted
+            )
+        }
+
+        // TRACKLIST
+        if (playlistInfo.tracks.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No playable tracks found in this playlist.", color = TextMuted, fontSize = 14.sp)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                itemsIndexed(playlistInfo.tracks, key = { idx, tr -> "${tr.id}_$idx" }) { idx, track ->
+                    SearchTrackItemRow(
+                        track = track,
+                        index = idx,
+                        isCurrentTrack = false,
+                        isPlaying = false,
+                        onPlay = { onTrackSelect(track) },
+                        onAddToPlaylist = { onAddToPlaylist(track) },
+                        onDownload = { onDownloadTrack(track) }
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun SeniorMediaDetailModal(
     media: EchoMediaItem,
@@ -2578,6 +3447,7 @@ fun SeniorMediaDetailModal(
     onDownloadTrack: (Track) -> Unit
 ) {
     var albumTracks by remember(media) { mutableStateOf<List<Track>>(emptyList()) }
+    var playlistTracks by remember(media) { mutableStateOf<List<Track>>(emptyList()) }
     var artistTracks by remember(media) { mutableStateOf<List<Track>>(emptyList()) }
     var artistAlbums by remember(media) { mutableStateOf<List<Album>>(emptyList()) }
     var isLoading by remember(media) { mutableStateOf(true) }
@@ -2593,6 +3463,16 @@ fun SeniorMediaDetailModal(
                 artistTracks = t
                 artistAlbums = a
             }
+            is Playlist -> {
+                val ytId = YouTubePlaylistEngine.extractPlaylistId(media.id)
+                if (ytId != null) {
+                    val ytExt = extensionManager.music.value.firstOrNull { it.id.contains("youtube", ignoreCase = true) }
+                    playlistTracks = runCatching {
+                        val ytVid = YouTubePlaylistEngine.extractVideoId(media.id)
+                        YouTubePlaylistEngine.fetchPlaylist(ytId, ytVid, ytExt?.id).tracks
+                    }.getOrDefault(emptyList())
+                }
+            }
             else -> {}
         }
         isLoading = false
@@ -2600,6 +3480,7 @@ fun SeniorMediaDetailModal(
 
     val isAlbum = media is Album
     val isArtist = media is Artist
+    val isPlaylist = media is Playlist
 
     val title = when (media) {
         is Album -> media.title
@@ -2674,7 +3555,7 @@ fun SeniorMediaDetailModal(
                                 )
                             } else {
                                 Icon(
-                                    imageVector = if (isArtist) Icons.Default.Person else Icons.Default.Album,
+                                    imageVector = if (isArtist) Icons.Default.Person else if (isPlaylist) Icons.Default.LibraryMusic else Icons.Default.Album,
                                     contentDescription = null,
                                     tint = Color.White.copy(alpha = 0.40f),
                                     modifier = Modifier.size(54.dp).align(Alignment.Center)
@@ -2697,7 +3578,7 @@ fun SeniorMediaDetailModal(
                                     borderColor = Color.White.copy(alpha = 0.22f)
                                 ) {
                                     Text(
-                                        text = if (isArtist) "ARTIST" else if (isAlbum) "ALBUM" else "COLLECTION",
+                                        text = if (isArtist) "ARTIST" else if (isAlbum) "ALBUM" else if (isPlaylist) "PLAYLIST" else "COLLECTION",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF38BDF8),
@@ -2733,7 +3614,7 @@ fun SeniorMediaDetailModal(
                                 overflow = TextOverflow.Ellipsis
                             )
 
-                            val activeTracks = if (isAlbum) albumTracks else artistTracks
+                            val activeTracks = if (isAlbum) albumTracks else if (isPlaylist) playlistTracks else artistTracks
                             Row(
                                 modifier = Modifier.padding(top = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -2748,7 +3629,7 @@ fun SeniorMediaDetailModal(
                                     ) {
                                         Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text(if (isArtist) "Play Popular" else "Play Album", fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                                        Text(if (isArtist) "Play Popular" else if (isPlaylist) "Play Playlist" else "Play Album", fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
                                     }
 
                                     OutlinedButton(
@@ -2766,7 +3647,7 @@ fun SeniorMediaDetailModal(
                                     }
                                 }
 
-                                if (isAlbum && albumTracks.isNotEmpty()) {
+                                if ((isAlbum || isPlaylist) && activeTracks.isNotEmpty()) {
                                     IconButton(
                                         onClick = {
                                             albumTracks.forEach { onDownloadTrack(it) }
@@ -2817,6 +3698,33 @@ fun SeniorMediaDetailModal(
                                             isCurrentTrack = false,
                                             isPlaying = false,
                                             onPlay = { playerViewModel.playWithQueue(tr, albumTracks) },
+                                            onAddToPlaylist = { onAddToPlaylist(tr) },
+                                            onDownload = { onDownloadTrack(tr) }
+                                        )
+                                    }
+                                }
+                            } else if (isPlaylist) {
+                                if (playlistTracks.isEmpty()) {
+                                    item {
+                                        Text("No tracks found for this playlist.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
+                                    }
+                                } else {
+                                    item {
+                                        Text(
+                                            text = "Playlist Tracks (${playlistTracks.size} Songs)",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White.copy(alpha = 0.90f),
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                    }
+                                    itemsIndexed(playlistTracks, key = { idx, tr -> "${tr.id}_$idx" }) { idx, tr ->
+                                        SearchTrackItemRow(
+                                            track = tr,
+                                            index = idx,
+                                            isCurrentTrack = false,
+                                            isPlaying = false,
+                                            onPlay = { playerViewModel.playWithQueue(tr, playlistTracks) },
                                             onAddToPlaylist = { onAddToPlaylist(tr) },
                                             onDownload = { onDownloadTrack(tr) }
                                         )
@@ -2914,6 +3822,16 @@ fun SearchScreen(
     var queryInput by remember { mutableStateOf(query) }
     var hasSearched by remember { mutableStateOf(false) }
     var trackForPlaylist by remember { mutableStateOf<Track?>(null) }
+        val libraryManager = remember {
+        runCatching { org.koin.mp.KoinPlatformTools.defaultContext().get().get<DesktopLibraryManager>() }
+            .getOrElse { DesktopLibraryManager.getInstance() }
+    }
+    val savedPlaylists by libraryManager.playlists.collectAsState()
+    var activeYouTubePlaylist by remember { mutableStateOf<YouTubePlaylistInfo?>(null) }
+    var isImportingPlaylist by remember { mutableStateOf(false) }
+    var playlistImportError by remember { mutableStateOf<String?>(null) }
+    val detectedPlaylistId = remember(queryInput) { YouTubePlaylistEngine.extractPlaylistId(queryInput) }
+
     var recentSearches by remember {
         mutableStateOf(listOf("The Weeknd", "Lofi Beats", "Coldplay", "Hans Zimmer", "Synthwave"))
     }
@@ -2951,25 +3869,31 @@ fun SearchScreen(
         )
     }
 
+    val stampTrackSource: (Track) -> Track = { t ->
+        if (!t.extras["extension_id"].isNullOrBlank()) t
+        else {
+            val isYt = t.extras["source"]?.equals("youtube", ignoreCase = true) == true
+                || t.extras.containsKey("video_id")
+                || t.id.matches(Regex("^[a-zA-Z0-9_-]{11}$"))
+            val targetExt = if (isYt) {
+                musicExtensions.firstOrNull { it.id.contains("youtube", ignoreCase = true) } ?: currentExt
+            } else {
+                currentExt
+            }
+            if (targetExt != null) {
+                t.copy(extras = t.extras + ("extension_id" to targetExt.id))
+            } else t
+        }
+    }
+
     val playTrackWithSource: (Track) -> Unit = { track ->
-        val ext = currentExt
-        val stamped = if (track.extras["extension_id"].isNullOrBlank() && ext != null) {
-            track.copy(extras = track.extras + ("extension_id" to ext.id))
-        } else track
-        playerViewModel.play(stamped)
+        playerViewModel.play(stampTrackSource(track))
     }
 
     val playTrackWithQueueContext: (Track, List<Track>) -> Unit = { track, queueContext ->
-        val ext = currentExt
-        val stamped = if (track.extras["extension_id"].isNullOrBlank() && ext != null) {
-            track.copy(extras = track.extras + ("extension_id" to ext.id))
-        } else track
+        val stamped = stampTrackSource(track)
         val stampedQueue = if (queueContext.isNotEmpty()) {
-            queueContext.map { t ->
-                if (t.extras["extension_id"].isNullOrBlank() && ext != null) {
-                    t.copy(extras = t.extras + ("extension_id" to ext.id))
-                } else t
-            }
+            queueContext.map { stampTrackSource(it) }
         } else listOf(stamped)
         playerViewModel.playWithQueue(stamped, stampedQueue)
     }
@@ -2977,6 +3901,29 @@ fun SearchScreen(
     fun executeSearch(searchTerm: String) {
         val trimmed = searchTerm.trim()
         if (trimmed.isNotBlank()) {
+            val ytPlaylistId = YouTubePlaylistEngine.extractPlaylistId(trimmed)
+            if (ytPlaylistId != null) {
+                queryInput = trimmed
+                hasSearched = true
+                isImportingPlaylist = true
+                playlistImportError = null
+                activeYouTubePlaylist = null
+                coroutineScope.launch {
+                    try {
+                        val ytExt = musicExtensions.firstOrNull { it.id.contains("youtube", ignoreCase = true) }
+                        val ytVideoId = YouTubePlaylistEngine.extractVideoId(trimmed)
+                        val info = YouTubePlaylistEngine.fetchPlaylist(ytPlaylistId, ytVideoId, ytExt?.id)
+                        activeYouTubePlaylist = info
+                    } catch (e: Throwable) {
+                        playlistImportError = e.message ?: "Failed to import YouTube playlist"
+                    } finally {
+                        isImportingPlaylist = false
+                    }
+                }
+                return
+            }
+            activeYouTubePlaylist = null
+            playlistImportError = null
             queryInput = trimmed
             hasSearched = true
             if (!recentSearches.contains(trimmed)) {
@@ -3251,6 +4198,54 @@ fun SearchScreen(
                 }
             }
 
+            // YouTube Playlist Link Detected Banner
+            if (detectedPlaylistId != null && activeYouTubePlaylist == null && !isImportingPlaylist) {
+                LiquidGlassCard(
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .clickable { executeSearch(queryInput) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE50914).copy(alpha = 0.22f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFFFF4D4D), modifier = Modifier.size(20.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "YouTube Playlist URL Detected",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                            Text(
+                                "Click here or press Enter to load, play, and save all songs from this playlist",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                        }
+                        Button(
+                            onClick = { executeSearch(queryInput) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Load Playlist", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
             // Autocomplete suggestions dropdown when typing (anchored directly under the search bar)
             if (queryInput.isNotBlank() && quickResults.isNotEmpty() && !hasSearched) {
                 LiquidGlassCard(
@@ -3342,6 +4337,63 @@ fun SearchScreen(
 
         Box(modifier = Modifier.fillMaxSize()) {
             when {
+                // IMPORTING YOUTUBE PLAYLIST
+                isImportingPlaylist -> {
+                    YouTubePlaylistImportingView(onCancel = { isImportingPlaylist = false })
+                }
+
+                // YOUTUBE PLAYLIST IMPORT ERROR
+                playlistImportError != null -> {
+                    YouTubePlaylistErrorView(
+                        error = playlistImportError ?: "Error importing playlist",
+                        onRetry = { executeSearch(queryInput) },
+                        onDismiss = {
+                            playlistImportError = null
+                            hasSearched = false
+                        }
+                    )
+                }
+
+                // ACTIVE YOUTUBE PLAYLIST VIEW
+                activeYouTubePlaylist != null -> {
+                    val pl = activeYouTubePlaylist!!
+                    val isSaved = libraryManager.isPlaylistSaved(pl.title)
+                    YouTubePlaylistDetailView(
+                        playlistInfo = pl,
+                        isSavedLocally = isSaved,
+                        onSaveToggle = {
+                            if (!isSaved) {
+                                libraryManager.saveImportedPlaylist(
+                                    title = pl.title,
+                                    description = pl.description,
+                                    tracks = pl.tracks
+                                )
+                            }
+                        },
+                        onPlayAll = {
+                            if (pl.tracks.isNotEmpty()) {
+                                playTrackWithQueueContext(pl.tracks.first(), pl.tracks)
+                            }
+                        },
+                        onShuffle = {
+                            val shuffled = pl.tracks.shuffled()
+                            if (shuffled.isNotEmpty()) {
+                                playTrackWithQueueContext(shuffled.first(), shuffled)
+                            }
+                        },
+                        onTrackSelect = { tr ->
+                            playTrackWithQueueContext(tr, pl.tracks)
+                        },
+                        onAddToPlaylist = { tr -> trackForPlaylist = tr },
+                        onDownloadTrack = { tr -> downloadManager.downloadTrack(tr) },
+                        onClose = {
+                            activeYouTubePlaylist = null
+                            hasSearched = false
+                            queryInput = ""
+                        }
+                    )
+                }
+
                 // IDLE STATE (Nothing searched yet or search cleared)
                 !hasSearched || queryInput.isBlank() -> {
                     SearchDiscoveryHub(

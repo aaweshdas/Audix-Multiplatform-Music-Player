@@ -3110,7 +3110,7 @@ private fun BillboardSoundstageVisualizer(
             initialValue = 0f,
             targetValue = (2 * Math.PI).toFloat(),
             animationSpec = infiniteRepeatable(
-                animation = tween(2800, easing = LinearEasing),
+                animation = tween(2600, easing = LinearEasing),
                 repeatMode = androidx.compose.animation.core.RepeatMode.Restart
             ),
             label = "soundstage_phase"
@@ -3131,32 +3131,34 @@ private fun BillboardSoundstageVisualizer(
     val liveBands by dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.visualizerBands.collectAsState()
     val isAudioActive = dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.isAudioActive
 
+    val reusablePath = remember { androidx.compose.ui.graphics.Path() }
+
     Box(
         modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
         Canvas(
             modifier = Modifier
-                .widthIn(max = 240.dp)
-                .fillMaxWidth(0.70f)
-                .height(28.dp)
+                .widthIn(max = 165.dp)
+                .fillMaxWidth(0.40f)
+                .height(20.dp)
         ) {
-            if (size.width <= 15f || size.height <= 8f) return@Canvas
+            if (size.width <= 15f || size.height <= 6f) return@Canvas
             val w = size.width
             val h = size.height
             val centerY = h / 2f
 
-            val padX = 6.dp.toPx()
+            val padX = 4.dp.toPx()
             val usableWidth = w - padX * 2f
-            if (usableWidth <= 10f) return@Canvas
+            if (usableWidth <= 8f) return@Canvas
 
-            // 1. Ambient Specular Aura Glow behind the center of the ribbon
-            val auraRadius = (usableWidth / 2.2f).coerceAtLeast(30f)
+            // 1. Ambient Specular Aura Glow behind center
+            val auraRadius = (usableWidth / 2.4f).coerceAtLeast(25f)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        if (isPlaying) Color(0xFF38BDF8).copy(alpha = 0.09f) else Color(0xFF38BDF8).copy(alpha = 0.03f),
-                        if (isPlaying) Color(0xFFEC4899).copy(alpha = 0.06f) else Color(0xFFEC4899).copy(alpha = 0.015f),
+                        if (isPlaying) Color(0xFF38BDF8).copy(alpha = 0.08f) else Color(0xFF38BDF8).copy(alpha = 0.02f),
+                        if (isPlaying) Color(0xFFEC4899).copy(alpha = 0.05f) else Color(0xFFEC4899).copy(alpha = 0.01f),
                         Color.Transparent
                     ),
                     center = Offset(w / 2f, centerY),
@@ -3166,114 +3168,131 @@ private fun BillboardSoundstageVisualizer(
                 center = Offset(w / 2f, centerY)
             )
 
-            // 2. Harmonic Ribbon Geometry & Strands
-            val strandCount = 14
-            val samplePoints = 65
-            val maxAmplitude = (h / 2f - 2.dp.toPx()).coerceAtLeast(4f)
+            // 2. Dual Braided Harmonic Ribbons (Electric Cyan & Neon Magenta)
+            val samplePoints = 60
+            val strandsPerRibbon = 7
 
-            val cyanGradient = Brush.horizontalGradient(
-                colors = listOf(
-                    Color(0xFF0284C7).copy(alpha = 0.75f),
-                    Color(0xFF06B6D4),
-                    Color(0xFF38BDF8),
-                    Color.White,
-                    Color(0xFFC084FC),
-                    Color(0xFFEC4899).copy(alpha = 0.85f)
-                ),
-                startX = padX,
-                endX = padX + usableWidth
+            // Ribbon A: Electric Cyan Bundle
+            val cyanPalettes = listOf(
+                Pair(Color(0xFF0284C7), 0.70.dp.toPx()),
+                Pair(Color(0xFF0EA5E9), 0.75.dp.toPx()),
+                Pair(Color(0xFF00F2FE), 0.85.dp.toPx()),
+                Pair(Color(0xFFE0F2FE), 0.95.dp.toPx()),
+                Pair(Color(0xFF38BDF8), 0.85.dp.toPx()),
+                Pair(Color(0xFF06B6D4), 0.75.dp.toPx()),
+                Pair(Color(0xFF0369A1), 0.70.dp.toPx())
             )
 
-            val magentaGradient = Brush.horizontalGradient(
-                colors = listOf(
-                    Color(0xFFF43F5E).copy(alpha = 0.85f),
-                    Color(0xFFEC4899),
-                    Color(0xFFA855F7),
-                    Color.White,
-                    Color(0xFF38BDF8),
-                    Color(0xFF0284C7).copy(alpha = 0.75f)
-                ),
-                startX = padX,
-                endX = padX + usableWidth
+            // Ribbon B: Neon Magenta Bundle
+            val magentaPalettes = listOf(
+                Pair(Color(0xFF7E22CE), 0.70.dp.toPx()),
+                Pair(Color(0xFFA855F7), 0.75.dp.toPx()),
+                Pair(Color(0xFFEC4899), 0.85.dp.toPx()),
+                Pair(Color(0xFFFDF2F8), 0.95.dp.toPx()),
+                Pair(Color(0xFFFF2E93), 0.85.dp.toPx()),
+                Pair(Color(0xFFD946EF), 0.75.dp.toPx()),
+                Pair(Color(0xFF9333EA), 0.70.dp.toPx())
             )
 
-            val path = androidx.compose.ui.graphics.Path()
+            // Determine depth order for 3D cross
+            val centerTheta = (2.0 * Math.PI * 1.70 * 0.5 - phase).toFloat()
+            val cyanInFront = kotlin.math.sin(centerTheta) < 0f
 
-            for (sIdx in 0 until strandCount) {
-                val sNorm = (sIdx.toFloat() / (strandCount - 1).coerceAtLeast(1)) // 0.0 to 1.0
-                val sOffset = (sNorm - 0.5f) * 2.0f // -1.0 to 1.0
+            val ribbonsToDraw = if (cyanInFront) listOf(1, 0) else listOf(0, 1)
 
-                val isCyanDominant = sIdx % 2 == 0
-                val brush = if (isCyanDominant) cyanGradient else magentaGradient
-                val strandAlpha = (0.45f + 0.50f * (1f - kotlin.math.abs(sOffset) * 0.40f)).coerceIn(0.35f, 0.95f)
-                val strokeWidthPx = if (kotlin.math.abs(sOffset) < 0.35f) 1.1.dp.toPx() else 0.85.dp.toPx()
+            for (ribbonId in ribbonsToDraw) {
+                val isCyan = (ribbonId == 0)
+                val paletteList = if (isCyan) cyanPalettes else magentaPalettes
 
-                path.reset()
+                for (sIdx in 0 until strandsPerRibbon) {
+                    val s = (sIdx - (strandsPerRibbon - 1) / 2f) / ((strandsPerRibbon - 1) / 2f)
+                    val (baseColor, strokePx) = paletteList[sIdx]
+                    val strandAlpha = (0.55f + 0.40f * (1f - kotlin.math.abs(s) * 0.45f)).coerceIn(0.40f, 0.95f)
 
-                for (p in 0..samplePoints) {
-                    val u = p.toFloat() / samplePoints.toFloat() // 0.0 to 1.0
-                    val px = padX + u * usableWidth
+                    reusablePath.reset()
 
-                    // Sample real-time audio FFT frequency band corresponding to this horizontal position
-                    val bFloat = u * 27f
-                    val bLow = bFloat.toInt().coerceIn(0, 27)
-                    val bHigh = (bLow + 1).coerceIn(0, 27)
-                    val frac = bFloat - bLow
-                    val bandEnergy = (liveBands.getOrElse(bLow) { 0f } * (1f - frac) + liveBands.getOrElse(bHigh) { 0f } * frac)
+                    for (p in 0..samplePoints) {
+                        val u = p.toFloat() / samplePoints.toFloat()
+                        val px = padX + u * usableWidth
 
-                    val audioAmpFactor = if (isPlaying) {
-                        if (isAudioActive && bandEnergy > 0.005f) {
-                            (0.12f + bandEnergy * 0.88f).coerceIn(0.12f, 1.0f)
+                        // Direct logarithmic frequency register mapping (bass -> mid -> treble)
+                        val bFloat = u * 27f
+                        val bLow = bFloat.toInt().coerceIn(0, 27)
+                        val bHigh = (bLow + 1).coerceIn(0, 27)
+                        val frac = bFloat - bLow
+                        val bandEnergy = (liveBands.getOrElse(bLow) { 0f } * (1f - frac) + liveBands.getOrElse(bHigh) { 0f } * frac)
+
+                        val audioAmp = if (isPlaying) {
+                            if (isAudioActive && bandEnergy > 0.005f) {
+                                (0.08f + bandEnergy * 0.92f).coerceIn(0.08f, 1.0f)
+                            } else {
+                                0.08f + 0.02f * kotlin.math.sin(phase + u * 2.0f)
+                            }
                         } else {
-                            0.14f + 0.04f * kotlin.math.sin(phase + u * 2.2f)
+                            0.04f + 0.015f * kotlin.math.sin(phase + u * 1.5f)
                         }
-                    } else {
-                        0.10f + 0.02f * kotlin.math.sin(phase + u * 1.5f)
+
+                        val maxAmp = (h / 2f - 2.dp.toPx()).coerceAtLeast(3f) * audioAmp
+
+                        // Hann envelope pinching smoothly to 0 at ends
+                        val rawEnv = kotlin.math.sin(u * Math.PI.toFloat())
+                        val env = if (rawEnv > 0f) Math.pow(rawEnv.toDouble(), 1.25).toFloat() else 0f
+
+                        val theta = (2.0 * Math.PI * 1.70 * u - phase).toFloat()
+                        val spine = 0.20f * maxAmp * kotlin.math.sin(2.0 * Math.PI * 1.25 * u - phase * 0.65f).toFloat()
+                        val ribbonSep = 0.60f * maxAmp * kotlin.math.sin(theta)
+
+                        val strandWidth = 0.35f * maxAmp * env
+                        val py = if (isCyan) {
+                            val yCenter = centerY + env * (spine - ribbonSep)
+                            val arch = if (ribbonSep > 0f) -(1f - s * s) * 1.5f * env else (1f - s * s) * 1.5f * env
+                            yCenter + s * strandWidth * kotlin.math.cos(theta + 0.20f) + arch
+                        } else {
+                            val yCenter = centerY + env * (spine + ribbonSep)
+                            val arch = if (ribbonSep < 0f) -(1f - s * s) * 1.5f * env else (1f - s * s) * 1.5f * env
+                            yCenter - s * strandWidth * kotlin.math.cos(theta + 0.20f) + arch
+                        }
+
+                        if (p == 0) {
+                            reusablePath.moveTo(px, py)
+                        } else {
+                            reusablePath.lineTo(px, py)
+                        }
                     }
 
-                    val localAmp = (maxAmplitude / 1.06f) * audioAmpFactor
-
-                    // Hann-style envelope with soft power taper to guarantee ends pinch cleanly to 0
-                    val env = kotlin.math.sin(u * Math.PI.toFloat()).let { if (it > 0f) Math.pow(it.toDouble(), 1.30).toFloat() else 0f }
-
-                    // Multi-harmonic standing waves + audio-modulated twist
-                    val audioMod = if (isAudioActive) bandEnergy * 1.1f else 0.3f
-                    val w1 = kotlin.math.sin(2.0 * Math.PI * 1.45 * u + phase + sOffset * 0.85f).toFloat()
-                    val w2 = 0.42f * kotlin.math.sin(2.0 * Math.PI * 2.90 * u - phase * 0.85f - sOffset * 0.60f).toFloat() * (0.6f + audioMod * 0.6f)
-                    val w3 = 0.16f * kotlin.math.cos(2.0 * Math.PI * 4.35 * u + phase * 1.50f + sOffset * 1.10f).toFloat() * (0.5f + audioMod * 0.7f)
-                    val twist = sOffset * 0.50f * kotlin.math.cos(Math.PI * u).toFloat() * (0.6f + audioMod * 0.6f)
-
-                    val disp = env * (0.60f * w1 + w2 + w3 + twist)
-                    val py = centerY + disp * localAmp
-
-                    if (p == 0) {
-                        path.moveTo(px, py)
-                    } else {
-                        path.lineTo(px, py)
-                    }
-                }
-
-                drawPath(
-                    path = path,
-                    brush = brush,
-                    alpha = strandAlpha,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = strokeWidthPx,
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                        join = androidx.compose.ui.graphics.StrokeJoin.Round
+                    drawPath(
+                        path = reusablePath,
+                        color = baseColor.copy(alpha = strandAlpha),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = strokePx,
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                            join = androidx.compose.ui.graphics.StrokeJoin.Round
+                        )
                     )
-                )
+                }
             }
 
-            // 3. Delicate micro anchor pins at the ends
-            val pinHeight = 7.dp.toPx()
-            val pinWidth = 1.8.dp.toPx()
+            // 3. Delicate Luminous Anchor Pins at both ends (matching reference)
+            val pinHeight = 5.5.dp.toPx()
+            val pinWidth = 1.4.dp.toPx()
             val pinCorner = androidx.compose.ui.geometry.CornerRadius(pinWidth / 2f, pinWidth / 2f)
 
-            // Left anchor: Neon Magenta
+            // Pin glow
+            drawCircle(
+                color = Color(0xFF00F2FE).copy(alpha = 0.25f),
+                radius = 3.dp.toPx(),
+                center = Offset(padX, centerY)
+            )
+            drawCircle(
+                color = Color(0xFF00F2FE).copy(alpha = 0.25f),
+                radius = 3.dp.toPx(),
+                center = Offset(padX + usableWidth, centerY)
+            )
+
+            // Left anchor pin (Cyan / Blue)
             drawRoundRect(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFFF43F5E), Color(0xFFEC4899), Color(0xFFA855F7)),
+                    colors = listOf(Color(0xFF00F2FE), Color(0xFF38BDF8), Color(0xFF0284C7)),
                     startY = centerY - pinHeight / 2f,
                     endY = centerY + pinHeight / 2f
                 ),
@@ -3282,7 +3301,7 @@ private fun BillboardSoundstageVisualizer(
                 cornerRadius = pinCorner
             )
 
-            // Right anchor: Electric Cyan
+            // Right anchor pin (Cyan / Blue)
             drawRoundRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(Color(0xFF00F2FE), Color(0xFF38BDF8), Color(0xFF0284C7)),

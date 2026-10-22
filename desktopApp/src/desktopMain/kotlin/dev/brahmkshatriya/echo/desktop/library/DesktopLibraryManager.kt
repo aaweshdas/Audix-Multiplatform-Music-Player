@@ -415,6 +415,32 @@ class DesktopLibraryManager(
         return newPlaylist
     }
 
+    fun isPlaylistSaved(title: String): Boolean {
+        return _playlists.value.any { it.title.equals(title.trim(), ignoreCase = true) }
+    }
+
+    fun saveImportedPlaylist(title: String, description: String = "", tracks: List<Track>): UserPlaylist {
+        val cleanTitle = title.ifBlank { "Imported Playlist" }
+        val newPlaylist = UserPlaylist(
+            id = UUID.randomUUID().toString(),
+            title = cleanTitle,
+            description = description,
+            createdAt = System.currentTimeMillis(),
+            tracks = tracks.map { it.toStoredTrack() }
+        )
+        val current = _playlists.value.toMutableList()
+        val existingIdx = current.indexOfFirst { it.title.equals(cleanTitle, ignoreCase = true) }
+        if (existingIdx >= 0) {
+            current[existingIdx] = newPlaylist
+        } else {
+            current.add(0, newPlaylist)
+        }
+        _playlists.value = current
+        saveData()
+        println("[DesktopLibraryManager] Saved imported playlist: '${newPlaylist.title}' with ${tracks.size} tracks")
+        return newPlaylist
+    }
+
     fun deletePlaylist(playlistId: String) {
         val current = _playlists.value.toMutableList()
         current.removeAll { it.id == playlistId }

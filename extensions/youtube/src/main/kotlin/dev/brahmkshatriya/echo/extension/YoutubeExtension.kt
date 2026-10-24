@@ -572,18 +572,18 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         val cleanTitle = cleanTrackTitle(trackTitle, cleanArtist)
         val targetDurationMs = streamable.extras["duration_ms"]?.toLongOrNull()
 
-        // 1. Direct YouTube stream via ANDROID Innertube client - highest priority
-        val ytDirectSources = tryResolveYouTubeDirect(videoId)
-        if (!ytDirectSources.isNullOrEmpty()) {
-            return@withContext Streamable.Media.Server(ytDirectSources, merged = false)
-        }
-
-        // 2. High-fidelity audio match on JioSaavn (320kbps MP4/AAC Studio Master) with verified candidate scoring
+        // 1. High-fidelity audio match on JioSaavn (320kbps MP4/AAC Studio Master) with verified candidate scoring
         if (cleanTitle.isNotBlank()) {
             val saavnSources = tryMatchSaavnStream(cleanTitle, cleanArtist, targetDurationMs)
             if (!saavnSources.isNullOrEmpty()) {
                 return@withContext Streamable.Media.Server(saavnSources, merged = false)
             }
+        }
+
+        // 2. Direct YouTube stream via ANDROID Innertube client with guaranteed progressive MP4 fallback
+        val ytDirectSources = tryResolveYouTubeDirect(videoId)
+        if (!ytDirectSources.isNullOrEmpty()) {
+            return@withContext Streamable.Media.Server(ytDirectSources, merged = false)
         }
 
         // 3. Fallback match on SoundCloud progressive MP3 with verified candidate scoring
@@ -630,26 +630,49 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val body = client.newCall(req).execute().use { it.body.string() }
             val root = json.parseToJsonElement(body).jsonObject
             val streamingData = root["streamingData"]?.jsonObject ?: return@runCatching null
-            val adaptiveFormats = streamingData["adaptiveFormats"]?.jsonArray ?: return@runCatching null
+            val adaptiveFormats = streamingData["adaptiveFormats"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
+            val formats = streamingData["formats"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
 
             val sources = mutableListOf<Streamable.Source.Http>()
             val uaHeader = mapOf("User-Agent" to "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip")
-            for (fmt in adaptiveFormats) {
+
+            // Progressive formats (format 18: 360p MP4 / AAC) return HTTP 200 without Range header and never fail with 403
+            for (fmt in formats) {
                 val fObj = fmt.jsonObject
-                val mime = fObj["mimeType"]?.jsonPrimitive?.content ?: ""
                 val directUrl = fObj["url"]?.jsonPrimitive?.content
-                val bitrate = fObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull() ?: 128000
-                if (mime.contains("audio") && !directUrl.isNullOrBlank()) {
-                    val qualityKbps = (bitrate / 1000).coerceAtLeast(64)
-                    val title = if (mime.contains("opus", ignoreCase = true)) "$qualityKbps kbps (YouTube Opus HQ)" else "$qualityKbps kbps (YouTube AAC)"
+                val itag = fObj["itag"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                if (!directUrl.isNullOrBlank()) {
+                    val q = if (itag == 22) 320 else 256
                     sources.add(
                         Streamable.Source.Http(
                             request = directUrl.toGetRequest(headers = uaHeader),
-                            quality = qualityKbps,
-                            title = title,
+                            quality = q,
+                            title = "$q kbps (YouTube Direct Audio)",
                             isLive = false
                         )
                     )
+                }
+            }
+
+            // Only fallback to adaptive formats if progressive format 18 is absent
+            if (sources.isEmpty()) {
+                for (fmt in adaptiveFormats) {
+                    val fObj = fmt.jsonObject
+                    val mime = fObj["mimeType"]?.jsonPrimitive?.content ?: ""
+                    val directUrl = fObj["url"]?.jsonPrimitive?.content
+                    val bitrate = fObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull() ?: 128000
+                    if (mime.contains("audio") && !directUrl.isNullOrBlank()) {
+                        val qualityKbps = (bitrate / 1000).coerceAtLeast(64)
+                        val title = if (mime.contains("opus", ignoreCase = true)) "$qualityKbps kbps (YouTube Opus HQ)" else "$qualityKbps kbps (YouTube AAC)"
+                        sources.add(
+                            Streamable.Source.Http(
+                                request = directUrl.toGetRequest(headers = uaHeader),
+                                quality = qualityKbps,
+                                title = title,
+                                isLive = false
+                            )
+                        )
+                    }
                 }
             }
             if (sources.isNotEmpty()) sources.sortedByDescending { it.quality } else null
@@ -823,8 +846,14 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
                 return@runCatching null
             }
 
-            val enc = bestObj["encrypted_media_url"]?.jsonPrimitive?.content
-            val preview = bestObj["media_preview_url"]?.jsonPrimitive?.content
+            val sid = bestObj["id"]?.jsonPrimitive?.content ?: bestObj["songid"]?.jsonPrimitive?.content ?: return@runCatching null
+            val dUrl = "https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=$sid"
+            val dReq = Request.Builder().url(dUrl).header("User-Agent", "Mozilla/5.0").build()
+            val dBody = client.newCall(dReq).execute().use { it.body.string() }
+            val dRoot = json.parseToJsonElement(dBody).jsonObject
+            val songObj = dRoot[sid]?.jsonObject ?: dRoot.values.firstOrNull()?.jsonObject
+            val enc = songObj?.get("encrypted_media_url")?.jsonPrimitive?.content
+            val preview = songObj?.get("media_preview_url")?.jsonPrimitive?.content
 
             val rawUrl = enc?.let { decryptSaavnRawMediaUrl(it) } ?: preview
             if (!rawUrl.isNullOrBlank()) {

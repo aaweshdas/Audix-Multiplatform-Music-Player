@@ -43,7 +43,10 @@ target_jar = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portab
 
 with zipfile.ZipFile(target_jar, 'r') as zin, zipfile.ZipFile(clean_ref_jar, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
     for item in zin.infolist():
-        if (not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/player/') and
+        if (not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ai/') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/AiStudio') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$AiStudio') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/player/') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/HomeScreenKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$HomeScreenKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/EchoScreensaverKt') and
@@ -56,6 +59,7 @@ with zipfile.ZipFile(target_jar, 'r') as zin, zipfile.ZipFile(clean_ref_jar, 'w'
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ExtensionCategoryFilter') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/EchoDesktopAppKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/ComposableSingletons$EchoDesktopAppKt') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/AudixArtworkEngine') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/DesktopBackgroundManager') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/BackgroundWallpaper') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/Screen') and
@@ -99,7 +103,10 @@ source_files = [
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screensaver\EchoScreensaver.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\SearchAndOthers.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\ExtensionsScreen.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\AudixArtworkEngine.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\DesktopBackgroundManager.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ai\AudixAiService.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\AiStudioScreen.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\EchoDesktopApp.kt')
 ]
 

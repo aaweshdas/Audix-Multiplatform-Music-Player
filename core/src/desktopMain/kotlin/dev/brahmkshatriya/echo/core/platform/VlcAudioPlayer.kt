@@ -4,6 +4,7 @@ import dev.brahmkshatriya.echo.common.models.Streamable
 import dev.brahmkshatriya.echo.common.models.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
@@ -79,28 +80,34 @@ class VlcAudioPlayer(
     private var activeSources: List<Streamable.Source.Http> = emptyList()
     private val activeSourceIndex = java.util.concurrent.atomic.AtomicInteger(0)
     private val failoverMutex = kotlinx.coroutines.sync.Mutex()
+    private var playbackWatchdogJob: Job? = null
+    private val sessionCounter = java.util.concurrent.atomic.AtomicLong(0L)
+    private val activeSession = java.util.concurrent.atomic.AtomicLong(0L)
 
-    private fun failoverToNextSource(reason: String, resumePosMs: Long = 0L) {
+    private fun failoverToNextSource(reason: String, resumePosMs: Long = 0L, targetSessionId: Long = activeSession.get()) {
         scope.launch(Dispatchers.IO) {
-            if (failoverMutex.tryLock()) {
-                try {
-                    val currentIdx = activeSourceIndex.get()
-                    val nextIdx = currentIdx + 1
-                    val sources = activeSources
-                    if (nextIdx < sources.size && activeSourceIndex.compareAndSet(currentIdx, nextIdx)) {
-                        val nextSource = sources[nextIdx]
-                        println("[VlcAudioPlayer] Auto-failing over to alternative source #$nextIdx ($reason): ${nextSource.title} (${nextSource.quality} kbps)")
-                        playHttpSource(nextSource)
-                        if (resumePosMs > 0L) {
-                            delay(200L)
-                            seekTo(resumePosMs)
-                        }
-                    } else if (nextIdx >= sources.size) {
-                        _state.value = PlayerState.error(Exception("VLC playback error on all available stream sources ($reason)"))
-                        _isPlaying.value = false
+            failoverMutex.withLock {
+                if (activeSession.get() != targetSessionId) {
+                    println("[VlcAudioPlayer] Ignored failover ($reason) for obsolete session #$targetSessionId (active: ${activeSession.get()})")
+                    return@withLock
+                }
+                val currentIdx = activeSourceIndex.get()
+                val nextIdx = currentIdx + 1
+                val sources = activeSources
+                if (nextIdx < sources.size && activeSourceIndex.compareAndSet(currentIdx, nextIdx)) {
+                    val nextSource = sources[nextIdx]
+                    println("[VlcAudioPlayer] Auto-failing over to alternative source #$nextIdx ($reason): ${nextSource.title} (${nextSource.quality} kbps)")
+                    delay(120L)
+                    playHttpSource(nextSource, targetSessionId)
+                    if (resumePosMs > 0L) {
+                        delay(200L)
+                        seekTo(resumePosMs)
                     }
-                } finally {
-                    failoverMutex.unlock()
+                } else if (nextIdx >= sources.size && activeSession.get() == targetSessionId) {
+                    println("[VlcAudioPlayer] All available stream sources exhausted ($reason). Setting ERROR state.")
+                    playbackWatchdogJob?.cancel()
+                    _state.value = PlayerState.error(Exception("VLC playback error on all available stream sources ($reason)"))
+                    _isPlaying.value = false
                 }
             }
         }
@@ -151,6 +158,14 @@ class VlcAudioPlayer(
                 if (dir.exists() && java.io.File(dir, "libvlc.dll").exists()) {
                     val abs = dir.canonicalPath
                     println("[VlcAudioPlayer] Found libvlc.dll at canonical path: $abs")
+                    runCatching {
+                        val kernel32 = com.sun.jna.NativeLibrary.getInstance("kernel32")
+                        val setDllDir = kernel32.getFunction("SetDllDirectoryW")
+                        setDllDir.invoke(arrayOf(com.sun.jna.WString(abs)))
+                        println("[VlcAudioPlayer] SetDllDirectoryW configured: $abs")
+                    }.onFailure { err ->
+                        println("[VlcAudioPlayer] SetDllDirectoryW notice: ${err.message}")
+                    }
                     com.sun.jna.NativeLibrary.addSearchPath("libvlc", abs)
                     com.sun.jna.NativeLibrary.addSearchPath("libvlccore", abs)
                     System.setProperty("jna.library.path", abs)
@@ -175,7 +190,9 @@ class VlcAudioPlayer(
 
     private val vlcEventListener = object : MediaPlayerEventAdapter() {
         override fun playing(mp: MediaPlayer) {
-            println("[VlcAudioPlayer] Event: PLAYING for ${_currentTrack.value?.title}")
+            val curSession = activeSession.get()
+            println("[VlcAudioPlayer] Event: PLAYING for ${_currentTrack.value?.title} (session #$curSession)")
+            playbackWatchdogJob?.cancel()
             _state.value = PlayerState.PLAYING
             _isPlaying.value = true
             AudioVisualizerManager.onPlaybackResumed()
@@ -192,7 +209,7 @@ class VlcAudioPlayer(
                     player?.audio()?.setVolume(targetVol)
                     player?.audio()?.setMute(false)
                 }
-                // Delay 220ms reinforcement
+                // Delay 140ms reinforcement
                 delay(140L)
                 runCatching {
                     player?.audio()?.setVolume(targetVol)
@@ -210,22 +227,34 @@ class VlcAudioPlayer(
 
         override fun paused(mp: MediaPlayer) {
             println("[VlcAudioPlayer] Event: PAUSED")
-            _state.value = PlayerState.PAUSED
-            _isPlaying.value = false
-            AudioVisualizerManager.onPlaybackPaused()
+            val st = _state.value.status
+            if (st == PlayerState.Status.PLAYING || st == PlayerState.Status.BUFFERING) {
+                _state.value = PlayerState.PAUSED
+                _isPlaying.value = false
+                AudioVisualizerManager.onPlaybackPaused()
+            }
         }
 
         override fun stopped(mp: MediaPlayer) {
             println("[VlcAudioPlayer] Event: STOPPED")
-            if (_state.value != PlayerState.LOADING) {
+            val st = _state.value.status
+            // Never let a stale STOPPED event from a previous song override an active, loading, or buffering track!
+            if (st != PlayerState.Status.LOADING && st != PlayerState.Status.BUFFERING && st != PlayerState.Status.PLAYING) {
                 _state.value = PlayerState.IDLE
+                _isPlaying.value = false
+                AudioVisualizerManager.clear()
             }
-            _isPlaying.value = false
-            AudioVisualizerManager.clear()
         }
 
         override fun finished(mp: MediaPlayer) {
-            println("[VlcAudioPlayer] Event: FINISHED for ${_currentTrack.value?.title}")
+            val curSession = activeSession.get()
+            println("[VlcAudioPlayer] Event: FINISHED for ${_currentTrack.value?.title} (session #$curSession)")
+            val st = _state.value.status
+            // If the player is currently LOADING or BUFFERING a new track, an old track's finish event must be ignored!
+            if (st == PlayerState.Status.LOADING || st == PlayerState.Status.BUFFERING) {
+                println("[VlcAudioPlayer] Ignored FINISHED event because player is currently in state $st")
+                return
+            }
             val curPos = _positionMs.value
             val curDur = _durationMs.value
             // If the track is longer than 15s and stopped more than 5s before the actual end,
@@ -234,7 +263,7 @@ class VlcAudioPlayer(
                 val sources = activeSources
                 if (activeSourceIndex.get() + 1 < sources.size) {
                     println("[VlcAudioPlayer] Warning: Stream EOF reached prematurely at ${curPos}ms of ${curDur}ms. Guarding against false track skip.")
-                    failoverToNextSource("Premature EOF", resumePosMs = curPos)
+                    failoverToNextSource("Premature EOF", resumePosMs = curPos, targetSessionId = curSession)
                     return
                 }
             }
@@ -245,15 +274,24 @@ class VlcAudioPlayer(
 
         override fun buffering(mp: MediaPlayer, newCache: Float) {
             if (newCache < 100.0f) {
-                _state.value = PlayerState.BUFFERING
-            } else if (_state.value == PlayerState.BUFFERING) {
+                if (_state.value != PlayerState.LOADING) {
+                    _state.value = PlayerState.BUFFERING
+                }
+            } else if (_state.value == PlayerState.BUFFERING || _state.value == PlayerState.LOADING) {
                 _state.value = PlayerState.PLAYING
+                _isPlaying.value = true
             }
         }
 
         override fun error(mp: MediaPlayer) {
-            System.err.println("[VlcAudioPlayer] Event: ERROR playing ${_currentTrack.value?.title} (source ${activeSourceIndex.get()} of ${activeSources.size})")
-            failoverToNextSource("Native libVLC error event")
+            val curSession = activeSession.get()
+            val st = _state.value.status
+            System.err.println("[VlcAudioPlayer] Event: ERROR playing ${_currentTrack.value?.title} (session #$curSession, state $st)")
+            // Ignore native errors if player is not actively loading, buffering, or playing
+            if (st == PlayerState.Status.IDLE || st == PlayerState.Status.ENDED) {
+                return
+            }
+            failoverToNextSource("Native libVLC error event", targetSessionId = curSession)
         }
 
         override fun timeChanged(mp: MediaPlayer, newTime: Long) {
@@ -299,10 +337,10 @@ class VlcAudioPlayer(
     private val player: MediaPlayer? get() = if (isReleased) null else audioComponent?.mediaPlayer()
 
     init {
-        // Poll position for smooth UI updates (50ms when playing for lyric sync, 1000ms when idle to reduce CPU wakeups)
+        // Poll position for smooth UI updates (100ms when playing for responsive progress, 1000ms when idle)
         scope.launch {
             while (true) {
-                val delayMs = if (_isPlaying.value) 50L else 1000L
+                val delayMs = if (_isPlaying.value) 100L else 1000L
                 delay(delayMs)
                 if (!_isPlaying.value) continue
                 runCatching {
@@ -318,6 +356,20 @@ class VlcAudioPlayer(
         }
     }
 
+    fun updateCurrentTrack(track: Track) {
+        if (_currentTrack.value?.id == track.id) {
+            _currentTrack.value = track
+            val currentQ = _queue.value
+            val idx = currentQ.indexOfFirst { it.id == track.id }
+            if (idx >= 0) {
+                val updated = currentQ.toMutableList()
+                updated[idx] = track
+                _queue.value = updated
+                originalQueue = updated
+            }
+        }
+    }
+
     fun setError(message: String) {
         _state.value = PlayerState.error(Exception(message))
         _isPlaying.value = false
@@ -325,8 +377,13 @@ class VlcAudioPlayer(
     }
 
     override fun prepareTrack(track: Track) {
-        // Immediately halt current audio output so old song stops playing in 0ms
-        runCatching { player?.controls()?.stop() }
+        val sessionId = sessionCounter.incrementAndGet()
+        activeSession.set(sessionId)
+        playbackWatchdogJob?.cancel()
+        // Do NOT call player?.controls()?.stop() synchronously here!
+        // Calling stop() synchronously blocks the calling thread during audio drain and causes
+        // race conditions with asynchronous STOPPED/ERROR events.
+        // LibVLC cleanly transitions media when p.media().play() is called on IO thread.
         AudioVisualizerManager.clear()
         _isPlaying.value = false
         _currentTrack.value = track
@@ -346,6 +403,9 @@ class VlcAudioPlayer(
     }
 
     override suspend fun play(track: Track, media: Streamable.Media.Server) {
+        playbackWatchdogJob?.cancel()
+        val sessionId = sessionCounter.incrementAndGet()
+        activeSession.set(sessionId)
         _state.value = PlayerState.LOADING
         _currentTrack.value = track
         _positionMs.value = 0L
@@ -359,6 +419,16 @@ class VlcAudioPlayer(
             _queue.value = updated
             originalQueue = updated
             queueIndex = updated.size - 1
+        }
+
+        playbackWatchdogJob = scope.launch {
+            delay(12_000L)
+            if (activeSession.get() == sessionId &&
+                (_state.value == PlayerState.LOADING || _state.value == PlayerState.BUFFERING) &&
+                _positionMs.value == 0L) {
+                println("[VlcAudioPlayer] Watchdog timeout (12s) during playback of '${track.title}'. Failing over...")
+                failoverToNextSource("Playback watchdog timeout", targetSessionId = sessionId)
+            }
         }
 
         val p = player ?: run {
@@ -376,24 +446,30 @@ class VlcAudioPlayer(
 
         activeSources = httpSources
         activeSourceIndex.set(0)
-        playHttpSource(httpSources[0])
+        playHttpSource(httpSources[0], sessionId)
     }
 
-    private suspend fun playHttpSource(source: Streamable.Source.Http): Unit = withContext(Dispatchers.IO) {
+    private suspend fun playHttpSource(source: Streamable.Source.Http, targetSessionId: Long = activeSession.get()): Unit = withContext(Dispatchers.IO) {
+        if (activeSession.get() != targetSessionId) {
+            println("[VlcAudioPlayer] Discarded playHttpSource for obsolete session #$targetSessionId")
+            return@withContext
+        }
         val p = player ?: return@withContext
         val cleanUrl = source.request.url.replace(Regex("[\\r\\n\\u0000]"), "").trim()
-        println("[VlcAudioPlayer] Playing stream: $cleanUrl (quality: ${source.quality}kbps, mime: ${source.title})")
+        println("[VlcAudioPlayer] Playing stream: $cleanUrl (quality: ${source.quality}kbps, mime: ${source.title}) [session #$targetSessionId]")
 
         // If local file URL, play directly without network caching overhead
         if (cleanUrl.startsWith("file:") || java.io.File(cleanUrl).exists()) {
             runCatching {
                 val ok = p.media().play(cleanUrl, ":no-video", ":audio-replay-gain-mode=none")
                 println("[VlcAudioPlayer] Local playback p.media().play() returned: $ok")
-                if (!ok) {
+                if (!ok && activeSession.get() == targetSessionId) {
                     _state.value = PlayerState.error(Exception("Local media playback failed for: $cleanUrl"))
                 }
             }.onFailure { err ->
-                _state.value = PlayerState.error(err)
+                if (activeSession.get() == targetSessionId) {
+                    _state.value = PlayerState.error(err)
+                }
             }
             return@withContext
         }
@@ -418,18 +494,17 @@ class VlcAudioPlayer(
             source.request.headers["Origin"]?.let { if (it.isNotBlank()) add(":http-origin=${cleanOpt(it)}") }
         }
 
-        runCatching { p.controls().stop() }
-        delay(25L)
-
         runCatching {
             val ok = p.media().play(cleanUrl, *options.toTypedArray())
             println("[VlcAudioPlayer] p.media().play() returned: $ok")
-            if (!ok) {
-                failoverToNextSource("Immediate play() failure")
+            if (!ok && activeSession.get() == targetSessionId) {
+                failoverToNextSource("Immediate play() failure", targetSessionId = targetSessionId)
             }
         }.onFailure { err ->
             System.err.println("[VlcAudioPlayer] Error calling p.media().play(): ${err.message}")
-            failoverToNextSource("Exception in play(): ${err.message}")
+            if (activeSession.get() == targetSessionId) {
+                failoverToNextSource("Exception in play(): ${err.message}", targetSessionId = targetSessionId)
+            }
         }
     }
 
@@ -440,7 +515,19 @@ class VlcAudioPlayer(
 
     override fun resume() {
         AudioVisualizerManager.onPlaybackResumed()
-        runCatching { player?.controls()?.play() }
+        runCatching {
+            val p = player ?: return@runCatching
+            val curState = _state.value
+            val pos = _positionMs.value
+            val dur = _durationMs.value
+            if (curState == PlayerState.ENDED || (dur > 0L && pos >= dur - 1000L)) {
+                p.controls().setTime(0L)
+                _positionMs.value = 0L
+            }
+            p.controls().play()
+            _isPlaying.value = true
+            _state.value = PlayerState.PLAYING
+        }
     }
 
     override fun togglePlayPause() {
@@ -457,8 +544,14 @@ class VlcAudioPlayer(
     }
 
     override fun stop() {
-        runCatching { player?.controls()?.stop() }
+        activeSession.incrementAndGet()
+        playbackWatchdogJob?.cancel()
+        scope.launch(Dispatchers.IO) {
+            runCatching { player?.controls()?.stop() }
+        }
         AudioVisualizerManager.clear()
+        _isPlaying.value = false
+        _state.value = PlayerState.IDLE
         _currentTrack.value = null
         _positionMs.value = 0L
         _durationMs.value = 0L

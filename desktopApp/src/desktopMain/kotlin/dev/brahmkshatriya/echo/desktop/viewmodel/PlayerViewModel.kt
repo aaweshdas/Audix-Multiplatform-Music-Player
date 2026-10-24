@@ -1,5 +1,6 @@
 package dev.brahmkshatriya.echo.desktop.viewmodel
 
+import dev.brahmkshatriya.echo.desktop.ui.AudixArtworkEngine
 import dev.brahmkshatriya.echo.common.MusicExtension
 import dev.brahmkshatriya.echo.common.clients.TrackClient
 import dev.brahmkshatriya.echo.common.models.Album
@@ -32,12 +33,15 @@ import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 
 class PlayerViewModel(
     private val player: AudioPlayer,
     private val extensionManager: ExtensionManager,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 ) {
+    // Dedicated IO scope for playback resolution — never blocks the UI thread
+    private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     val state: StateFlow<PlayerState> get() = player.state
     val currentTrack: StateFlow<Track?> get() = player.currentTrack
     val queue: StateFlow<List<Track>> get() = player.queue
@@ -48,18 +52,18 @@ class PlayerViewModel(
     val repeatMode: StateFlow<RepeatMode> get() = player.repeatMode
     val shuffleEnabled: StateFlow<Boolean> get() = player.shuffleEnabled
     private val failedTracks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val consecutiveFailures = java.util.concurrent.atomic.AtomicInteger(0)
     private var loadingWatchdogJob: Job? = null
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     init {
-        var consecutiveErrors = 0
         scope.launch {
             player.state.collect { st ->
-                if (st.status == PlayerState.Status.PLAYING || st.status == PlayerState.Status.PAUSED || st.status == PlayerState.Status.ERROR || st.status == PlayerState.Status.IDLE) {
+                if (st.status == PlayerState.Status.PLAYING || st.status == PlayerState.Status.PAUSED || st.status == PlayerState.Status.ERROR) {
                     loadingWatchdogJob?.cancel()
                 }
                 if (st.status == PlayerState.Status.PLAYING) {
-                    consecutiveErrors = 0
+                    consecutiveFailures.set(0)
                 }
                 if (st == PlayerState.ENDED) {
                     val curPos = player.positionMs.value
@@ -78,31 +82,57 @@ class PlayerViewModel(
                         RepeatMode.NONE -> {
                             val q = player.queue.value
                             val curr = player.currentTrack.value
-                            val idx = if (curr != null) q.indexOfFirst { it.id == curr.id } else -1
+                            val idx = if (curr != null) {
+                                val i = q.indexOfFirst { it.id == curr.id }
+                                if (i >= 0) i else q.indexOfFirst { it.title.equals(curr.title, ignoreCase = true) }
+                            } else -1
                             if (idx >= 0 && idx + 1 < q.size) {
                                 skipNext()
+                            } else if (idx == -1 && q.size > 1) {
+                                skipNext()
+                            } else {
+                                println("[PlayerViewModel] Reached end of queue in RepeatMode.NONE. Stopping playback.")
+                                player.stop()
                             }
                         }
                     }
                 } else if (st.status == PlayerState.Status.ERROR || st.error != null) {
-                    consecutiveErrors++
-                    if (consecutiveErrors > 3) {
-                        println("[PlayerViewModel] Multiple consecutive playback failures ($consecutiveErrors). Stopping auto-skip loop.")
+                    val fails = consecutiveFailures.incrementAndGet()
+                    if (fails > 3) {
+                        println("[PlayerViewModel] Multiple consecutive playback failures ($fails). Stopping auto-skip loop.")
                         return@collect
                     }
                     val curr = player.currentTrack.value
                     if (curr != null) {
-                        if (!failedTracks.contains(curr.id)) {
-                            failedTracks.add(curr.id)
-                            println("[PlayerViewModel] Player error detected for '${curr.title}'. Initiating auto-recovery fallback...")
-                            scope.launch {
-                                val recovered = runCatching { playStudioFallback(curr) }.isSuccess
+                        ioScope.launch {
+                            if (!failedTracks.contains(curr.id)) {
+                                failedTracks.add(curr.id)
+                                println("[PlayerViewModel] Player error detected for '${curr.title}'. Initiating auto-recovery fallback...")
+                                val recovered = playStudioFallback(curr)
                                 if (!recovered) {
                                     println("[PlayerViewModel] Track '${curr.title}' failed recovery.")
+                                    if (consecutiveFailures.get() <= 3) {
+                                        delay(800L)
+                                        val q = player.queue.value
+                                        val idx = q.indexOfFirst { it.id == curr.id }.takeIf { it >= 0 }
+                                            ?: q.indexOfFirst { it.title.equals(curr.title, ignoreCase = true) }
+                                        if (idx >= 0 && idx + 1 < q.size) {
+                                            skipNext()
+                                        }
+                                    }
+                                }
+                            } else {
+                                println("[PlayerViewModel] Track '${curr.title}' already failed recovery.")
+                                if (consecutiveFailures.get() <= 3) {
+                                    delay(600L)
+                                    val q = player.queue.value
+                                    val idx = q.indexOfFirst { it.id == curr.id }.takeIf { it >= 0 }
+                                        ?: q.indexOfFirst { it.title.equals(curr.title, ignoreCase = true) }
+                                    if (idx >= 0 && idx + 1 < q.size) {
+                                        skipNext()
+                                    }
                                 }
                             }
-                        } else {
-                            println("[PlayerViewModel] Track '${curr.title}' already failed recovery.")
                         }
                     }
                 }
@@ -199,11 +229,24 @@ class PlayerViewModel(
         player.seekTo(positionMs)
     }
 
+    private val lastSkipTimestamp = java.util.concurrent.atomic.AtomicLong(0L)
+
     fun skipNext() {
+        val now = System.currentTimeMillis()
+        val prev = lastSkipTimestamp.get()
+        if (now - prev < 600L) {
+            println("[PlayerViewModel] Ignored duplicate skipNext call within ${now - prev}ms")
+            return
+        }
+        lastSkipTimestamp.set(now)
+
         val q = queue.value
         if (q.isEmpty()) return
         val current = currentTrack.value
-        val currentIndex = if (current != null) q.indexOfFirst { it.id == current.id } else -1
+        val currentIndex = if (current != null) {
+            val i = q.indexOfFirst { it.id == current.id }
+            if (i >= 0) i else q.indexOfFirst { it.title.equals(current.title, ignoreCase = true) }
+        } else -1
         val nextIndex = when (repeatMode.value) {
             RepeatMode.ONE -> if (currentIndex >= 0) currentIndex else 0
             RepeatMode.ALL -> if (currentIndex >= 0) (currentIndex + 1) % q.size else 0
@@ -224,7 +267,10 @@ class PlayerViewModel(
         val q = queue.value
         if (q.isEmpty()) return
         val current = currentTrack.value
-        val currentIndex = if (current != null) q.indexOfFirst { it.id == current.id } else -1
+        val currentIndex = if (current != null) {
+            val i = q.indexOfFirst { it.id == current.id }
+            if (i >= 0) i else q.indexOfFirst { it.title.equals(current.title, ignoreCase = true) }
+        } else -1
         val prevIndex = if (currentIndex > 0) currentIndex - 1 else 0
         if (prevIndex in q.indices) {
             play(q[prevIndex])
@@ -423,16 +469,8 @@ class PlayerViewModel(
     fun extractTrackCoverUrl(track: Track?): String? {
         if (track == null) return null
         val cover = track.cover ?: track.album?.cover
-        val directUrl = when (cover) {
-            is ImageHolder.NetworkRequestImageHolder -> cover.request.url
-            is ImageHolder.ResourceUriImageHolder -> cover.uri
-            else -> null
-        }
-        val extraCover = track.extras["cover_url"]
-        if (!extraCover.isNullOrBlank()) {
-            if (isLowResOrGenericCover(directUrl)) return extraCover
-        }
-        return directUrl ?: extraCover
+        val directUrl = AudixArtworkEngine.toCoverUrl(cover) ?: track.extras["cover_url"]
+        return AudixArtworkEngine.upgradeYouTubeThumbnail(directUrl)
     }
 
     fun sanitizeTrackLocally(track: Track): Track {
@@ -634,11 +672,30 @@ class PlayerViewModel(
             } else return 0
         }
 
-        // Penalize remix/cover if target is not remix/cover
-        val isTargetRemix = normTTitle.contains("remix") || normTTitle.contains("cover") || normTTitle.contains("live")
-        val isCandRemix = normCTitle.contains("remix") || normCTitle.contains("cover") || normCTitle.contains("live") || normCTitle.contains("karaoke")
+        // Strictly reject amateur covers, tributes, karaoke, slowed+reverb, sped up, edits, and fake versions
+        val penaltyKeywords = listOf(
+            "cover", "tribute", "instrumental", "karaoke", "acoustic",
+            "slowed", "reverb", "sped up", "speed up", "nightcore", "parody",
+            "mashup", "bass boosted", "bassboosted", "status", "reels", "reel",
+            "edit", "dance version", "chipmunk", "8d audio", "ringtone", "lofi remix"
+        )
+        for (kw in penaltyKeywords) {
+            if (normCTitle.contains(kw) && !normTTitle.contains(kw)) {
+                return 0 // Immediately reject fake/amateur candidate
+            }
+        }
+
+        // Penalize remix/live if target is not remix/live
+        val isTargetRemix = normTTitle.contains("remix") || normTTitle.contains("live")
+        val isCandRemix = normCTitle.contains("remix") || normCTitle.contains("live")
         if (isCandRemix && !isTargetRemix) {
             score -= 40
+        }
+
+        // Award bonus for authentic studio audio keywords
+        if (normCTitle.contains("official audio") || normCTitle.contains("original mix") ||
+            normCTitle.contains("album version") || normCTitle.contains("studio version")) {
+            score += 20
         }
 
         if (tArtist.isNotBlank() && !isGarbageArtist(tArtist)) {
@@ -726,26 +783,49 @@ class PlayerViewModel(
             val body = okHttpClient.newCall(req).execute().use { it.body?.string() } ?: return@runCatching null
             val root = jsonParser.parseToJsonElement(body).jsonObject
             val streamingData = root["streamingData"]?.jsonObject ?: return@runCatching null
-            val adaptiveFormats = streamingData["adaptiveFormats"]?.jsonArray ?: return@runCatching null
+            val adaptiveFormats = streamingData["adaptiveFormats"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
+            val formats = streamingData["formats"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
 
             val sources = mutableListOf<Streamable.Source.Http>()
             val uaHeader = mapOf("User-Agent" to "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip")
-            for (fmt in adaptiveFormats) {
+
+            // Progressive formats (format 18: 360p MP4 / AAC) return HTTP 200 without Range header and never fail with 403
+            for (fmt in formats) {
                 val fObj = fmt.jsonObject
-                val mime = fObj["mimeType"]?.jsonPrimitive?.content ?: ""
                 val directUrl = fObj["url"]?.jsonPrimitive?.content
-                val bitrate = fObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull() ?: 128000
-                if (mime.contains("audio") && !directUrl.isNullOrBlank()) {
-                    val qualityKbps = (bitrate / 1000).coerceAtLeast(64)
-                    val title = if (mime.contains("opus", ignoreCase = true)) "$qualityKbps kbps (YouTube Opus HQ)" else "$qualityKbps kbps (YouTube AAC)"
+                val itag = fObj["itag"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                if (!directUrl.isNullOrBlank()) {
+                    val q = if (itag == 22) 320 else 256
                     sources.add(
                         Streamable.Source.Http(
                             request = directUrl.toGetRequest(headers = uaHeader),
-                            quality = qualityKbps,
-                            title = title,
+                            quality = q,
+                            title = "$q kbps (YouTube Direct Audio)",
                             isLive = false
                         )
                     )
+                }
+            }
+
+            // Only fallback to adaptive formats if progressive format 18 is absent
+            if (sources.isEmpty()) {
+                for (fmt in adaptiveFormats) {
+                    val fObj = fmt.jsonObject
+                    val mime = fObj["mimeType"]?.jsonPrimitive?.content ?: ""
+                    val directUrl = fObj["url"]?.jsonPrimitive?.content
+                    val bitrate = fObj["bitrate"]?.jsonPrimitive?.content?.toIntOrNull() ?: 128000
+                    if (mime.contains("audio") && !directUrl.isNullOrBlank()) {
+                        val qualityKbps = (bitrate / 1000).coerceAtLeast(64)
+                        val title = if (mime.contains("opus", ignoreCase = true)) "$qualityKbps kbps (YouTube Opus HQ)" else "$qualityKbps kbps (YouTube AAC)"
+                        sources.add(
+                            Streamable.Source.Http(
+                                request = directUrl.toGetRequest(headers = uaHeader),
+                                quality = qualityKbps,
+                                title = title,
+                                isLive = false
+                            )
+                        )
+                    }
                 }
             }
             if (sources.isNotEmpty()) sources.sortedByDescending { it.quality } else null
@@ -754,7 +834,7 @@ class PlayerViewModel(
 
     suspend fun searchAndResolveYouTubeStream(title: String, artist: String): Pair<Track, List<Streamable.Source.Http>>? = withContext(Dispatchers.IO) {
         runCatching {
-            val query = if (artist.isNotBlank() && !isGarbageArtist(artist)) "$title $artist" else title
+            val query = if (artist.isNotBlank() && !isGarbageArtist(artist)) "$title $artist official audio" else "$title official audio"
             val sUrl = "https://music.youtube.com/youtubei/v1/search"
             val cleanQuery = query.replace("\"", "").replace("\\", "")
             val sPayload = "{\"context\":{\"client\":{\"clientName\":\"WEB_REMIX\",\"clientVersion\":\"1.20240101.01.00\",\"hl\":\"en\",\"gl\":\"US\"}},\"query\":\"" + cleanQuery + "\",\"params\":\"EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D\"}"
@@ -800,7 +880,7 @@ class PlayerViewModel(
             val vid = findVideoId(sRoot) ?: return@runCatching null
             val sources = resolveYouTubeDirectStream(vid) ?: return@runCatching null
 
-            val coverHolder = ImageHolder.NetworkRequestImageHolder(request = "https://i.ytimg.com/vi/$vid/hqdefault.jpg".toGetRequest(), crop = false)
+            val coverHolder = ImageHolder.NetworkRequestImageHolder(request = "https://i.ytimg.com/vi/$vid/maxresdefault.jpg".toGetRequest(), crop = false)
             val resolvedTrack = Track(
                 id = vid,
                 title = title,
@@ -828,7 +908,7 @@ class PlayerViewModel(
         trackId: String? = null
     ): Pair<Track, List<Streamable.Source.Http>>? = withContext(Dispatchers.IO) {
         // Direct ID resolution if numeric JioSaavn track ID is present
-        if (!trackId.isNullOrBlank() && trackId.length >= 6 && trackId.all { it.isDigit() }) {
+        if (!trackId.isNullOrBlank() && trackId.length in 6..32 && !trackId.contains(" ") && !trackId.startsWith("http") && !trackId.matches(REGEX_YOUTUBE_ID)) {
             val directResult = runCatching {
                 val url = "https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=$trackId"
                 val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
@@ -913,7 +993,21 @@ class PlayerViewModel(
             }
 
             val chosen = bestObj
-            val enc = chosen["encrypted_media_url"]?.jsonPrimitive?.content
+            val sid = chosen["id"]?.jsonPrimitive?.content ?: chosen["songid"]?.jsonPrimitive?.content
+            val enc = chosen["encrypted_media_url"]?.jsonPrimitive?.content?.takeIf { it != "false" && it.isNotBlank() }
+                ?: if (!sid.isNullOrBlank()) {
+                    val dUrl = "https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=$sid"
+                    val dReq = Request.Builder().url(dUrl).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+                    runCatching {
+                        okHttpClient.newCall(dReq).execute().use { resp ->
+                            val dRoot = jsonParser.parseToJsonElement(resp.body?.string() ?: "").jsonObject
+                            val songObj = dRoot[sid]?.jsonObject ?: dRoot.values.firstOrNull()?.jsonObject
+                            songObj?.get("encrypted_media_url")?.jsonPrimitive?.content?.takeIf { it != "false" && it.isNotBlank() }
+                                ?: songObj?.get("media_preview_url")?.jsonPrimitive?.content
+                        }
+                    }.getOrNull()
+                } else null
+
             val preview = chosen["media_preview_url"]?.jsonPrimitive?.content
             val sources = getSaavnMultiQualitySources(enc, preview)
 
@@ -1316,6 +1410,15 @@ class PlayerViewModel(
                     put("metadata_source", "JioSaavn")
                 }
             )
+            val hdCoverUrl = saavnTrack.extras["cover_url"]
+            if (!hdCoverUrl.isNullOrBlank()) {
+                saavnTrack.album?.title?.let { albTitle ->
+                    if (albTitle.isNotBlank()) AudixArtworkEngine.albumCache[AudixArtworkEngine.cleanAlbumKey(albTitle)] = hdCoverUrl
+                }
+                if (rawArtist.isNotBlank() && !AudixArtworkEngine.artistCache.containsKey(AudixArtworkEngine.cleanArtistKey(rawArtist))) {
+                    ioScope.launch { AudixArtworkEngine.resolveArtistCoverAsync(rawArtist) }
+                }
+            }
             val sanitizedMerged = sanitizeTrackLocally(merged)
             metadataEnrichmentCache[cacheKey] = sanitizedMerged
             return@withContext sanitizedMerged
@@ -1344,9 +1447,28 @@ class PlayerViewModel(
                     put("metadata_source", "iTunes")
                 }
             )
+            val hdCoverUrl = itunesTrack.extras["cover_url"]
+            if (!hdCoverUrl.isNullOrBlank()) {
+                itunesTrack.album?.title?.let { albTitle ->
+                    if (albTitle.isNotBlank()) AudixArtworkEngine.albumCache[AudixArtworkEngine.cleanAlbumKey(albTitle)] = hdCoverUrl
+                }
+                if (rawArtist.isNotBlank() && !AudixArtworkEngine.artistCache.containsKey(AudixArtworkEngine.cleanArtistKey(rawArtist))) {
+                    ioScope.launch { AudixArtworkEngine.resolveArtistCoverAsync(rawArtist) }
+                }
+            }
             val sanitizedMerged = sanitizeTrackLocally(merged)
             metadataEnrichmentCache[cacheKey] = sanitizedMerged
             return@withContext sanitizedMerged
+        }
+
+        val rawCoverUrl = AudixArtworkEngine.toCoverUrl(track.cover)
+        if (!rawCoverUrl.isNullOrBlank()) {
+            val upgraded = AudixArtworkEngine.upgradeYouTubeThumbnail(rawCoverUrl)
+            if (upgraded != null && upgraded != rawCoverUrl) {
+                return@withContext track.copy(
+                    cover = ImageHolder.NetworkRequestImageHolder(request = upgraded.toGetRequest(), crop = false)
+                )
+            }
         }
 
         track
@@ -1371,12 +1493,16 @@ class PlayerViewModel(
         currentPlayJob?.cancel()
         loadingWatchdogJob?.cancel()
 
-        loadingWatchdogJob = scope.launch {
-            delay(12_000L)
-            if (player.state.value.status == PlayerState.Status.LOADING) {
-                println("[PlayerViewModel] Loading timeout (12s) for '${track.title}'. Auto-advancing...")
+        loadingWatchdogJob = ioScope.launch {
+            delay(15_000L)
+            val st = player.state.value.status
+            if (st == PlayerState.Status.LOADING || st == PlayerState.Status.BUFFERING) {
+                println("[PlayerViewModel] Loading timeout (15s) for '${track.title}'. Auto-advancing...")
+                val fails = consecutiveFailures.incrementAndGet()
                 val q = queue.value
-                if (q.size > 1) {
+                val idx = q.indexOfFirst { it.id == track.id }.takeIf { it >= 0 }
+                    ?: q.indexOfFirst { it.title.equals(track.title, ignoreCase = true) }
+                if (idx >= 0 && idx + 1 < q.size && fails <= 3) {
                     skipNext()
                 } else {
                     runCatching { (player as? dev.brahmkshatriya.echo.core.platform.VlcAudioPlayer)?.setError("Playback timed out for '${track.title}'") }
@@ -1384,9 +1510,10 @@ class PlayerViewModel(
             }
         }
 
-        currentPlayJob = scope.launch {
+        currentPlayJob = ioScope.launch {
             runCatching {
                 if (currentToken != playRequestId.get() || !isActive) return@runCatching
+
                 // 1. Maintain queue and immediately sanitize locally so UI never shows "Song" or spam titles
                 val localCleaned = sanitizeTrackLocally(track)
                 if (player.queue.value.none { it.id == localCleaned.id }) {
@@ -1394,38 +1521,77 @@ class PlayerViewModel(
                 }
                 player.prepareTrack(localCleaned)
 
-                // 2. Perform online enrichment if track has incomplete metadata, spam title, or low-res cover
                 var workingTrack = localCleaned
-                if (needsOnlineEnrichment(workingTrack)) {
-                    val enriched = enrichTrackOnline(workingTrack)
-                    if (enriched != workingTrack) {
-                        workingTrack = sanitizeTrackLocally(enriched)
-                        player.prepareTrack(workingTrack)
-                    }
-                }
-
                 var loadedTrack = workingTrack
                 var mediaToPlay: Streamable.Media.Server? = null
 
-                // 3. Direct stream URL fast path
-                val directUrl = workingTrack.extras["stream_url"]
-                    ?: workingTrack.servers.firstOrNull()?.extras?.get("stream_url")
-                if (!directUrl.isNullOrBlank() && (directUrl.startsWith("http://") || directUrl.startsWith("https://") || directUrl.startsWith("file:/"))) {
-                    val isLive = workingTrack.extras["is_live"] == "true"
+                // 2. Direct local file fast path
+                val localFile = when {
+                    !workingTrack.extras["local_file"].isNullOrBlank() -> java.io.File(workingTrack.extras["local_file"]!!)
+                    java.io.File(workingTrack.id).exists() && java.io.File(workingTrack.id).isFile -> java.io.File(workingTrack.id)
+                    else -> null
+                }
+                if (localFile != null && localFile.exists()) {
+                    val uri = localFile.toURI().toString()
                     val source = Streamable.Source.Http(
-                        request = directUrl.toGetRequest(),
+                        request = uri.toGetRequest(),
                         quality = 320,
-                        title = if (isLive) "Live Radio" else "Direct Stream",
-                        isLive = isLive
+                        title = "Local Audio File",
+                        isLive = false
                     )
                     mediaToPlay = Streamable.Media.Server(listOf(source), merged = false)
                 }
 
-                // 3.5 Direct YouTube fast path
+                // 3. Direct stream URL fast path
+                if (mediaToPlay == null) {
+                    val directUrl = workingTrack.extras["stream_url"]
+                        ?: workingTrack.servers.firstOrNull()?.extras?.get("stream_url")
+                    if (!directUrl.isNullOrBlank() && (directUrl.startsWith("http://") || directUrl.startsWith("https://") || directUrl.startsWith("file:/"))) {
+                        val isLive = workingTrack.extras["is_live"] == "true"
+                        val source = Streamable.Source.Http(
+                            request = directUrl.toGetRequest(),
+                            quality = 320,
+                            title = if (isLive) "Live Radio" else "Direct Stream",
+                            isLive = isLive
+                        )
+                        mediaToPlay = Streamable.Media.Server(listOf(source), merged = false)
+                    }
+                }
+
+                // 3.5 Authentic Studio Master Fast Path (JioSaavn 320kbps CD Master)
+                // Always resolve studio master first to bypass video dialogues, intro cutscenes, and amateur audio
+                if (mediaToPlay == null) {
+                    val rawArtist = workingTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
+                    val cleanTitle = cleanTrackTitle(workingTrack.title, rawArtist)
+                    if (cleanTitle.isNotBlank()) {
+                        val searchQuery = if (rawArtist.isNotBlank()) "$cleanTitle $rawArtist" else cleanTitle
+                        val saavnResult = withTimeoutOrNull(2500L) {
+                            resolveSaavnStudioStream(searchQuery, cleanTitle, rawArtist, workingTrack.duration, workingTrack.id)
+                        }
+                        if (saavnResult != null) {
+                            val (resolvedTrack, sources) = saavnResult
+                            println("[PlayerViewModel] Upgraded to pure 320kbps Studio Master for '$cleanTitle' by '$rawArtist' (${sources.size} sources)")
+                            mediaToPlay = Streamable.Media.Server(sources, merged = false)
+                            val chosenTitle = if (workingTrack.title.isNotBlank() && !isSpamTitle(workingTrack.title)) workingTrack.title else resolvedTrack.title
+                            val chosenArtists = if (workingTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) workingTrack.artists else resolvedTrack.artists
+                            val cleanAlb = workingTrack.album?.takeIf { !isGarbageAlbum(it.title) } ?: resolvedTrack.album?.takeIf { !isGarbageAlbum(it.title) }
+                            loadedTrack = workingTrack.copy(
+                                title = cleanTrackTitle(chosenTitle, chosenArtists.firstOrNull()?.name ?: ""),
+                                artists = chosenArtists,
+                                album = cleanAlb,
+                                cover = resolvedTrack.cover ?: workingTrack.cover,
+                                duration = if ((resolvedTrack.duration ?: 0L) > 0L) resolvedTrack.duration else workingTrack.duration,
+                                extras = workingTrack.extras + resolvedTrack.extras
+                            )
+                        }
+                    }
+                }
+
+                // 3.6 Direct YouTube fallback (if video_id present or 11-char YouTube ID)
                 if (mediaToPlay == null) {
                     val vid = workingTrack.extras["video_id"] ?: if (workingTrack.id.matches(REGEX_YOUTUBE_ID)) workingTrack.id else null
-                    if (!vid.isNullOrBlank() && (workingTrack.extras["source"]?.equals("youtube", ignoreCase = true) == true || workingTrack.id.matches(REGEX_YOUTUBE_ID))) {
-                        val ytDirect = resolveYouTubeDirectStream(vid)
+                    if (!vid.isNullOrBlank()) {
+                        val ytDirect = withTimeoutOrNull(3000L) { resolveYouTubeDirectStream(vid) }
                         if (!ytDirect.isNullOrEmpty()) {
                             println("[PlayerViewModel] Resolved direct YouTube stream for '${workingTrack.title}' (videoId: $vid, sources: ${ytDirect.size})")
                             mediaToPlay = Streamable.Media.Server(ytDirect, merged = false)
@@ -1475,32 +1641,34 @@ class PlayerViewModel(
                         val client = getTrackClient(matchingExtension)
                         if (client != null) {
                             runCatching {
-                                withContext(Dispatchers.IO) {
-                                    val loaded = client.loadTrack(workingTrack, false)
-                                    val server = loaded.servers.firstOrNull() ?: loaded.streamables.firstOrNull() ?: workingTrack.servers.firstOrNull() ?: workingTrack.streamables.firstOrNull()
-                                    if (server != null) {
-                                        val resolvedMedia = client.loadStreamableMedia(server, false)
-                                        if (resolvedMedia is Streamable.Media.Server && resolvedMedia.sources.isNotEmpty()) {
-                                            mediaToPlay = resolvedMedia
-                                            val cleanLoadedArtists = loaded.artists.filterNot { isGarbageArtist(it.name) || it.name == "Audix Hi-Res Audio" }
-                                            val chosenTitle = if (workingTrack.title.isNotBlank() && !isSpamTitle(workingTrack.title)) workingTrack.title else cleanTrackTitle(loaded.title, "")
-                                            val chosenArtists = if (workingTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) workingTrack.artists else cleanLoadedArtists.ifEmpty { workingTrack.artists }
-                                            val chosenCover = when {
-                                                workingTrack.cover != null && !isLowResOrGenericCover(extractTrackCoverUrl(workingTrack)) -> workingTrack.cover
-                                                loaded.cover != null && !isLowResOrGenericCover(extractTrackCoverUrl(loaded)) -> loaded.cover
-                                                workingTrack.cover != null -> workingTrack.cover
-                                                else -> loaded.cover
+                                withTimeoutOrNull(3000L) {
+                                    withContext(Dispatchers.IO) {
+                                        val loaded = client.loadTrack(workingTrack, false)
+                                        val server = loaded.servers.firstOrNull() ?: loaded.streamables.firstOrNull() ?: workingTrack.servers.firstOrNull() ?: workingTrack.streamables.firstOrNull()
+                                        if (server != null) {
+                                            val resolvedMedia = client.loadStreamableMedia(server, false)
+                                            if (resolvedMedia is Streamable.Media.Server && resolvedMedia.sources.isNotEmpty()) {
+                                                mediaToPlay = resolvedMedia
+                                                val cleanLoadedArtists = loaded.artists.filterNot { isGarbageArtist(it.name) || it.name == "Audix Hi-Res Audio" }
+                                                val chosenTitle = if (workingTrack.title.isNotBlank() && !isSpamTitle(workingTrack.title)) workingTrack.title else cleanTrackTitle(loaded.title, "")
+                                                val chosenArtists = if (workingTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) workingTrack.artists else cleanLoadedArtists.ifEmpty { workingTrack.artists }
+                                                val chosenCover = when {
+                                                    workingTrack.cover != null && !isLowResOrGenericCover(extractTrackCoverUrl(workingTrack)) -> workingTrack.cover
+                                                    loaded.cover != null && !isLowResOrGenericCover(extractTrackCoverUrl(loaded)) -> loaded.cover
+                                                    workingTrack.cover != null -> workingTrack.cover
+                                                    else -> loaded.cover
+                                                }
+                                                val cleanAlb = workingTrack.album?.takeIf { !isGarbageAlbum(it.title) } ?: loaded.album?.takeIf { !isGarbageAlbum(it.title) }
+                                                loadedTrack = workingTrack.copy(
+                                                    title = cleanTrackTitle(chosenTitle, chosenArtists.firstOrNull()?.name ?: ""),
+                                                    artists = chosenArtists,
+                                                    album = cleanAlb,
+                                                    cover = chosenCover,
+                                                    duration = if ((workingTrack.duration ?: 0L) > 0L) workingTrack.duration else loaded.duration,
+                                                    streamables = loaded.streamables.ifEmpty { workingTrack.streamables },
+                                                    extras = workingTrack.extras + loaded.extras
+                                                )
                                             }
-                                            val cleanAlb = workingTrack.album?.takeIf { !isGarbageAlbum(it.title) } ?: loaded.album?.takeIf { !isGarbageAlbum(it.title) }
-                                            loadedTrack = workingTrack.copy(
-                                                title = cleanTrackTitle(chosenTitle, chosenArtists.firstOrNull()?.name ?: ""),
-                                                artists = chosenArtists,
-                                                album = cleanAlb,
-                                                cover = chosenCover,
-                                                duration = if ((workingTrack.duration ?: 0L) > 0L) workingTrack.duration else loaded.duration,
-                                                streamables = loaded.streamables.ifEmpty { workingTrack.streamables },
-                                                extras = workingTrack.extras + loaded.extras
-                                            )
                                         }
                                     }
                                 }
@@ -1519,7 +1687,9 @@ class PlayerViewModel(
 
                     println("[PlayerViewModel] Resolving stream for '$cleanTitle' ($rawArtist) via Studio Engine...")
 
-                    val saavnResult = resolveSaavnStudioStream(searchQuery, cleanTitle, rawArtist, loadedTrack.duration, loadedTrack.id)
+                    val saavnResult = withTimeoutOrNull(3500L) {
+                        resolveSaavnStudioStream(searchQuery, cleanTitle, rawArtist, loadedTrack.duration, loadedTrack.id)
+                    }
                     if (saavnResult != null) {
                         val (resolvedTrack, sources) = saavnResult
                         val chosenTitle = if (loadedTrack.title.isNotBlank() && !isSpamTitle(loadedTrack.title)) loadedTrack.title else resolvedTrack.title
@@ -1537,7 +1707,9 @@ class PlayerViewModel(
                     }
 
                     if (mediaToPlay == null) {
-                        val scStream = resolveSoundCloudStream(searchQuery, cleanTitle, rawArtist, loadedTrack.duration)
+                        val scStream = withTimeoutOrNull(3000L) {
+                            resolveSoundCloudStream(searchQuery, cleanTitle, rawArtist, loadedTrack.duration)
+                        }
                         if (!scStream.isNullOrBlank()) {
                             val source = Streamable.Source.Http(
                                 request = scStream.toGetRequest(),
@@ -1555,12 +1727,12 @@ class PlayerViewModel(
                     val rawArtist = loadedTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
                     val cleanTitle = cleanTrackTitle(loadedTrack.title, rawArtist)
                     val vid = loadedTrack.extras["video_id"] ?: if (loadedTrack.id.matches(REGEX_YOUTUBE_ID)) loadedTrack.id else null
-                    val ytDirect = if (!vid.isNullOrBlank()) resolveYouTubeDirectStream(vid) else null
+                    val ytDirect = if (!vid.isNullOrBlank()) withTimeoutOrNull(3000L) { resolveYouTubeDirectStream(vid) } else null
                     if (!ytDirect.isNullOrEmpty()) {
                         println("[PlayerViewModel] Universal YouTube direct match for '$cleanTitle' ($vid)")
                         mediaToPlay = Streamable.Media.Server(ytDirect, merged = false)
                     } else {
-                        val ytSearchResult = searchAndResolveYouTubeStream(cleanTitle, rawArtist)
+                        val ytSearchResult = withTimeoutOrNull(3500L) { searchAndResolveYouTubeStream(cleanTitle, rawArtist) }
                         if (ytSearchResult != null) {
                             val (resolvedYtTrack, ytSources) = ytSearchResult
                             println("[PlayerViewModel] Universal YouTube search match for '$cleanTitle' ($rawArtist) -> ${resolvedYtTrack.id}")
@@ -1580,21 +1752,41 @@ class PlayerViewModel(
                     val finalSanitized = sanitizeTrackLocally(loadedTrack)
                     println("[PlayerViewModel] Starting playback: '${finalSanitized.title}' by '${finalSanitized.artists.joinToString { it.name }}' (sources: ${mediaToPlay.sources.size})")
                     loadingWatchdogJob?.cancel()
+                    consecutiveFailures.set(0)
                     player.play(finalSanitized, mediaToPlay)
 
                     runCatching {
                         dev.brahmkshatriya.echo.desktop.library.DesktopLibraryManager.getOrNull()?.recordHistory(finalSanitized)
                     }
+
+                    // 7. Non-blocking Background Online Enrichment
+                    if (needsOnlineEnrichment(finalSanitized)) {
+                        scope.launch(Dispatchers.IO) {
+                            runCatching {
+                                val enriched = enrichTrackOnline(finalSanitized)
+                                if (enriched != finalSanitized && isActive) {
+                                    val cleanEnriched = sanitizeTrackLocally(enriched)
+                                    if (player.currentTrack.value?.id == finalSanitized.id) {
+                                        (player as? dev.brahmkshatriya.echo.core.platform.VlcAudioPlayer)?.updateCurrentTrack(cleanEnriched)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else {
                     println("[PlayerViewModel] Error: Unable to resolve playable media for '${track.title}'")
                     loadingWatchdogJob?.cancel()
                     runCatching { (player as? dev.brahmkshatriya.echo.core.platform.VlcAudioPlayer)?.setError("Unable to play '${track.title}'") }
+                    val fails = consecutiveFailures.incrementAndGet()
                     val q = player.queue.value
-                    val currentIdx = q.indexOfFirst { it.id == track.id }
-                    if (currentIdx >= 0 && q.size > 1) {
-                        println("[PlayerViewModel] Automatically advancing to next track in queue after resolution failure...")
+                    val currentIdx = q.indexOfFirst { it.id == track.id }.takeIf { it >= 0 }
+                        ?: q.indexOfFirst { it.title.equals(track.title, ignoreCase = true) }
+                    if (currentIdx >= 0 && q.size > 1 && fails <= 3) {
+                        println("[PlayerViewModel] Advancing to next track in queue after resolution failure (failure $fails)...")
                         delay(1200L)
                         skipNext()
+                    } else {
+                        println("[PlayerViewModel] Stopping auto-advance after failed track (failures: $fails).")
                     }
                 }
             }.onFailure { e ->
@@ -1602,9 +1794,11 @@ class PlayerViewModel(
                 e.printStackTrace()
                 loadingWatchdogJob?.cancel()
                 runCatching { (player as? dev.brahmkshatriya.echo.core.platform.VlcAudioPlayer)?.setError("Playback error: ${e.message}") }
+                val fails = consecutiveFailures.incrementAndGet()
                 val q = player.queue.value
-                val currentIdx = q.indexOfFirst { it.id == track.id }
-                if (currentIdx >= 0 && q.size > 1) {
+                val currentIdx = q.indexOfFirst { it.id == track.id }.takeIf { it >= 0 }
+                    ?: q.indexOfFirst { it.title.equals(track.title, ignoreCase = true) }
+                if (currentIdx >= 0 && q.size > 1 && fails <= 3) {
                     delay(1200L)
                     skipNext()
                 }
@@ -1612,8 +1806,8 @@ class PlayerViewModel(
         }
     }
 
-    private suspend fun playStudioFallback(track: Track) = withContext(Dispatchers.IO) {
-        runCatching {
+    private suspend fun playStudioFallback(track: Track): Boolean = withContext(Dispatchers.IO) {
+        val ok = runCatching {
             val localCleaned = sanitizeTrackLocally(track)
             val rawArtist = localCleaned.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
             val cleanTitle = cleanTrackTitle(localCleaned.title, rawArtist)
@@ -1637,7 +1831,7 @@ class PlayerViewModel(
                 ))
                 val media = Streamable.Media.Server(sources, merged = false)
                 player.play(finalTrack, media)
-                return@withContext
+                return@withContext true
             }
 
             val scStream = resolveSoundCloudStream(searchQuery, cleanTitle, rawArtist)
@@ -1649,12 +1843,26 @@ class PlayerViewModel(
                     isLive = false
                 )
                 player.play(localCleaned, Streamable.Media.Server(listOf(source), merged = false))
-                return@withContext
+                return@withContext true
+            }
+
+            val ytSearchResult = searchAndResolveYouTubeStream(cleanTitle, rawArtist)
+            if (ytSearchResult != null) {
+                val (resolvedYtTrack, ytSources) = ytSearchResult
+                val finalTrack = sanitizeTrackLocally(localCleaned.copy(
+                    cover = localCleaned.cover ?: resolvedYtTrack.cover,
+                    duration = if ((localCleaned.duration ?: 0L) > 0L) localCleaned.duration else resolvedYtTrack.duration,
+                    extras = localCleaned.extras + resolvedYtTrack.extras
+                ))
+                player.play(finalTrack, Streamable.Media.Server(ytSources, merged = false))
+                return@withContext true
             }
 
             println("[PlayerViewModel] Auto-recovery could not find alternative stream for '${track.title}'")
+            false
         }.onFailure { err ->
             println("[PlayerViewModel] Error during studio fallback: ${err.message}")
-        }
+        }.getOrDefault(false)
+        ok
     }
 }

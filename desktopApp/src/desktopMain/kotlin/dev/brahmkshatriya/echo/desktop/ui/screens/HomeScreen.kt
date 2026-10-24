@@ -38,6 +38,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import dev.brahmkshatriya.echo.desktop.ui.AudixArtworkEngine
 import dev.brahmkshatriya.echo.desktop.ui.LocalAppBlurredBackground
 import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.graphicsLayer
@@ -259,11 +260,7 @@ private val curatedFlagshipArtists = listOf(
 // ------------------------------------------------------------------------------------------------
 // HELPER EXTENSIONS FOR ARTWORK EXTRACTION
 // ------------------------------------------------------------------------------------------------
-private fun ImageHolder?.toCoverUrl(): String? = when (this) {
-    is ImageHolder.NetworkRequestImageHolder -> request.url
-    is ImageHolder.ResourceUriImageHolder -> uri
-    else -> null
-}
+private fun ImageHolder?.toCoverUrl(): String? = AudixArtworkEngine.toCoverUrl(this)
 
 private fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Audix Artist"): String {
     if (artists.isNullOrEmpty()) return fallback
@@ -313,9 +310,9 @@ private fun Track.extractCoverUrl(): String? {
             fromHolder.contains("hqdefault.jpg") ||
             fromHolder.contains("mqdefault.jpg") ||
             fromHolder.contains("120x120")
-        if (isGeneric) return extraCover
+        if (isGeneric) return AudixArtworkEngine.upgradeYouTubeThumbnail(extraCover)
     }
-    return fromHolder ?: extraCover
+    return AudixArtworkEngine.upgradeYouTubeThumbnail(fromHolder ?: extraCover)
 }
 
 /**
@@ -402,7 +399,10 @@ fun HomeScreen(
         val extractedAlbums = effectiveShelves.flatMap { s ->
             when (s) {
                 is Shelf.Lists.Items -> s.list.filterIsInstance<Album>()
-                is Shelf.Lists.Tracks -> s.list.mapNotNull { it.album }
+                is Shelf.Lists.Tracks -> s.list.mapNotNull { track ->
+                    val alb = track.album ?: return@mapNotNull null
+                    if (alb.cover == null && track.cover != null) alb.copy(cover = track.cover) else alb
+                }
                 else -> emptyList()
             }
         }.filter { it.title.isNotBlank() }
@@ -421,7 +421,11 @@ fun HomeScreen(
         val extractedArtists = effectiveShelves.flatMap { s ->
             when (s) {
                 is Shelf.Lists.Items -> s.list.filterIsInstance<Artist>()
-                is Shelf.Lists.Tracks -> s.list.flatMap { it.artists }
+                is Shelf.Lists.Tracks -> s.list.flatMap { track ->
+                    track.artists.map { art ->
+                        if (art.cover == null && track.cover != null) art.copy(cover = track.cover) else art
+                    }
+                }
                 else -> emptyList()
             }
         }.filterNot { a -> a.name.isBlank() || a.name.equals("Various Artists", true) || a.name.equals("Unknown", true) || a.name.contains("Topic", true) }
@@ -2194,10 +2198,6 @@ fun LiquidGlassCard(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isInteractiveHover = isHovered && onClick != null
 
-    val blurredBg = LocalAppBlurredBackground.current
-    var boxOffset by remember { mutableStateOf(Offset.Zero) }
-    var windowSize by remember { mutableStateOf(IntSize.Zero) }
-
     val currentTopBg = if (isInteractiveHover) {
         Color.White.copy(alpha = 0.12f)
     } else {
@@ -2238,91 +2238,33 @@ fun LiquidGlassCard(
 
     Box(
         modifier = modifier
-            .onGloballyPositioned { coordinates ->
-                boxOffset = coordinates.positionInWindow()
-                val root = coordinates.findRootCoordinates()
-                windowSize = root.size
+            .graphicsLayer {
+                this.shape = shape
+                clip = true
             }
-            .shadow(
-                elevation = if (isInteractiveHover) 10.dp else 5.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = Color(0x66000000),
-                spotColor = Color(0x25000000)
-            )
             .clip(shape)
-            .drawBehind {
-                if (blurredBg != null && windowSize.width > 0 && windowSize.height > 0) {
-                    val scaleX = windowSize.width.toFloat() / blurredBg.width.toFloat()
-                    val scaleY = windowSize.height.toFloat() / blurredBg.height.toFloat()
-                    val scale = maxOf(scaleX, scaleY)
-                    val rw = (blurredBg.width * scale).roundToInt()
-                    val rh = (blurredBg.height * scale).roundToInt()
-                    val ox = ((windowSize.width - rw) / 2f).roundToInt()
-                    val oy = ((windowSize.height - rh) / 2f).roundToInt()
-                    val dx = ox - boxOffset.x.roundToInt()
-                    val dy = oy - boxOffset.y.roundToInt()
-                    drawImage(
-                        image = blurredBg,
-                        dstOffset = IntOffset(dx, dy),
-                        dstSize = IntSize(rw, rh),
-                        filterQuality = FilterQuality.Medium
-                    )
-                }
-            }
             .background(bgBrush)
             .border(borderStroke, shape)
             .drawWithContent {
                 drawContent()
 
-                // Layer 1: 3D Convex Gloss Sheen (Smooth upper-dome light reflection)
+                // High-performance single-pass 3D gloss reflection
                 drawRect(
                     brush = Brush.verticalGradient(
                         colors = if (isInteractiveHover) CardSheenColorsHovered else CardSheenColorsNormal,
                         startY = 0f,
-                        endY = size.height * 0.48f
+                        endY = size.height * 0.45f
                     ),
-                    size = Size(size.width, size.height * 0.48f)
+                    size = Size(size.width, size.height * 0.45f)
                 )
 
-                // Layer 2: Diagonal High-Gloss Specular Glare
-                drawOval(
-                    brush = Brush.radialGradient(
-                        colors = if (isInteractiveHover) CardGlareColorsHovered else CardGlareColorsNormal,
-                        center = Offset(size.width * 0.22f, 0f),
-                        radius = (size.width * 0.50f).coerceAtLeast(70f)
-                    ),
-                    topLeft = Offset(-size.width * 0.10f, -size.height * 0.15f),
-                    size = Size(size.width * 0.85f, size.height * 0.65f)
-                )
-
-                // Layer 3: Ultra-Sharp Top Specular Rim Reflection
+                // Top hairline specular highlight
                 drawLine(
                     brush = Brush.horizontalGradient(
                         colors = if (isInteractiveHover) CardTopRimColorsHovered else CardTopRimColorsNormal
                     ),
-                    start = Offset(size.width * 0.06f, 1f),
-                    end = Offset(size.width * 0.94f, 1f),
-                    strokeWidth = 1.5.dp.toPx()
-                )
-
-                // Layer 4: Secondary Inner Specular Micro-Bevel Hairline
-                drawLine(
-                    brush = Brush.horizontalGradient(
-                        colors = if (isInteractiveHover) CardInnerRimColorsHovered else CardInnerRimColorsNormal
-                    ),
-                    start = Offset(size.width * 0.15f, 3f),
-                    end = Offset(size.width * 0.85f, 3f),
-                    strokeWidth = 1.dp.toPx()
-                )
-
-                // Layer 5: Bottom Refractive Caustic Rim Reflection
-                drawLine(
-                    brush = Brush.horizontalGradient(
-                        colors = if (isInteractiveHover) CardBottomCausticColorsHovered else CardBottomCausticColorsNormal
-                    ),
-                    start = Offset(size.width * 0.12f, size.height - 1f),
-                    end = Offset(size.width * 0.88f, size.height - 1f),
+                    start = Offset(size.width * 0.08f, 1f),
+                    end = Offset(size.width * 0.92f, 1f),
                     strokeWidth = 1.dp.toPx()
                 )
             }
@@ -2362,10 +2304,6 @@ fun LiquidGlassBox(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isInteractiveHover = isHovered && onClick != null
-
-    val blurredBg = LocalAppBlurredBackground.current
-    var boxOffset by remember { mutableStateOf(Offset.Zero) }
-    var windowSize by remember { mutableStateOf(IntSize.Zero) }
 
     val currentTopBg = when {
         isSelected -> selectedBgColor
@@ -2428,44 +2366,17 @@ fun LiquidGlassBox(
 
     Box(
         modifier = modifier
-            .onGloballyPositioned { coordinates ->
-                boxOffset = coordinates.positionInWindow()
-                val root = coordinates.findRootCoordinates()
-                windowSize = root.size
+            .graphicsLayer {
+                this.shape = shape
+                clip = true
             }
-            .shadow(
-                elevation = if (isSelected) 5.dp else if (isInteractiveHover) 3.dp else 1.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = Color(0x44000000),
-                spotColor = Color(0x18000000)
-            )
             .clip(shape)
-            .drawBehind {
-                if (blurredBg != null && windowSize.width > 0 && windowSize.height > 0) {
-                    val scaleX = windowSize.width.toFloat() / blurredBg.width.toFloat()
-                    val scaleY = windowSize.height.toFloat() / blurredBg.height.toFloat()
-                    val scale = maxOf(scaleX, scaleY)
-                    val rw = (blurredBg.width * scale).roundToInt()
-                    val rh = (blurredBg.height * scale).roundToInt()
-                    val ox = ((windowSize.width - rw) / 2f).roundToInt()
-                    val oy = ((windowSize.height - rh) / 2f).roundToInt()
-                    val dx = ox - boxOffset.x.roundToInt()
-                    val dy = oy - boxOffset.y.roundToInt()
-                    drawImage(
-                        image = blurredBg,
-                        dstOffset = IntOffset(dx, dy),
-                        dstSize = IntSize(rw, rh),
-                        filterQuality = FilterQuality.Medium
-                    )
-                }
-            }
             .background(bgBrush)
             .border(borderStroke, shape)
             .drawWithContent {
                 drawContent()
 
-                // Layer 1: 3D Convex Gloss Sheen
+                // Fast single-pass sheen
                 val sheenColors = when {
                     isSelected -> BoxSheenColorsSelected
                     isInteractiveHover -> BoxSheenColorsHovered
@@ -2475,28 +2386,12 @@ fun LiquidGlassBox(
                     brush = Brush.verticalGradient(
                         colors = sheenColors,
                         startY = 0f,
-                        endY = size.height * 0.48f
+                        endY = size.height * 0.45f
                     ),
-                    size = Size(size.width, size.height * 0.48f)
+                    size = Size(size.width, size.height * 0.45f)
                 )
 
-                // Layer 2: Diagonal High-Gloss Specular Glare
-                val glareColors = when {
-                    isSelected -> BoxGlareColorsSelected
-                    isInteractiveHover -> BoxGlareColorsHovered
-                    else -> BoxGlareColorsNormal
-                }
-                drawOval(
-                    brush = Brush.radialGradient(
-                        colors = glareColors,
-                        center = Offset(size.width * 0.22f, 0f),
-                        radius = (size.width * 0.50f).coerceAtLeast(40f)
-                    ),
-                    topLeft = Offset(-size.width * 0.10f, -size.height * 0.15f),
-                    size = Size(size.width * 0.85f, size.height * 0.65f)
-                )
-
-                // Layer 3: Ultra-Sharp Top Specular Rim Reflection
+                // Top rim highlight
                 val topRimColors = when {
                     isSelected -> BoxTopRimColorsSelected
                     isInteractiveHover -> BoxTopRimColorsHovered
@@ -2504,34 +2399,8 @@ fun LiquidGlassBox(
                 }
                 drawLine(
                     brush = Brush.horizontalGradient(colors = topRimColors),
-                    start = Offset(size.width * 0.06f, 1f),
-                    end = Offset(size.width * 0.94f, 1f),
-                    strokeWidth = 1.5.dp.toPx()
-                )
-
-                // Layer 4: Secondary Inner Specular Micro-Bevel Hairline
-                val innerRimColors = when {
-                    isSelected -> BoxInnerRimColorsSelected
-                    isInteractiveHover -> BoxInnerRimColorsHovered
-                    else -> BoxInnerRimColorsNormal
-                }
-                drawLine(
-                    brush = Brush.horizontalGradient(colors = innerRimColors),
-                    start = Offset(size.width * 0.15f, 2.5f),
-                    end = Offset(size.width * 0.85f, 2.5f),
-                    strokeWidth = 1.dp.toPx()
-                )
-
-                // Layer 5: Bottom Refractive Caustic Rim Reflection
-                val bottomCausticColors = when {
-                    isSelected -> BoxBottomCausticColorsSelected
-                    isInteractiveHover -> BoxBottomCausticColorsHovered
-                    else -> BoxBottomCausticColorsNormal
-                }
-                drawLine(
-                    brush = Brush.horizontalGradient(colors = bottomCausticColors),
-                    start = Offset(size.width * 0.12f, size.height - 1f),
-                    end = Offset(size.width * 0.88f, size.height - 1f),
+                    start = Offset(size.width * 0.08f, 0.75f),
+                    end = Offset(size.width * 0.92f, 0.75f),
                     strokeWidth = 1.dp.toPx()
                 )
             }
@@ -2547,11 +2416,7 @@ fun LiquidGlassBox(
                 } else Modifier
             ),
         contentAlignment = contentAlignment,
-        content = {
-            CompositionLocalProvider(LocalContentColor provides Color.White) {
-                content()
-            }
-        }
+        content = content
     )
 }
 
@@ -5634,7 +5499,7 @@ private fun SeniorLiquidAlbumCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val coverUrl = album.cover.toCoverUrl() ?: album.extras["cover_url"]
+    val coverUrl = AudixArtworkEngine.rememberAlbumCover(album)
 
     LiquidGlassCard(
         modifier = Modifier.width(176.dp),
@@ -5772,7 +5637,7 @@ private fun SeniorLiquidArtistCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val coverUrl = artist.cover.toCoverUrl() ?: artist.extras["cover_url"]
+    val coverUrl = AudixArtworkEngine.rememberArtistCover(artist)
 
     LiquidGlassCard(
         modifier = Modifier.width(176.dp),

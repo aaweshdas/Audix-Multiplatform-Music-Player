@@ -99,7 +99,10 @@ def update_jar(jar_path):
         for item in zin.infolist():
             if item.filename in classes_to_update:
                 continue
-            elif (item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/HomeScreenKt') or
+            elif (item.filename.startswith('dev/brahmkshatriya/echo/desktop/ai/') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/AiStudio') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$AiStudio') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/HomeScreenKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$HomeScreenKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/EchoScreensaverKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/ComposableSingletons$EchoScreensaverKt') or
@@ -137,7 +140,18 @@ def update_jar(jar_path):
         for path, data in classes_to_update.items():
             zout.writestr(path, data)
             
-    os.replace(temp_jar, jar_path)
+    import time
+    for attempt in range(5):
+        try:
+            os.replace(temp_jar, jar_path)
+            break
+        except PermissionError:
+            time.sleep(0.6)
+    else:
+        time.sleep(1.0)
+        if os.path.exists(jar_path):
+            os.remove(jar_path)
+        shutil.move(temp_jar, jar_path)
     print(f'   Successfully updated: {jar_path}')
 
 target_jars = [

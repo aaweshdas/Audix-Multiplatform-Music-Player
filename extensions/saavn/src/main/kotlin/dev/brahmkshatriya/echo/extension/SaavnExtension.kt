@@ -113,11 +113,10 @@ class SaavnExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, TrackC
                     val rawImage = obj["image"]?.jsonPrimitive?.content ?: ""
                     val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500")
 
-                    val encUrl = obj["encrypted_media_url"]?.jsonPrimitive?.content
-                    val previewUrl = obj["media_preview_url"]?.jsonPrimitive?.content
+                    val encUrl = obj["encrypted_media_url"]?.jsonPrimitive?.content?.takeIf { it != "false" && it.isNotBlank() }
+                    val previewUrl = obj["media_preview_url"]?.jsonPrimitive?.content?.takeIf { it != "false" && it.isNotBlank() }
 
                     val streamUrl = encUrl?.let { decryptMediaUrl(it) } ?: previewUrl ?: ""
-                    if (streamUrl.isBlank()) return@runCatching null
 
                     val durationStr = obj["duration"]?.jsonPrimitive?.content
                     val durationMs = durationStr?.toLongOrNull()?.times(1000L)
@@ -126,12 +125,13 @@ class SaavnExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, TrackC
                         id = id,
                         quality = 320,
                         title = "320 kbps (JioSaavn HQ)",
-                        extras = mapOf(
-                            "stream_url" to streamUrl,
-                            "extension_id" to "saavn_music",
-                            "track_title" to title,
-                            "artist_name" to artistsRaw
-                        )
+                        extras = buildMap {
+                            if (streamUrl.isNotBlank()) put("stream_url", streamUrl)
+                            put("extension_id", "saavn_music")
+                            put("track_title", title)
+                            put("artist_name", artistsRaw)
+                            put("song_id", id)
+                        }
                     )
 
                     Track(
@@ -143,11 +143,12 @@ class SaavnExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, TrackC
                         streamables = listOf(streamable),
                         duration = durationMs,
                         extras = buildMap {
-                            put("stream_url", streamUrl)
+                            if (streamUrl.isNotBlank()) put("stream_url", streamUrl)
                             put("extension_id", "saavn_music")
                             put("source", "JioSaavn")
                             put("track_title", title)
                             put("artist_name", artistsRaw)
+                            put("song_id", id)
                             if (highResImage.isNotBlank()) put("cover_url", highResImage)
                             if (albumRaw != null) put("album_name", albumRaw)
                         }
@@ -489,7 +490,7 @@ class SaavnExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, TrackC
 
         // Direct fetch by numeric JioSaavn song ID
         val songId = track.extras["song_id"] ?: track.id
-        if (songId.length >= 6 && songId.all { it.isDigit() }) {
+        if (songId.isNotBlank() && songId.length in 6..32 && !songId.contains(" ") && !songId.startsWith("http")) {
             val directTrack = runCatching {
                 val url = "https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=$songId"
                 val req = Request.Builder().url(url).build()

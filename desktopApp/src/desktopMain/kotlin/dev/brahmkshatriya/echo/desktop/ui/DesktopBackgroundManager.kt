@@ -369,6 +369,9 @@ object DesktopBackgroundManager {
                     ?: Paths.get("src", "desktopMain", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                 stream?.use { ImageIO.read(it)?.toComposeImageBitmap() }
             } else null
+        }.onFailure {
+            println("[DesktopBackgroundManager] Error loading bitmap for '${wallpaper.id}': ${it.message}")
+            it.printStackTrace()
         }.getOrNull()
 
         if (bmp != null) {
@@ -426,6 +429,9 @@ object DesktopBackgroundManager {
                     blurredSkia.toComposeImageBitmap()
                 } else null
             } else null
+        }.onFailure {
+            println("[DesktopBackgroundManager] Error loading blurred bitmap for '${wallpaper.id}': ${it.message}")
+            it.printStackTrace()
         }.getOrNull()
 
         if (bmp != null) {

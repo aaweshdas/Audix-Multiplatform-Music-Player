@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import dev.brahmkshatriya.echo.common.models.EchoMediaItem
 import dev.brahmkshatriya.echo.core.settings.EchoSettings
 import dev.brahmkshatriya.echo.desktop.ui.player.MiniPlayer
+import dev.brahmkshatriya.echo.desktop.ui.screens.AiStudioScreen
 import dev.brahmkshatriya.echo.desktop.ui.screens.DownloadsScreen
 import dev.brahmkshatriya.echo.desktop.ui.screens.ExtensionsScreen
 import dev.brahmkshatriya.echo.desktop.ui.screens.HomeScreen
@@ -95,6 +97,7 @@ enum class Screen(
     val icon: ImageVector,
 ) {
     HOME("Home", Icons.Default.Home),
+    AI_STUDIO("AI Studio", Icons.Default.AutoAwesome),
     ROTATION("Rotation", Icons.Default.Whatshot),
     SEARCH("Search", Icons.Default.Search),
     LIBRARY("Library", Icons.Default.LibraryMusic),
@@ -139,17 +142,17 @@ fun EchoDesktopApp() {
             val settings = runCatching { koinInject<EchoSettings>() }.getOrNull()
 
             var isScreensaverActive by remember { mutableStateOf(false) }
-            var lastActivityTime by remember { mutableStateOf(System.currentTimeMillis()) }
-            var screensaverActivatedAt by remember { mutableStateOf(0L) }
-            var isMouseInsideApp by remember { mutableStateOf(true) }
-            var mouseExitedAt by remember { mutableStateOf(0L) }
-            var lastPointerPosition by remember { mutableStateOf(Offset.Zero) }
-            var screensaverStartPointerPosition by remember { mutableStateOf(Offset.Zero) }
+            val lastActivityTime = remember { java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis()) }
+            val screensaverActivatedAt = remember { java.util.concurrent.atomic.AtomicLong(0L) }
+            val isMouseInsideApp = remember { java.util.concurrent.atomic.AtomicBoolean(true) }
+            val mouseExitedAt = remember { java.util.concurrent.atomic.AtomicLong(0L) }
+            val lastPointerPosition = remember { java.util.concurrent.atomic.AtomicReference(Offset.Zero) }
+            val screensaverStartPointerPosition = remember { java.util.concurrent.atomic.AtomicReference(Offset.Zero) }
 
             val launchScreensaver: () -> Unit = {
-                mouseExitedAt = 0L
-                screensaverActivatedAt = System.currentTimeMillis()
-                screensaverStartPointerPosition = lastPointerPosition
+                mouseExitedAt.set(0L)
+                screensaverActivatedAt.set(System.currentTimeMillis())
+                screensaverStartPointerPosition.set(lastPointerPosition.get())
                 isScreensaverActive = true
             }
 
@@ -178,22 +181,22 @@ fun EchoDesktopApp() {
                     val now = System.currentTimeMillis()
                     when (event.id) {
                         MouseEvent.MOUSE_ENTERED -> {
-                            isMouseInsideApp = true
-                            mouseExitedAt = 0L
-                            lastActivityTime = now
+                            isMouseInsideApp.set(true)
+                            mouseExitedAt.set(0L)
+                            lastActivityTime.set(now)
                         }
                         MouseEvent.MOUSE_EXITED -> {
-                            isMouseInsideApp = false
-                            mouseExitedAt = now
+                            isMouseInsideApp.set(false)
+                            mouseExitedAt.set(now)
                         }
                         MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_CLICKED -> {
-                            lastActivityTime = now
+                            lastActivityTime.set(now)
                         }
                         KeyEvent.KEY_PRESSED -> {
-                            lastActivityTime = now
-                            if (isScreensaverActive && now - screensaverActivatedAt > 400L) {
+                            lastActivityTime.set(now)
+                            if (isScreensaverActive && now - screensaverActivatedAt.get() > 400L) {
                                 isScreensaverActive = false
-                                mouseExitedAt = 0L
+                                mouseExitedAt.set(0L)
                             }
                         }
                         MouseEvent.MOUSE_MOVED, MouseEvent.MOUSE_DRAGGED -> {
@@ -202,22 +205,24 @@ fun EchoDesktopApp() {
                                     Offset(event.xOnScreen.toFloat(), event.yOnScreen.toFloat())
                                 }.getOrNull()
                                 if (curPt != null) {
-                                    val dx = curPt.x - lastPointerPosition.x
-                                    val dy = curPt.y - lastPointerPosition.y
+                                    val lastPt = lastPointerPosition.get()
+                                    val dx = curPt.x - lastPt.x
+                                    val dy = curPt.y - lastPt.y
 
                                     // Ignore optical sensor micro-jitter (< 10px distance)
                                     if (dx * dx + dy * dy > 100f) {
-                                        lastPointerPosition = curPt
-                                        lastActivityTime = now
-                                        isMouseInsideApp = true
+                                        lastPointerPosition.set(curPt)
+                                        lastActivityTime.set(now)
+                                        isMouseInsideApp.set(true)
 
                                         // Wake from screensaver on deliberate movement (> 30px from activation)
-                                        if (isScreensaverActive && now - screensaverActivatedAt > 600L) {
-                                            val wakeDx = curPt.x - screensaverStartPointerPosition.x
-                                            val wakeDy = curPt.y - screensaverStartPointerPosition.y
+                                        if (isScreensaverActive && now - screensaverActivatedAt.get() > 600L) {
+                                            val startPt = screensaverStartPointerPosition.get()
+                                            val wakeDx = curPt.x - startPt.x
+                                            val wakeDy = curPt.y - startPt.y
                                             if (wakeDx * wakeDx + wakeDy * wakeDy > 900f) {
                                                 isScreensaverActive = false
-                                                mouseExitedAt = 0L
+                                                mouseExitedAt.set(0L)
                                             }
                                         }
                                     }
@@ -243,65 +248,59 @@ fun EchoDesktopApp() {
                 }
             }
 
-            // Hardware-polled monitor loop running continuously
+            // Hardware-polled monitor loop running continuously (optimized 500ms cycle)
             LaunchedEffect(Unit) {
                 while (true) {
-                    delay(200)
+                    delay(500)
                     val now = System.currentTimeMillis()
 
-                    // 1. Physically check if pointer is inside any visible application window
                     val mousePt = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
                     val isPhysicallyInside = if (mousePt != null) {
                         runCatching {
                             Window.getWindows().any { w -> w.isShowing && w.bounds.contains(mousePt) }
-                        }.getOrDefault(isMouseInsideApp)
+                        }.getOrDefault(isMouseInsideApp.get())
                     } else {
-                        isMouseInsideApp
+                        isMouseInsideApp.get()
                     }
 
-                    // Sync mouse state
                     if (isPhysicallyInside) {
-                        if (!isMouseInsideApp) {
-                            // Pointer entered the application window!
-                            isMouseInsideApp = true
-                            lastActivityTime = now
+                        if (!isMouseInsideApp.get()) {
+                            isMouseInsideApp.set(true)
+                            lastActivityTime.set(now)
                         }
                     } else {
-                        if (isMouseInsideApp) {
-                            // Pointer just left the application window!
-                            isMouseInsideApp = false
-                            mouseExitedAt = now
+                        if (isMouseInsideApp.get()) {
+                            isMouseInsideApp.set(false)
+                            mouseExitedAt.set(now)
                         }
                     }
 
-                    // 2. Hardware motion detection (jitter rejection > 10px)
                     if (mousePt != null) {
                         val curX = mousePt.x.toFloat()
                         val curY = mousePt.y.toFloat()
-                        val dx = curX - lastPointerPosition.x
-                        val dy = curY - lastPointerPosition.y
+                        val lastPt = lastPointerPosition.get()
+                        val dx = curX - lastPt.x
+                        val dy = curY - lastPt.y
                         if (dx * dx + dy * dy > 100f) {
-                            lastPointerPosition = Offset(curX, curY)
-                            lastActivityTime = now
+                            lastPointerPosition.set(Offset(curX, curY))
+                            lastActivityTime.set(now)
                         }
                     }
 
-                    // 3. Screen saver activation conditions
                     if (!isScreensaverActive) {
                         val mouseExitEnabled = settings?.getBoolean("screensaver_mouse_exit", true) ?: true
-                        // Condition A: Cursor is outside the app for >= 2.5s ("dont bring the mouse in the app")
-                        if (mouseExitEnabled && !isMouseInsideApp && mouseExitedAt > 0L) {
-                            val outsideDuration = now - mouseExitedAt
+                        val exitTime = mouseExitedAt.get()
+                        if (mouseExitEnabled && !isMouseInsideApp.get() && exitTime > 0L) {
+                            val outsideDuration = now - exitTime
                             if (outsideDuration >= 2500L) {
                                 launchScreensaver()
                             }
                         }
 
-                        // Condition B: User doesn't click or interact for >= timeout ("when the user dont click")
                         val timeoutSecs = settings?.getInt("screensaver_timeout", 60) ?: 60
                         if (timeoutSecs > 0) {
                             val idleTimeoutMs = (timeoutSecs * 1000L).coerceAtLeast(5000L)
-                            val idleDuration = now - lastActivityTime
+                            val idleDuration = now - lastActivityTime.get()
                             if (idleDuration >= idleTimeoutMs) {
                                 launchScreensaver()
                             }
@@ -372,6 +371,7 @@ fun EchoDesktopApp() {
                             Box(Modifier.fillMaxSize()) {
                                 when (selectedScreen) {
                                     Screen.HOME -> HomeScreen(onLaunchScreensaver = launchScreensaver)
+                                    Screen.AI_STUDIO -> AiStudioScreen(playerViewModel = playerViewModel, settings = settings)
                                     Screen.ROTATION -> HeavyRotationScreen(playerViewModel = playerViewModel, onLaunchScreensaver = launchScreensaver)
                                     Screen.SEARCH -> SearchScreen()
                                     Screen.LIBRARY -> LibraryScreen()
@@ -404,12 +404,12 @@ fun EchoDesktopApp() {
                 ) {
                     EchoScreensaver(
                         playerViewModel = playerViewModel,
-                        screensaverActivatedAt = screensaverActivatedAt,
+                        screensaverActivatedAt = screensaverActivatedAt.get(),
                         settings = settings,
                         onWakeUp = {
                             isScreensaverActive = false
-                            mouseExitedAt = 0L
-                            lastActivityTime = System.currentTimeMillis()
+                            mouseExitedAt.set(0L)
+                            lastActivityTime.set(System.currentTimeMillis())
                         }
                     )
                 }

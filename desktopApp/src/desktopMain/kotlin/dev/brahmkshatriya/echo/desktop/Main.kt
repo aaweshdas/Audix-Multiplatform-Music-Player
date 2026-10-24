@@ -106,6 +106,7 @@ fun main() {
         val entry = "[${LocalDateTime.now()}] ${sanitizeLog(message)}"
         runCatching {
             logWriter?.println(entry)
+            logWriter?.flush()
         }
         System.out.println(entry)
     }
@@ -115,14 +116,22 @@ fun main() {
             override fun println(x: String?) {
                 val clean = sanitizeLog(x ?: "")
                 logWriter?.println("[${LocalDateTime.now()}] [STDOUT] $clean")
+                logWriter?.flush()
                 super.println(clean)
+            }
+            override fun println(x: Any?) {
+                println(x?.toString())
             }
         }
         val teeErr = object : java.io.PrintStream(System.err) {
             override fun println(x: String?) {
                 val clean = sanitizeLog(x ?: "")
                 logWriter?.println("[${LocalDateTime.now()}] [STDERR] $clean")
+                logWriter?.flush()
                 super.println(clean)
+            }
+            override fun println(x: Any?) {
+                println(x?.toString())
             }
         }
         System.setOut(teeOut)
@@ -216,14 +225,23 @@ fun main() {
     val downloadManager = dev.brahmkshatriya.echo.desktop.download.DesktopDownloadManager.getInstance(playerViewModel, echoSettings, platform)
     runCatching {
         val extraModule = org.koin.dsl.module {
+            single<PlayerViewModel> { playerViewModel }
             single { libraryManager }
             single { downloadManager }
             single { dev.brahmkshatriya.echo.desktop.viewmodel.LyricsViewModel(get(), get(), get()) }
         }
-        koin.loadModules(listOf(extraModule))
-        log("Registered DesktopLibraryManager, DesktopDownloadManager & LyricsViewModel into Koin container")
+        koin.loadModules(listOf(extraModule), allowOverride = true)
+        log("Registered singleton PlayerViewModel, DesktopLibraryManager, DesktopDownloadManager & LyricsViewModel into Koin container")
     }.onFailure {
         log("Failed to register extra modules: ${it.stackTraceToString()}")
+    }
+
+    log("Initializing DesktopBackgroundManager...")
+    runCatching {
+        dev.brahmkshatriya.echo.desktop.ui.DesktopBackgroundManager.initialize(echoSettings)
+        log("DesktopBackgroundManager initialized successfully")
+    }.onFailure {
+        log("DesktopBackgroundManager init failed: ${it.stackTraceToString()}")
     }
 
     log("Initializing Coil...")

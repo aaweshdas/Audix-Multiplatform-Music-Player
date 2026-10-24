@@ -42,12 +42,15 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import dev.brahmkshatriya.echo.desktop.ui.AudixArtworkEngine
 import dev.brahmkshatriya.echo.desktop.ui.DesktopBackgroundManager
 import dev.brahmkshatriya.echo.desktop.ui.BackgroundWallpaper
 import dev.brahmkshatriya.echo.common.MusicExtension
@@ -282,15 +285,13 @@ private val TextPrimary = Color(0xFFFFFFFF)
 private val TextSecondary = Color(0xFFFFFFFF)
 private val TextMuted = Color(0xFFFFFFFF)
 
-private fun ImageHolder?.toCoverUrl(): String? = when (this) {
-    is ImageHolder.NetworkRequestImageHolder -> request.url
-    is ImageHolder.ResourceUriImageHolder -> uri
-    else -> null
-}
+private fun ImageHolder?.toCoverUrl(): String? = AudixArtworkEngine.toCoverUrl(this)
 
 private fun EchoMediaItem.extractCoverUrl(): String? = when (this) {
     is Track -> this.extractCoverUrl()
-    else -> cover.toCoverUrl() ?: (this as? dev.brahmkshatriya.echo.common.models.Album)?.cover.toCoverUrl()
+    is Artist -> AudixArtworkEngine.toCoverUrl(cover) ?: AudixArtworkEngine.artistCache[AudixArtworkEngine.cleanArtistKey(name)] ?: extras["cover_url"]
+    is Album -> AudixArtworkEngine.toCoverUrl(cover) ?: AudixArtworkEngine.albumCache[AudixArtworkEngine.cleanAlbumKey(title)] ?: extras["cover_url"]
+    else -> AudixArtworkEngine.toCoverUrl(cover) ?: (this as? dev.brahmkshatriya.echo.common.models.Album)?.cover?.let { AudixArtworkEngine.toCoverUrl(it) } ?: extras["cover_url"]
 }
 
 private fun Track.extractCoverUrl(): String? {
@@ -302,9 +303,9 @@ private fun Track.extractCoverUrl(): String? {
             fromHolder.contains("hqdefault.jpg") ||
             fromHolder.contains("mqdefault.jpg") ||
             fromHolder.contains("120x120")
-        if (isGeneric) return extraCover
+        if (isGeneric) return AudixArtworkEngine.upgradeYouTubeThumbnail(extraCover)
     }
-    return fromHolder ?: extraCover
+    return AudixArtworkEngine.upgradeYouTubeThumbnail(fromHolder ?: extraCover)
 }
 
 private fun formatTrackDuration(durationMs: Long?): String {
@@ -2520,29 +2521,23 @@ fun SeniorShelfDetailModal(
                                     )
                                 }
                                 is Album -> {
+                                    val albCover = AudixArtworkEngine.rememberAlbumCover(item)
                                     ShelfMediaCardRow(
                                         title = item.title,
                                         subtitle = item.artists.joinToString(", ") { it.name }.ifBlank { "Album" },
                                         badge = "ALBUM",
-                                        coverUrl = when (val c = item.cover) {
-                                            is ImageHolder.NetworkRequestImageHolder -> c.request.url
-                                            is ImageHolder.ResourceUriImageHolder -> c.uri
-                                            else -> item.extras["cover_url"]
-                                        },
+                                        coverUrl = albCover,
                                         onClick = { onMediaSelected(item) }
                                     )
                                 }
                                 is Artist -> {
+                                    val artCover = AudixArtworkEngine.rememberArtistCover(item)
                                     ShelfMediaCardRow(
                                         title = item.name,
                                         subtitle = item.subtitle ?: "Artist",
                                         badge = "ARTIST",
                                         isCircle = true,
-                                        coverUrl = when (val c = item.cover) {
-                                            is ImageHolder.NetworkRequestImageHolder -> c.request.url
-                                            is ImageHolder.ResourceUriImageHolder -> c.uri
-                                            else -> item.extras["cover_url"]
-                                        },
+                                        coverUrl = artCover,
                                         onClick = { onMediaSelected(item) }
                                     )
                                 }
@@ -3496,10 +3491,15 @@ fun SeniorMediaDetailModal(
         is Track -> media.artists.joinToString(", ") { it.name }
         else -> ""
     }
-    val coverUrl = when (val c = media.cover) {
-        is ImageHolder.NetworkRequestImageHolder -> c.request.url
-        is ImageHolder.ResourceUriImageHolder -> c.uri
-        else -> media.extras["cover_url"]
+    val coverUrl = when (media) {
+        is Artist -> AudixArtworkEngine.rememberArtistCover(media)
+        is Album -> AudixArtworkEngine.rememberAlbumCover(media)
+        is Track -> AudixArtworkEngine.rememberMediaCover(media)
+        else -> when (val c = media.cover) {
+            is ImageHolder.NetworkRequestImageHolder -> AudixArtworkEngine.upgradeYouTubeThumbnail(c.request.url)
+            is ImageHolder.ResourceUriImageHolder -> c.uri
+            else -> media.extras["cover_url"]
+        }
     }
 
     Box(
@@ -3766,15 +3766,12 @@ fun SeniorMediaDetailModal(
                                         )
                                     }
                                     items(artistAlbums, key = { it.id }) { alb ->
+                                        val albCover = AudixArtworkEngine.rememberAlbumCover(alb)
                                         ShelfMediaCardRow(
                                             title = alb.title,
                                             subtitle = alb.releaseDate?.toString()?.takeIf { it.isNotBlank() } ?: alb.subtitle ?: "Album",
                                             badge = "ALBUM",
-                                            coverUrl = when (val c = alb.cover) {
-                                                is ImageHolder.NetworkRequestImageHolder -> c.request.url
-                                                is ImageHolder.ResourceUriImageHolder -> c.uri
-                                                else -> alb.extras["cover_url"]
-                                            },
+                                            coverUrl = albCover,
                                             onClick = { onMediaSelected(alb) }
                                         )
                                     }
@@ -5841,6 +5838,7 @@ enum class SettingsSection(
 ) {
     AUDIO("Audio & Playback", "Stream bitrate, volume normalization, buffer latency & LibVLC decoding", Icons.Default.GraphicEq),
     APPEARANCE("Appearance & Visuals", "3D music screensaver, interface styling & fluid animations", Icons.Default.Palette),
+    AI_INTELLIGENCE("Audix Intelligence", "Gemini AI API key, generative playlists & smart DJ", Icons.Default.AutoAwesome),
     STORAGE("Storage & Downloads", "Download paths, directory picker & cache management", Icons.Default.Folder),
     LOCAL_LIBRARY("Local Music Folders", "Offline music scan directories & storage paths", Icons.Default.LibraryMusic),
     SYSTEM("System & Desktop", "Tray minimization, startup & notifications", Icons.Default.Computer),
@@ -6118,6 +6116,13 @@ fun SettingsScreen(
 
     var enableAnimations by remember { mutableStateOf(settings.getBoolean("enable_animations", true)) }
     var dynamicAccentGlow by remember { mutableStateOf(settings.getBoolean("dynamic_accent_glow", true)) }
+
+    // Audix Intelligence state
+    var geminiApiKey by remember { mutableStateOf(settings.getString("gemini_api_key", "") ?: "") }
+    var geminiModel by remember { mutableStateOf(settings.getString("gemini_selected_model", "gemini-2.5-flash") ?: "gemini-2.5-flash") }
+    var isTestingAiConnection by remember { mutableStateOf(false) }
+    var aiConnectionStatus by remember { mutableStateOf<String?>(null) }
+    var aiConnectionSuccess by remember { mutableStateOf<Boolean?>(null) }
 
     // Storage state
     var downloadDir by remember {
@@ -6515,6 +6520,43 @@ fun SettingsScreen(
                     }
 
                     when (activeSection) {
+                        SettingsSection.AI_INTELLIGENCE -> {
+                            item {
+                                RenderAiIntelligenceCard(
+                                    apiKey = geminiApiKey,
+                                    selectedModel = geminiModel,
+                                    isTesting = isTestingAiConnection,
+                                    connectionStatus = aiConnectionStatus,
+                                    isSuccess = aiConnectionSuccess,
+                                    onApiKeyChange = { key ->
+                                        geminiApiKey = key
+                                        settings.putString("gemini_api_key", key)
+                                        aiConnectionStatus = null
+                                        aiConnectionSuccess = null
+                                    },
+                                    onModelChange = { model ->
+                                        geminiModel = model
+                                        settings.putString("gemini_selected_model", model)
+                                    },
+                                    onTestConnection = {
+                                        coroutineScope.launch {
+                                            isTestingAiConnection = true
+                                            aiConnectionStatus = "Connecting to Google Generative AI..."
+                                            aiConnectionSuccess = null
+                                            val res = dev.brahmkshatriya.echo.desktop.ai.AudixAiService.testApiKey(geminiApiKey, geminiModel)
+                                            if (res.isSuccess) {
+                                                aiConnectionStatus = "Connected successfully (${geminiModel})"
+                                                aiConnectionSuccess = true
+                                            } else {
+                                                aiConnectionStatus = res.exceptionOrNull()?.message ?: "Connection failed"
+                                                aiConnectionSuccess = false
+                                            }
+                                            isTestingAiConnection = false
+                                        }
+                                    }
+                                )
+                            }
+                        }
                         SettingsSection.AUDIO -> {
                             item {
                                 RenderAudioFidelityCard(
@@ -6801,13 +6843,14 @@ fun SettingsScreen(
             // Live Search View: Matches cards across all categories in monochrome style
             val matchesAudio = q.contains("audio") || q.contains("qual") || q.contains("bitrate") || q.contains("stream") || q.contains("opus") || q.contains("norm") || q.contains("vol") || q.contains("silence") || q.contains("trim") || q.contains("buffer") || q.contains("latency") || q.contains("vlc") || q.contains("decod") || q.contains("engine")
             val matchesAppearance = q.contains("appear") || q.contains("visual") || q.contains("screen") || q.contains("saver") || q.contains("anim") || q.contains("motion") || q.contains("theme") || q.contains("glow") || q.contains("scrim") || q.contains("idle") || q.contains("time")
+            val matchesAi = q.contains("ai") || q.contains("gemini") || q.contains("intel") || q.contains("prompt") || q.contains("dj") || q.contains("persona") || q.contains("radar") || q.contains("smart") || q.contains("key")
             val matchesStorage = q.contains("stor") || q.contains("down") || q.contains("folder") || q.contains("dir") || q.contains("path") || q.contains("cache") || q.contains("temp") || q.contains("clear") || q.contains("disk")
             val matchesLocal = q.contains("local") || q.contains("music") || q.contains("scan") || q.contains("offline") || q.contains("mp3") || q.contains("flac") || q.contains("dir") || q.contains("folder")
             val matchesSystem = q.contains("sys") || q.contains("tray") || q.contains("close") || q.contains("min") || q.contains("notif") || q.contains("key") || q.contains("media") || q.contains("window")
             val matchesExt = q.contains("ext") || q.contains("plug") || q.contains("source") || q.contains("repo") || q.contains("update") || q.contains("saavn") || q.contains("sound") || q.contains("radio")
             val matchesAbout = q.contains("about") || q.contains("ver") || q.contains("diag") || q.contains("info") || q.contains("jvm") || q.contains("java") || q.contains("mem") || q.contains("reset") || q.contains("factory")
 
-            val hasAnyMatch = matchesAudio || matchesAppearance || matchesStorage || matchesLocal || matchesSystem || matchesExt || matchesAbout
+            val hasAnyMatch = matchesAudio || matchesAppearance || matchesAi || matchesStorage || matchesLocal || matchesSystem || matchesExt || matchesAbout
 
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -6859,6 +6902,43 @@ fun SettingsScreen(
                                 onBufferLatencyChange = {
                                     bufferLatency = it
                                     settings.putInt("buffer_latency", it)
+                                }
+                            )
+                        }
+                    }
+                    if (matchesAi) {
+                        item {
+                            RenderAiIntelligenceCard(
+                                apiKey = geminiApiKey,
+                                selectedModel = geminiModel,
+                                isTesting = isTestingAiConnection,
+                                connectionStatus = aiConnectionStatus,
+                                isSuccess = aiConnectionSuccess,
+                                onApiKeyChange = { key ->
+                                    geminiApiKey = key
+                                    settings.putString("gemini_api_key", key)
+                                    aiConnectionStatus = null
+                                    aiConnectionSuccess = null
+                                },
+                                onModelChange = { model ->
+                                    geminiModel = model
+                                    settings.putString("gemini_selected_model", model)
+                                },
+                                onTestConnection = {
+                                    coroutineScope.launch {
+                                        isTestingAiConnection = true
+                                        aiConnectionStatus = "Connecting to Google Generative AI..."
+                                        aiConnectionSuccess = null
+                                        val res = dev.brahmkshatriya.echo.desktop.ai.AudixAiService.testApiKey(geminiApiKey, geminiModel)
+                                        if (res.isSuccess) {
+                                            aiConnectionStatus = "Connected successfully (${geminiModel})"
+                                            aiConnectionSuccess = true
+                                        } else {
+                                            aiConnectionStatus = res.exceptionOrNull()?.message ?: "Connection failed"
+                                            aiConnectionSuccess = false
+                                        }
+                                        isTestingAiConnection = false
+                                    }
                                 }
                             )
                         }
@@ -7106,6 +7186,373 @@ fun SettingsScreen(
 // ==========================================
 // MODULAR MONOCHROME SETTINGS CARD RENDERERS
 // ==========================================
+
+@Composable
+private fun RenderAiIntelligenceCard(
+    apiKey: String,
+    selectedModel: String,
+    isTesting: Boolean,
+    connectionStatus: String?,
+    isSuccess: Boolean?,
+    onApiKeyChange: (String) -> Unit,
+    onModelChange: (String) -> Unit,
+    onTestConnection: () -> Unit
+) {
+    var isKeyVisible by remember { mutableStateOf(false) }
+
+    SettingsCategoryCard(
+        title = "Audix Intelligence & Gemini AI Engine",
+        subtitle = "Connect Google Gemini generative intelligence to unlock natural-language playlist synthesis, real-time DJ track commentary, song lore & neural vibe radar.",
+        icon = Icons.Default.AutoAwesome,
+        badge = if (apiKey.isNotBlank()) "Gemini Active" else "Autonomous Studio"
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Engine Status Glass Banner
+            LiquidGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                backgroundColor = if (apiKey.isNotBlank()) Color(0xFF00382B).copy(alpha = 0.28f) else Color(0xFF1A153A).copy(alpha = 0.28f),
+                borderColor = if (apiKey.isNotBlank()) Color(0xFF00E5A3).copy(alpha = 0.35f) else Color(0xFF8A70FF).copy(alpha = 0.35f)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LiquidGlassBox(
+                        modifier = Modifier.size(36.dp),
+                        shape = CircleShape,
+                        backgroundColor = if (apiKey.isNotBlank()) Color(0xFF00E5A3).copy(alpha = 0.18f) else Color(0xFF8A70FF).copy(alpha = 0.18f),
+                        borderColor = if (apiKey.isNotBlank()) Color(0xFF00E5A3).copy(alpha = 0.40f) else Color(0xFF8A70FF).copy(alpha = 0.40f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                if (apiKey.isNotBlank()) Icons.Default.AutoAwesome else Icons.Default.Psychology,
+                                contentDescription = null,
+                                tint = if (apiKey.isNotBlank()) Color(0xFF00E5A3) else Color(0xFFB5A4FF),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (apiKey.isNotBlank()) "Google Gemini Generative AI Active" else "Autonomous Studio AI Engine Active",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = if (apiKey.isNotBlank())
+                                "Connected to Google DeepMind Gemini API. Natural language reasoning, lyrical interpretation, and DJ commentary are streaming live."
+                            else
+                                "Audix AI works 100% offline with built-in semantic curation and acoustic feature detection. Provide a Gemini API key below to unlock limitless deep-story reasoning.",
+                            color = Color.White.copy(alpha = 0.70f),
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+
+            // API Key Input Field with Liquid Glass styling
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Google Gemini API Key",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                runCatching {
+                                    Desktop.getDesktop().browse(java.net.URI("https://aistudio.google.com/app/apikey"))
+                                }
+                            }
+                            .pointerHoverIcon(PointerIcon.Hand),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            tint = Color(0xFF4E95FF),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "Get Free Gemini Key",
+                            color = Color(0xFF4E95FF),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                LiquidGlassBox(
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    backgroundColor = Color(0xFF0F131D).copy(alpha = 0.40f),
+                    borderColor = Color.White.copy(alpha = 0.15f)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Key,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.50f),
+                            modifier = Modifier.size(16.dp)
+                        )
+
+                        Spacer(Modifier.width(10.dp))
+
+                        BasicTextField(
+                            value = apiKey,
+                            onValueChange = onApiKeyChange,
+                            modifier = Modifier.weight(1f),
+                            textStyle = TextStyle(
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Normal
+                            ),
+                            singleLine = true,
+                            visualTransformation = if (isKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            cursorBrush = SolidColor(Color.White),
+                            decorationBox = { innerTextField ->
+                                if (apiKey.isEmpty()) {
+                                    Text(
+                                        text = "Paste AIzaSy... key or leave blank for autonomous studio mode",
+                                        color = Color.White.copy(alpha = 0.35f),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
+
+                        if (apiKey.isNotEmpty()) {
+                            IconButton(
+                                onClick = { isKeyVisible = !isKeyVisible },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    if (isKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = "Toggle Visibility",
+                                    tint = Color.White.copy(alpha = 0.60f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            Spacer(Modifier.width(4.dp))
+
+                            IconButton(
+                                onClick = { onApiKeyChange("") },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "Clear Key",
+                                    tint = Color.White.copy(alpha = 0.60f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Connection Diagnostic Feedback Banner
+            if (connectionStatus != null) {
+                LiquidGlassBox(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    backgroundColor = if (isSuccess == true) Color(0xFF00E5A3).copy(alpha = 0.12f) else Color(0xFFFF4848).copy(alpha = 0.12f),
+                    borderColor = if (isSuccess == true) Color(0xFF00E5A3).copy(alpha = 0.30f) else Color(0xFFFF4848).copy(alpha = 0.30f)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (isSuccess == true) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = if (isSuccess == true) Color(0xFF00E5A3) else Color(0xFFFF6B6B),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = connectionStatus,
+                            color = if (isSuccess == true) Color(0xFF00E5A3) else Color(0xFFFF6B6B),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // Model Selection Pills & Test Button Row
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Gemini Foundation Model",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                val availableModels = listOf(
+                    "gemini-2.5-flash" to "2.5 Flash (Recommended)",
+                    "gemini-2.0-flash" to "2.0 Flash (Fast)",
+                    "gemini-1.5-flash" to "1.5 Flash (Lightweight)",
+                    "gemini-1.5-pro" to "1.5 Pro (Deep Reasoning)"
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availableModels.forEach { (modelId, modelName) ->
+                        val isSelected = selectedModel == modelId
+                        LiquidGlassBox(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { onModelChange(modelId) }
+                                .pointerHoverIcon(PointerIcon.Hand),
+                            shape = RoundedCornerShape(8.dp),
+                            backgroundColor = if (isSelected) Color.White.copy(alpha = 0.20f) else Color(0xFF0F131D).copy(alpha = 0.35f),
+                            borderColor = if (isSelected) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.12f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp)) {
+                                Text(
+                                    text = modelName,
+                                    color = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                    fontSize = 10.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Action Buttons Row (Test Connection)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LiquidGlassBox(
+                    modifier = Modifier
+                        .height(36.dp)
+                        .clickable(
+                            enabled = !isTesting,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onTestConnection
+                        )
+                        .pointerHoverIcon(if (isTesting) PointerIcon.Default else PointerIcon.Hand),
+                    shape = RoundedCornerShape(8.dp),
+                    backgroundColor = Color.White.copy(alpha = 0.14f),
+                    borderColor = Color.White.copy(alpha = 0.28f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isTesting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                color = Color.White,
+                                strokeWidth = 1.8.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Testing...",
+                                color = Color.White,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Test Connection",
+                                color = Color.White,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Feature Highlights Matrix
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(
+                    Icons.Default.AutoAwesome to "Prompt-to-Playlist" to "Natural language to full playable queue",
+                    Icons.Default.GraphicEq to "AI DJ & Lore" to "Behind-the-scenes song stories & meaning",
+                    Icons.Default.Tune to "Musical DNA" to "Estimated BPM, Key & Mood metadata",
+                    Icons.Default.Psychology to "Taste Radar" to "5-axis acoustic persona visualization"
+                ).forEach { (pair, desc) ->
+                    val (icon, title) = pair
+                    LiquidGlassBox(
+                        modifier = Modifier.weight(1f).height(74.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        backgroundColor = Color(0xFF0F131D).copy(alpha = 0.28f),
+                        borderColor = Color.White.copy(alpha = 0.10f)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(title, color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            }
+                            Spacer(Modifier.height(3.dp))
+                            Text(desc, color = Color.White.copy(alpha = 0.55f), fontSize = 9.sp, lineHeight = 12.sp, maxLines = 2)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun RenderAudioFidelityCard(

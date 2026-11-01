@@ -2254,6 +2254,10 @@ fun LiquidGlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val blurredBg = LocalAppBlurredBackground.current
+    var cardWindowPos by remember { mutableStateOf<Offset?>(null) }
+    var rootWindowSize by remember { mutableStateOf<IntSize?>(null) }
+
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isInteractiveHover = isHovered && onClick != null
@@ -2298,11 +2302,54 @@ fun LiquidGlassCard(
 
     Box(
         modifier = modifier
+            .onGloballyPositioned { coords ->
+                if (blurredBg != null) {
+                    cardWindowPos = coords.positionInWindow()
+                    rootWindowSize = coords.findRootCoordinates().size
+                }
+            }
             .graphicsLayer {
                 this.shape = shape
                 clip = true
             }
             .clip(shape)
+            .drawBehind {
+                if (blurredBg != null && rootWindowSize != null && rootWindowSize!!.width > 0 && rootWindowSize!!.height > 0 && cardWindowPos != null) {
+                    val rootW = rootWindowSize!!.width.toFloat()
+                    val rootH = rootWindowSize!!.height.toFloat()
+                    val pos = cardWindowPos!!
+                    val rx = (pos.x / rootW).coerceIn(0f, 1f)
+                    val ry = (pos.y / rootH).coerceIn(0f, 1f)
+                    val rw = (size.width / rootW).coerceIn(0.001f, 1f - rx)
+                    val rh = (size.height / rootH).coerceIn(0.001f, 1f - ry)
+
+                    val srcX = (rx * blurredBg.width).toInt().coerceIn(0, blurredBg.width - 1)
+                    val srcY = (ry * blurredBg.height).toInt().coerceIn(0, blurredBg.height - 1)
+                    val srcW = (rw * blurredBg.width).toInt().coerceIn(1, blurredBg.width - srcX)
+                    val srcH = (rh * blurredBg.height).toInt().coerceIn(1, blurredBg.height - srcY)
+
+                    drawImage(
+                        image = blurredBg,
+                        srcOffset = IntOffset(srcX, srcY),
+                        srcSize = IntSize(srcW, srcH),
+                        dstOffset = IntOffset.Zero,
+                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                        alpha = 0.88f,
+                        filterQuality = FilterQuality.Low
+                    )
+                } else if (blurredBg != null) {
+                    drawImage(
+                        image = blurredBg,
+                        srcOffset = IntOffset.Zero,
+                        srcSize = IntSize(blurredBg.width, blurredBg.height),
+                        dstOffset = IntOffset.Zero,
+                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                        alpha = 0.82f,
+                        filterQuality = FilterQuality.Low
+                    )
+                }
+                drawRect(color = Color(0xFF04060A).copy(alpha = 0.38f))
+            }
             .background(bgBrush)
             .border(borderStroke, shape)
             .drawWithContent {
@@ -2361,6 +2408,10 @@ fun LiquidGlassBox(
     contentAlignment: Alignment = Alignment.Center,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val blurredBg = LocalAppBlurredBackground.current
+    var boxWindowPos by remember { mutableStateOf<Offset?>(null) }
+    var boxRootWindowSize by remember { mutableStateOf<IntSize?>(null) }
+
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isInteractiveHover = isHovered && onClick != null
@@ -2426,11 +2477,54 @@ fun LiquidGlassBox(
 
     Box(
         modifier = modifier
+            .onGloballyPositioned { coords ->
+                if (blurredBg != null) {
+                    boxWindowPos = coords.positionInWindow()
+                    boxRootWindowSize = coords.findRootCoordinates().size
+                }
+            }
             .graphicsLayer {
                 this.shape = shape
                 clip = true
             }
             .clip(shape)
+            .drawBehind {
+                if (blurredBg != null && boxRootWindowSize != null && boxRootWindowSize!!.width > 0 && boxRootWindowSize!!.height > 0 && boxWindowPos != null) {
+                    val rootW = boxRootWindowSize!!.width.toFloat()
+                    val rootH = boxRootWindowSize!!.height.toFloat()
+                    val pos = boxWindowPos!!
+                    val rx = (pos.x / rootW).coerceIn(0f, 1f)
+                    val ry = (pos.y / rootH).coerceIn(0f, 1f)
+                    val rw = (size.width / rootW).coerceIn(0.001f, 1f - rx)
+                    val rh = (size.height / rootH).coerceIn(0.001f, 1f - ry)
+
+                    val srcX = (rx * blurredBg.width).toInt().coerceIn(0, blurredBg.width - 1)
+                    val srcY = (ry * blurredBg.height).toInt().coerceIn(0, blurredBg.height - 1)
+                    val srcW = (rw * blurredBg.width).toInt().coerceIn(1, blurredBg.width - srcX)
+                    val srcH = (rh * blurredBg.height).toInt().coerceIn(1, blurredBg.height - srcY)
+
+                    drawImage(
+                        image = blurredBg,
+                        srcOffset = IntOffset(srcX, srcY),
+                        srcSize = IntSize(srcW, srcH),
+                        dstOffset = IntOffset.Zero,
+                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                        alpha = 0.85f,
+                        filterQuality = FilterQuality.Low
+                    )
+                } else if (blurredBg != null) {
+                    drawImage(
+                        image = blurredBg,
+                        srcOffset = IntOffset.Zero,
+                        srcSize = IntSize(blurredBg.width, blurredBg.height),
+                        dstOffset = IntOffset.Zero,
+                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                        alpha = 0.78f,
+                        filterQuality = FilterQuality.Low
+                    )
+                }
+                drawRect(color = Color(0xFF04060A).copy(alpha = 0.35f))
+            }
             .background(bgBrush)
             .border(borderStroke, shape)
             .drawWithContent {

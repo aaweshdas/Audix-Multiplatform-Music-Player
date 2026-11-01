@@ -106,6 +106,14 @@ data class MovieStreamOption(
     val sourceType: String = "moviebox"
 )
 
+enum class MovieSortOrder(val label: String) {
+    NAME_ASC("Name (A → Z)"),
+    NAME_DESC("Name (Z → A)"),
+    RATING_DESC("Top Rated (★)"),
+    YEAR_DESC("Year (Newest)"),
+    YEAR_ASC("Year (Oldest)")
+}
+
 // Legacy compatibility model
 data class MovieSoundtrack(
     val id: String,
@@ -192,7 +200,13 @@ object MoviePlayRepository {
             return json.decodeFromString<List<MovieBoxItem>>(directPath.readText(Charsets.UTF_8))
         }
 
-        // 4. Try Relative Path
+        // 4. Try Workspace Source Resource Path
+        val devResPath = File("desktopApp/src/desktopMain/resources/moviebox/curated_catalog.json")
+        if (devResPath.exists()) {
+            return json.decodeFromString<List<MovieBoxItem>>(devResPath.readText(Charsets.UTF_8))
+        }
+
+        // 5. Try Relative Path
         val relPath = File("app/resources/moviebox/curated_catalog.json")
         if (relPath.exists()) {
             return json.decodeFromString<List<MovieBoxItem>>(relPath.readText(Charsets.UTF_8))

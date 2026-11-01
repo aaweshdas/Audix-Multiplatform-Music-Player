@@ -1,6 +1,19 @@
 package dev.brahmkshatriya.echo.desktop.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.derivedStateOf
+import dev.brahmkshatriya.echo.desktop.ui.LocalAppBlurredBackground
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -191,8 +204,15 @@ fun MoviePlayScreen(
     // Hero Spotlight Movie (top blockbuster e.g. Deadpool & Wolverine or Dune 2)
     val heroMovie = remember(displayMovies) { displayMovies.firstOrNull() ?: allMovies.firstOrNull() }
 
+    val listState = rememberLazyListState()
+    val showScrollToTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 1 }
+    }
+    val franchiseListState = rememberLazyListState()
+
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -538,17 +558,49 @@ fun MoviePlayScreen(
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = Color.White
                             )
-                            if (selectedFranchise != null) {
-                                Text(
-                                    text = "Clear filter",
-                                    fontSize = 11.5.sp,
-                                    color = Color(0xFF38BDF8),
-                                    modifier = Modifier.clickable { selectedFranchise = null }
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (selectedFranchise != null) {
+                                    Text(
+                                        text = "Clear filter",
+                                        fontSize = 11.5.sp,
+                                        color = Color(0xFF38BDF8),
+                                        modifier = Modifier.clickable { selectedFranchise = null }
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                }
+                                // Carousel scroll buttons
+                                LiquidGlassBox(
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(28.dp).pointerHoverIcon(PointerIcon.Hand),
+                                    onClick = {
+                                        scope.launch {
+                                            val current = franchiseListState.firstVisibleItemIndex
+                                            franchiseListState.animateScrollToItem((current - 3).coerceAtLeast(0))
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.ChevronLeft, contentDescription = "Scroll Left", tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                                LiquidGlassBox(
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(28.dp).pointerHoverIcon(PointerIcon.Hand),
+                                    onClick = {
+                                        scope.launch {
+                                            val current = franchiseListState.firstVisibleItemIndex
+                                            franchiseListState.animateScrollToItem((current + 3).coerceAtMost(franchiseCollections.size - 1))
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.ChevronRight, contentDescription = "Scroll Right", tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
 
                         LazyRow(
+                            state = franchiseListState,
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
@@ -625,32 +677,107 @@ fun MoviePlayScreen(
                             color = Color.White
                         )
 
-                        val chunkedMovies = displayMovies.chunked(4)
-                        for (row in chunkedMovies) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                for (movie in row) {
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        MovieBoxCinemaCard(
-                                            item = movie,
-                                            onPlay = {
-                                                selectedMovieForModal = movie
-                                            },
-                                            onSelect = {
-                                                selectedMovieForModal = movie
+                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                            val screenWidth = maxWidth
+                            val columns = when {
+                                screenWidth >= 1650.dp -> 7
+                                screenWidth >= 1350.dp -> 6
+                                screenWidth >= 1050.dp -> 5
+                                screenWidth >= 750.dp -> 4
+                                else -> 3
+                            }
+                            val chunkedMovies = displayMovies.chunked(columns)
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                for (row in chunkedMovies) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                    ) {
+                                        for (movie in row) {
+                                            Box(modifier = Modifier.weight(1f)) {
+                                                MovieBoxCinemaCard(
+                                                    item = movie,
+                                                    onPlay = {
+                                                        selectedMovieForModal = movie
+                                                    },
+                                                    onSelect = {
+                                                        selectedMovieForModal = movie
+                                                    },
+                                                    onTrailerClick = {
+                                                        val tUrl = MoviePlayRepository.getTrailerUrl(movie.title)
+                                                        MoviePlayRepository.openInBrowser(tUrl)
+                                                        toastMessage = "🎬 Opening Official Trailer for ${movie.title}..."
+                                                    },
+                                                    onSoundtrackClick = {
+                                                        scope.launch {
+                                                            toastMessage = "🎵 Finding Original Soundtrack for ${movie.title}..."
+                                                            val tracks = MoviePlayRepository.resolveSoundtrackForMovie(movie.title)
+                                                            if (tracks.isNotEmpty()) {
+                                                                playerViewModel.playWithQueue(tracks.first(), tracks)
+                                                                toastMessage = "▶ Playing Soundtrack: ${movie.title} (${tracks.size} tracks queued)"
+                                                            } else {
+                                                                toastMessage = "⚠ No audio album found for ${movie.title}"
+                                                            }
+                                                        }
+                                                    }
+                                                )
                                             }
-                                        )
+                                        }
+                                        val rem = columns - row.size
+                                        if (rem > 0) {
+                                            for (i in 0 until rem) Spacer(Modifier.weight(1f))
+                                        }
                                     }
-                                }
-                                val rem = 4 - row.size
-                                if (rem > 0) {
-                                    for (i in 0 until rem) Spacer(Modifier.weight(1f))
                                 }
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // Floating Quick Scroll-to-Top Navigation Button
+        AnimatedVisibility(
+            visible = showScrollToTop,
+            enter = fadeIn(tween(250)) + scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)),
+            exit = fadeOut(tween(200)) + scaleOut(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 28.dp, bottom = 28.dp)
+                .zIndex(95f)
+        ) {
+            LiquidGlassCard(
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .height(44.dp)
+                    .shadow(16.dp, RoundedCornerShape(16.dp), spotColor = Color(0xFFE11D48).copy(alpha = 0.60f))
+                    .pointerHoverIcon(PointerIcon.Hand),
+                backgroundColor = Color(0xFFE11D48).copy(alpha = 0.90f),
+                borderColor = Color.White.copy(alpha = 0.40f),
+                hoverBorderColor = Color.White,
+                onClick = {
+                    scope.launch {
+                        listState.animateScrollToItem(0)
+                    }
+                }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Scroll to Top",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        "Top",
+                        color = Color.White,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -831,118 +958,259 @@ fun SeniorMoviePlaySection(
 fun MovieBoxCinemaCard(
     item: MovieBoxItem,
     onPlay: () -> Unit,
-    onSelect: () -> Unit
+    onSelect: () -> Unit,
+    onTrailerClick: (() -> Unit)? = null,
+    onSoundtrackClick: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.04f else 1.0f,
+        targetValue = if (isHovered) 1.035f else 1.0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium)
     )
 
-    Column(
+    LiquidGlassCard(
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(interactionSource = interactionSource, indication = null) { onSelect() }
+            .pointerHoverIcon(PointerIcon.Hand),
+        backgroundColor = if (isHovered) Color(0xFF131824).copy(alpha = 0.45f) else Color(0xFF0A0D14).copy(alpha = 0.28f),
+        borderColor = if (isHovered) Color(0xFFE11D48).copy(alpha = 0.70f) else Color.White.copy(alpha = 0.12f),
+        hoverBorderColor = Color(0xFFE11D48).copy(alpha = 0.85f),
+        onClick = onSelect
     ) {
-        // Poster with glow
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(235.dp)
-                .shadow(
-                    elevation = if (isHovered) 18.dp else 6.dp,
-                    shape = RoundedCornerShape(14.dp),
-                    spotColor = Color(0xFFE11D48).copy(alpha = 0.50f)
-                )
-                .clip(RoundedCornerShape(14.dp))
-                .border(
-                    BorderStroke(1.dp, if (isHovered) Color(0xFFE11D48).copy(alpha = 0.80f) else Color.White.copy(alpha = 0.12f)),
-                    shape = RoundedCornerShape(14.dp)
-                )
+                .padding(8.dp)
         ) {
-            AsyncImage(
-                model = item.coverUrl.ifBlank { item.bannerUrl },
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Top Quality & Rating badges
-            Row(
+            // Poster with true cinema portrait 2:3 aspect ratio
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(
+                        BorderStroke(1.dp, if (isHovered) Color(0xFFE11D48).copy(alpha = 0.60f) else Color.White.copy(alpha = 0.08f)),
+                        shape = RoundedCornerShape(12.dp)
+                    )
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.75f))
-                        .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.60f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(item.qualityBadge.ifBlank { "HD" }, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                }
+                AsyncImage(
+                    model = item.coverUrl.ifBlank { item.bannerUrl },
+                    contentDescription = item.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
 
+                // Top Quality & Rating badges
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.75f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        .fillMaxWidth()
+                        .padding(6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(11.dp))
-                    Text(item.rating, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
+                    // Quality Pill
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(Color.Black.copy(alpha = 0.75f))
+                            .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.60f), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = item.qualityBadge.ifBlank { "1080p HD" },
+                            color = Color.White,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
-            // Hover quick play button
-            if (isHovered) {
-                Box(
+                    // IMDB Rating Pill
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(Color.Black.copy(alpha = 0.75f))
+                            .border(1.dp, Color(0xFFFBBF24).copy(alpha = 0.40f), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(10.dp))
+                        Text(
+                            text = item.rating.ifBlank { "8.5" },
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Bottom badges on poster: Type (Left) & Duration (Right)
+                Row(
                     modifier = Modifier
-                        .size(46.dp)
-                        .align(Alignment.Center)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE11D48))
-                        .clickable { onPlay() },
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(24.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF0F172A).copy(alpha = 0.85f))
+                            .border(1.dp, if (item.type == "series") Color(0xFF38BDF8).copy(alpha = 0.6f) else Color(0xFFE11D48).copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                    ) {
+                        Text(
+                            text = if (item.type == "series") "SERIES" else "MOVIE",
+                            color = if (item.type == "series") Color(0xFF38BDF8) else Color(0xFFFDA4AF),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.3.sp
+                        )
+                    }
+
+                    if (item.duration.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color.Black.copy(alpha = 0.80f))
+                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                        ) {
+                            Text(
+                                text = item.duration,
+                                color = Color.White.copy(alpha = 0.90f),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
+                // Hover Action Overlay
+                if (isHovered) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.Black.copy(alpha = 0.25f),
+                                        Color.Black.copy(alpha = 0.60f),
+                                        Color(0xFF0F172A).copy(alpha = 0.92f)
+                                    )
+                                )
+                            )
+                    ) {
+                        // Center Play Stream Button
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .align(Alignment.Center)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE11D48))
+                                .clickable { onPlay() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(26.dp))
+                        }
+
+                        // Bottom Quick Actions: Trailer & Music
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = 6.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (onTrailerClick != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color.White.copy(alpha = 0.20f))
+                                        .clickable { onTrailerClick() }
+                                        .padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Icon(Icons.Default.Theaters, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
+                                        Text("Trailer", color = Color.White, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            if (onSoundtrackClick != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFF38BDF8).copy(alpha = 0.25f))
+                                        .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.50f), RoundedCornerShape(6.dp))
+                                        .clickable { onSoundtrackClick() }
+                                        .padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(11.dp))
+                                        Text("Music", color = Color.White, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        }
 
-        Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
-        Text(
-            text = item.title,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+            // Mini-Info: Title
             Text(
-                text = "${item.year} • ${item.genre.split(",").firstOrNull()?.trim() ?: "Cinema"}",
-                fontSize = 11.sp,
-                color = Color.White.copy(alpha = 0.70f),
+                text = item.title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+                fontSize = 12.5.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            if (item.type == "series") {
-                Text("Series", fontSize = 10.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(2.dp))
+
+            // Mini-Info: Year • Genre • Mirrors
+            val mainGenre = item.genre.split(",").firstOrNull()?.trim() ?: "Cinema"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${item.year} • $mainGenre",
+                    fontSize = 10.5.sp,
+                    color = Color.White.copy(alpha = 0.70f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "4 Mirrors",
+                    fontSize = 9.sp,
+                    color = Color(0xFF10B981),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Mini-Info: Plot Synopsis Snippet
+            if (item.description.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = item.description,
+                    fontSize = 9.5.sp,
+                    color = Color.White.copy(alpha = 0.50f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 12.sp
+                )
             }
         }
     }
@@ -963,17 +1231,22 @@ fun MovieCinemaCard(
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium)
     )
 
-    Column(
+    LiquidGlassCard(
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(interactionSource = interactionSource, indication = null) { onSelect() }
+            .pointerHoverIcon(PointerIcon.Hand),
+        backgroundColor = if (isHovered) Color(0xFF131824).copy(alpha = 0.45f) else Color(0xFF0A0D14).copy(alpha = 0.28f),
+        borderColor = if (isHovered) movie.accentColor.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.12f),
+        hoverBorderColor = movie.accentColor,
+        onClick = onSelect
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(235.dp)
+        Column(modifier = Modifier.fillMaxWidth().padding(7.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
                 .shadow(
                     elevation = if (isHovered) 18.dp else 6.dp,
                     shape = RoundedCornerShape(14.dp),
@@ -1031,9 +1304,12 @@ fun MovieCinemaCard(
 
         Text(
             text = "${movie.year} • ${movie.genre}",
-            fontSize = 11.sp,
-            color = Color.White.copy(alpha = 0.70f)
+            fontSize = 10.5.sp,
+            color = Color.White.copy(alpha = 0.70f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
+        }
     }
 }
 
@@ -1211,15 +1487,15 @@ fun SeniorMovieBoxDetailModal(
             .zIndex(90f),
         contentAlignment = Alignment.Center
     ) {
-        Box(
+        LiquidGlassCard(
+            shape = RoundedCornerShape(22.dp),
             modifier = Modifier
                 .width(820.dp)
                 .heightIn(max = 680.dp)
-                .shadow(28.dp, RoundedCornerShape(22.dp), spotColor = Color(0xFFE11D48))
-                .clip(RoundedCornerShape(22.dp))
-                .background(Color(0xFF0A0C10))
-                .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.40f), RoundedCornerShape(22.dp))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { /* Consume */ }
+                .shadow(28.dp, RoundedCornerShape(22.dp), spotColor = Color(0xFFE11D48).copy(alpha = 0.50f))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { /* Consume */ },
+            backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.60f),
+            borderColor = Color(0xFFE11D48).copy(alpha = 0.50f)
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),

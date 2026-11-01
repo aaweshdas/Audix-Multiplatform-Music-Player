@@ -313,35 +313,31 @@ fun MoviePlayScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFFE11D48).copy(alpha = 0.15f))
-                                    .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.40f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            LiquidGlassBox(
+                                shape = RoundedCornerShape(6.dp),
+                                borderColor = Color(0xFFE11D48).copy(alpha = 0.40f)
                             ) {
                                 Text(
                                     text = "MOVIEBOX CORE • 1,534+ CINEMA & SERIES TITLES",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFFE11D48),
-                                    letterSpacing = 0.5.sp
+                                    letterSpacing = 0.5.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
 
                             // Live server status pill
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isServerOnline) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFF38BDF8).copy(alpha = 0.15f))
-                                    .border(1.dp, if (isServerOnline) Color(0xFF10B981).copy(alpha = 0.40f) else Color(0xFF38BDF8).copy(alpha = 0.40f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            LiquidGlassBox(
+                                shape = RoundedCornerShape(6.dp),
+                                borderColor = if (isServerOnline) Color(0xFF10B981).copy(alpha = 0.40f) else Color(0xFF38BDF8).copy(alpha = 0.40f)
                             ) {
                                 Text(
                                     text = if (isServerOnline) "● Server 3000 Online" else "● Local Master Cache",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isServerOnline) Color(0xFF10B981) else Color(0xFF38BDF8)
+                                    color = if (isServerOnline) Color(0xFF10B981) else Color(0xFF38BDF8),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
                         }
@@ -444,14 +440,11 @@ fun MoviePlayScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Color(0xFFE11D48).copy(alpha = 0.20f))
-                                            .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.60f), RoundedCornerShape(6.dp))
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    LiquidGlassBox(
+                                        shape = RoundedCornerShape(6.dp),
+                                        borderColor = Color(0xFFE11D48).copy(alpha = 0.60f)
                                     ) {
-                                        Text(heroMovie.qualityBadge.ifBlank { "4K UHD" }, color = Color(0xFFE11D48), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(heroMovie.qualityBadge.ifBlank { "4K UHD" }, color = Color(0xFFE11D48), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
                                     }
 
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -797,37 +790,33 @@ fun MoviePlayScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             if (selectedLetter == "All" && searchQuery.isBlank() && sortOrder == MovieSortOrder.NAME_ASC) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (groupByLetter) Color(0xFFE11D48).copy(alpha = 0.20f) else Color.White.copy(alpha = 0.08f))
-                                        .border(1.dp, if (groupByLetter) Color(0xFFE11D48).copy(alpha = 0.60f) else Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                        .clickable { groupByLetter = !groupByLetter }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(8.dp),
+                                    borderColor = if (groupByLetter) Color(0xFFE11D48).copy(alpha = 0.60f) else Color.White.copy(alpha = 0.15f),
+                                    isSelected = groupByLetter,
+                                    selectedBgColor = Color(0xFFE11D48).copy(alpha = 0.22f)
                                 ) {
                                     Text(
                                         text = if (groupByLetter) "✓ A-Z Grouped" else "Flat Grid",
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = if (groupByLetter) Color.White else Color.White.copy(alpha = 0.75f)
+                                        color = if (groupByLetter) Color.White else Color.White.copy(alpha = 0.75f),
+                                        modifier = Modifier.clickable { groupByLetter = !groupByLetter }.padding(horizontal = 10.dp, vertical = 6.dp)
                                     )
                                 }
                             }
 
                             if (selectedLetter != "All") {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFF38BDF8).copy(alpha = 0.15f))
-                                        .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.40f), RoundedCornerShape(8.dp))
-                                        .clickable { selectedLetter = "All" }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(8.dp),
+                                    borderColor = Color(0xFF38BDF8).copy(alpha = 0.40f)
                                 ) {
                                     Text(
                                         text = "Reset Letter filter ×",
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF38BDF8)
+                                        color = Color(0xFF38BDF8),
+                                        modifier = Modifier.clickable { selectedLetter = "All" }.padding(horizontal = 10.dp, vertical = 6.dp)
                                     )
                                 }
                             }
@@ -993,17 +982,21 @@ fun MoviePlayScreen(
 
         // Toast feedback overlay
         toastMessage?.let { msg ->
-            Box(
+            LiquidGlassBox(
+                shape = RoundedCornerShape(12.dp),
+                borderColor = Color(0xFFE11D48).copy(alpha = 0.85f),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 24.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF0F172A).copy(alpha = 0.95f))
-                    .border(1.dp, Color(0xFFE11D48), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 20.dp, vertical = 10.dp)
                     .zIndex(100f)
             ) {
-                Text(text = msg, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(
+                    text = msg,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                )
             }
             LaunchedEffect(msg) {
                 delay(3200L)
@@ -1093,19 +1086,17 @@ fun SeniorMoviePlaySection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFE11D48).copy(alpha = 0.20f))
-                            .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.50f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    LiquidGlassBox(
+                        shape = RoundedCornerShape(4.dp),
+                        borderColor = Color(0xFFE11D48).copy(alpha = 0.50f)
                     ) {
                         Text(
                             text = "CINEMA STUDIO • 1,534+ TITLES",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE11D48),
-                            letterSpacing = 0.5.sp
+                            letterSpacing = 0.5.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
@@ -1185,7 +1176,7 @@ fun MovieBoxCinemaCard(
             .fillMaxWidth()
             .scale(scale)
             .pointerHoverIcon(PointerIcon.Hand),
-        backgroundColor = if (isHovered) Color(0xFF131824).copy(alpha = 0.45f) else Color(0xFF0A0D14).copy(alpha = 0.28f),
+        backgroundColor = if (isHovered) Color(0xFF131824).copy(alpha = 0.35f) else Color(0xFF0A0D14).copy(alpha = 0.20f),
         borderColor = if (isHovered) Color(0xFFE11D48).copy(alpha = 0.70f) else Color.White.copy(alpha = 0.12f),
         hoverBorderColor = Color(0xFFE11D48).copy(alpha = 0.85f),
         onClick = onSelect
@@ -1213,7 +1204,7 @@ fun MovieBoxCinemaCard(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Top Quality & Rating badges
+                // Top Quality & Rating badges with Frosted Glass Blur
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1222,42 +1213,41 @@ fun MovieBoxCinemaCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Quality Pill
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(Color.Black.copy(alpha = 0.75f))
-                            .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.60f), RoundedCornerShape(5.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    LiquidGlassBox(
+                        shape = RoundedCornerShape(6.dp),
+                        borderColor = Color(0xFFE11D48).copy(alpha = 0.60f)
                     ) {
                         Text(
                             text = item.qualityBadge.ifBlank { "1080p HD" },
                             color = Color.White,
                             fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
 
                     // IMDB Rating Pill
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(Color.Black.copy(alpha = 0.75f))
-                            .border(1.dp, Color(0xFFFBBF24).copy(alpha = 0.40f), RoundedCornerShape(5.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    LiquidGlassBox(
+                        shape = RoundedCornerShape(6.dp),
+                        borderColor = Color(0xFFFBBF24).copy(alpha = 0.50f)
                     ) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(10.dp))
-                        Text(
-                            text = item.rating.ifBlank { "8.5" },
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(10.dp))
+                            Text(
+                                text = item.rating.ifBlank { "8.5" },
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
-                // Bottom badges on poster: Type (Left) & Duration (Right)
+                // Bottom badges on poster: Type (Left) & Duration (Right) with Frosted Glass Blur
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1266,34 +1256,31 @@ fun MovieBoxCinemaCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF0F172A).copy(alpha = 0.85f))
-                            .border(1.dp, if (item.type == "series") Color(0xFF38BDF8).copy(alpha = 0.6f) else Color(0xFFE11D48).copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                    LiquidGlassBox(
+                        shape = RoundedCornerShape(5.dp),
+                        borderColor = if (item.type == "series") Color(0xFF38BDF8).copy(alpha = 0.6f) else Color(0xFFE11D48).copy(alpha = 0.5f)
                     ) {
                         Text(
                             text = if (item.type == "series") "SERIES" else "MOVIE",
                             color = if (item.type == "series") Color(0xFF38BDF8) else Color(0xFFFDA4AF),
                             fontSize = 8.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.3.sp
+                            letterSpacing = 0.3.sp,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                         )
                     }
 
                     if (item.duration.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color.Black.copy(alpha = 0.80f))
-                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                        LiquidGlassBox(
+                            shape = RoundedCornerShape(5.dp),
+                            borderColor = Color.White.copy(alpha = 0.20f)
                         ) {
                             Text(
                                 text = item.duration,
                                 color = Color.White.copy(alpha = 0.90f),
                                 fontSize = 8.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -1327,7 +1314,7 @@ fun MovieBoxCinemaCard(
                             Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(26.dp))
                         }
 
-                        // Bottom Quick Actions: Trailer & Music
+                        // Bottom Quick Actions: Trailer & Music with Frosted Glass Blur
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1337,15 +1324,16 @@ fun MovieBoxCinemaCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (onTrailerClick != null) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color.White.copy(alpha = 0.20f))
-                                        .clickable { onTrailerClick() }
-                                        .padding(horizontal = 7.dp, vertical = 3.5.dp),
-                                    contentAlignment = Alignment.Center
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(6.dp),
+                                    borderColor = Color.White.copy(alpha = 0.35f),
+                                    onClick = onTrailerClick
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
                                         Icon(Icons.Default.Theaters, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
                                         Text("Trailer", color = Color.White, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
                                     }
@@ -1353,16 +1341,16 @@ fun MovieBoxCinemaCard(
                             }
 
                             if (onSoundtrackClick != null) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0xFF38BDF8).copy(alpha = 0.25f))
-                                        .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.50f), RoundedCornerShape(6.dp))
-                                        .clickable { onSoundtrackClick() }
-                                        .padding(horizontal = 7.dp, vertical = 3.5.dp),
-                                    contentAlignment = Alignment.Center
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(6.dp),
+                                    borderColor = Color(0xFF38BDF8).copy(alpha = 0.50f),
+                                    onClick = onSoundtrackClick
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
                                         Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(11.dp))
                                         Text("Music", color = Color.White, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
                                     }
@@ -1474,16 +1462,14 @@ fun MovieCinemaCard(
                 modifier = Modifier.fillMaxSize()
             )
 
-            Box(
+            LiquidGlassBox(
+                shape = RoundedCornerShape(6.dp),
+                borderColor = movie.accentColor.copy(alpha = 0.60f),
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(8.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.75f))
-                    .border(1.dp, movie.accentColor.copy(alpha = 0.60f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
-                Text(movie.bannerBadge, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(movie.bannerBadge, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
             }
 
             if (isHovered) {
@@ -1719,14 +1705,11 @@ fun SeniorMovieBoxDetailModal(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFFE11D48).copy(alpha = 0.20f))
-                                    .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.50f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            LiquidGlassBox(
+                                shape = RoundedCornerShape(6.dp),
+                                borderColor = Color(0xFFE11D48).copy(alpha = 0.50f)
                             ) {
-                                Text(movie.qualityBadge.ifBlank { "4K UHD" }, color = Color(0xFFE11D48), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(movie.qualityBadge.ifBlank { "4K UHD" }, color = Color(0xFFE11D48), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                             }
                             Text("MOVIEBOX STREAMING REVERSE CORE", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.70f))
                         }
@@ -1935,15 +1918,14 @@ fun SeniorMovieDetailModal(
             .zIndex(90f),
         contentAlignment = Alignment.Center
     ) {
-        Box(
+        LiquidGlassCard(
+            shape = RoundedCornerShape(20.dp),
             modifier = Modifier
                 .width(780.dp)
                 .heightIn(max = 640.dp)
                 .shadow(24.dp, RoundedCornerShape(20.dp), spotColor = movie.accentColor)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF0F172A))
-                .border(1.dp, movie.accentColor.copy(alpha = 0.40f), RoundedCornerShape(20.dp))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { /* Consume */ }
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { /* Consume */ },
+            borderColor = movie.accentColor.copy(alpha = 0.50f)
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -2056,49 +2038,34 @@ fun AlphabeticalRibbon(
             val isSelected = letter == selectedLetter
             val hasItems = letter == "All" || count > 0
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        when {
-                            isSelected -> Color(0xFFE11D48)
-                            hasItems -> Color(0xFF0A0C10).copy(alpha = 0.50f)
-                            else -> Color(0xFF0A0C10).copy(alpha = 0.20f)
-                        }
-                    )
-                    .border(
-                        1.dp,
-                        when {
-                            isSelected -> Color(0xFFE11D48)
-                            hasItems -> Color.White.copy(alpha = 0.18f)
-                            else -> Color.White.copy(alpha = 0.05f)
-                        },
-                        RoundedCornerShape(8.dp)
-                    )
-                    .clickable(enabled = hasItems) { onLetterSelected(letter) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
+            LiquidGlassBox(
+                shape = RoundedCornerShape(8.dp),
+                isSelected = isSelected,
+                selectedBgColor = Color(0xFFE11D48),
+                selectedBorderColor = Color(0xFFE11D48),
+                onClick = if (hasItems) { { onLetterSelected(letter) } } else null
             ) {
                 Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = letter,
                         fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
                         color = when {
                             isSelected -> Color.White
                             hasItems -> Color.White
-                            else -> Color.White.copy(alpha = 0.30f)
+                            else -> Color.White.copy(alpha = 0.35f)
                         }
                     )
-                    if (letter != "All" && count > 0) {
+                    if (count > 0 && letter != "All") {
                         Text(
-                            text = "$count",
+                            text = count.toString(),
                             fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) Color.White.copy(alpha = 0.90f) else Color(0xFF38BDF8)
+                            color = if (isSelected) Color.White.copy(alpha = 0.90f) else Color.White.copy(alpha = 0.50f),
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -2124,51 +2091,52 @@ fun AlphabeticalSectionHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFE11D48).copy(alpha = 0.20f))
-                    .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.70f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
+            LiquidGlassBox(
+                shape = RoundedCornerShape(8.dp),
+                borderColor = Color(0xFFE11D48).copy(alpha = 0.70f),
+                modifier = Modifier.size(34.dp)
             ) {
                 Text(
                     text = letter,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color.White
+                    color = Color(0xFFE11D48)
                 )
             }
-            Text(
-                text = if (letter == "#") "Numbers & Symbols" else "Titles starting with '$letter'",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.12f))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-            ) {
+
+            Column {
                 Text(
-                    text = "$count",
+                    text = if (letter == "#") "Special & Numeric Titles" else "Letter $letter",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+                Text(
+                    text = "$count movies & series starting with $letter",
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF38BDF8)
+                    color = Color.White.copy(alpha = 0.60f)
                 )
             }
         }
-        Text(
-            text = "Focus '$letter' only →",
-            fontSize = 11.5.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFF38BDF8),
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .clickable { onJumpToLetter() }
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        )
+
+        LiquidGlassBox(
+            shape = RoundedCornerShape(8.dp),
+            onClick = onJumpToLetter
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = null, tint = Color.White.copy(alpha = 0.70f), modifier = Modifier.size(12.dp))
+                Text(
+                    text = "Filter $letter Only",
+                    fontSize = 10.5.sp,
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
     }
 }
 
@@ -2180,15 +2148,12 @@ fun MovieSortSelector(
     var expanded by remember { mutableStateOf(false) }
 
     Box {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF0A0C10).copy(alpha = 0.50f))
-                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(8.dp))
-                .clickable { expanded = !expanded }
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+        LiquidGlassBox(
+            shape = RoundedCornerShape(8.dp),
+            onClick = { expanded = !expanded }
         ) {
             Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -2207,33 +2172,20 @@ fun MovieSortSelector(
             androidx.compose.material3.DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.40f), RoundedCornerShape(8.dp))
+                modifier = Modifier.background(Color(0xFF0F172A).copy(alpha = 0.90f))
             ) {
-                MovieSortOrder.values().forEach { option ->
-                    val isSelected = option == currentSort
+                MovieSortOrder.values().forEach { sort ->
                     androidx.compose.material3.DropdownMenuItem(
                         text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(14.dp))
-                                } else {
-                                    Spacer(Modifier.size(14.dp))
-                                }
-                                Text(
-                                    text = option.label,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Color(0xFFE11D48) else Color.White
-                                )
-                            }
+                            Text(
+                                text = sort.label,
+                                color = if (sort == currentSort) Color(0xFFE11D48) else Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = if (sort == currentSort) FontWeight.Bold else FontWeight.Normal
+                            )
                         },
                         onClick = {
-                            onSortSelected(option)
+                            onSortSelected(sort)
                             expanded = false
                         }
                     )

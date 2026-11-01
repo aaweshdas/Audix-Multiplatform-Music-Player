@@ -2248,9 +2248,9 @@ private val BoxBottomCausticColorsNormal = listOf(Color.Transparent, Color.White
 fun LiquidGlassCard(
     modifier: Modifier = Modifier,
     shape: RoundedCornerShape = RoundedCornerShape(20.dp),
-    backgroundColor: Color = Color(0xFF0A0C10).copy(alpha = 0.30f),
-    borderColor: Color = Color.White.copy(alpha = 0.14f),
-    hoverBorderColor: Color = Color.White.copy(alpha = 0.35f),
+    backgroundColor: Color = Color(0xFF0A0C10).copy(alpha = 0.20f),
+    borderColor: Color = Color.White.copy(alpha = 0.16f),
+    hoverBorderColor: Color = Color.White.copy(alpha = 0.45f),
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
@@ -2262,42 +2262,35 @@ fun LiquidGlassCard(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isInteractiveHover = isHovered && onClick != null
 
-    val currentTopBg = if (isInteractiveHover) {
-        Color.White.copy(alpha = 0.12f)
-    } else {
-        backgroundColor.copy(alpha = (backgroundColor.alpha * 0.90f).coerceIn(0.08f, 0.60f))
-    }
-
-    val currentBottomBg = if (isInteractiveHover) {
-        Color.Black.copy(alpha = 0.42f)
-    } else {
-        backgroundColor.copy(alpha = (backgroundColor.alpha * 1.25f).coerceIn(0.15f, 0.70f))
-    }
-
     val currentBorder = if (isInteractiveHover) hoverBorderColor else borderColor
-
-    val bgBrush = remember(currentTopBg, currentBottomBg) {
-        Brush.verticalGradient(listOf(currentTopBg, currentBottomBg))
-    }
 
     val borderStroke = remember(isInteractiveHover, currentBorder) {
         val colors = if (isInteractiveHover) {
             listOf(
                 Color.White.copy(alpha = 0.85f),
                 Color.White.copy(alpha = 0.55f),
-                Color.White.copy(alpha = 0.20f),
-                Color(0xFF040507).copy(alpha = 0.80f)
+                Color.White.copy(alpha = 0.25f),
+                Color(0xFF040507).copy(alpha = 0.60f)
             )
         } else {
             listOf(
-                Color.White.copy(alpha = 0.50f),
-                Color.White.copy(alpha = 0.24f),
-                currentBorder.copy(alpha = 0.12f),
-                Color(0xFF080A0E).copy(alpha = 0.40f),
-                Color(0xFF020305).copy(alpha = 0.70f)
+                Color.White.copy(alpha = 0.55f),
+                Color.White.copy(alpha = 0.25f),
+                currentBorder.copy(alpha = 0.15f),
+                Color(0xFF080A0E).copy(alpha = 0.30f),
+                Color(0xFF020305).copy(alpha = 0.50f)
             )
         }
         BorderStroke(1.2.dp, Brush.linearGradient(colors, start = Offset(0f, 0f), end = Offset(450f, 450f)))
+    }
+
+    val fallbackBrush = remember(backgroundColor) {
+        Brush.verticalGradient(
+            listOf(
+                backgroundColor.copy(alpha = 0.25f),
+                Color(0xFF040507).copy(alpha = 0.50f)
+            )
+        )
     }
 
     Box(
@@ -2314,43 +2307,58 @@ fun LiquidGlassCard(
             }
             .clip(shape)
             .drawBehind {
-                if (blurredBg != null && rootWindowSize != null && rootWindowSize!!.width > 0 && rootWindowSize!!.height > 0 && cardWindowPos != null) {
-                    val rootW = rootWindowSize!!.width.toFloat()
-                    val rootH = rootWindowSize!!.height.toFloat()
-                    val pos = cardWindowPos!!
-                    val rx = (pos.x / rootW).coerceIn(0f, 1f)
-                    val ry = (pos.y / rootH).coerceIn(0f, 1f)
-                    val rw = (size.width / rootW).coerceIn(0.001f, 1f - rx)
-                    val rh = (size.height / rootH).coerceIn(0.001f, 1f - ry)
+                runCatching {
+                    if (blurredBg != null && rootWindowSize != null && rootWindowSize!!.width > 0 && rootWindowSize!!.height > 0 && cardWindowPos != null && size.width > 0f && size.height > 0f) {
+                        val rootW = rootWindowSize!!.width.toFloat()
+                        val rootH = rootWindowSize!!.height.toFloat()
+                        val pos = cardWindowPos!!
+                        val rx = (pos.x / rootW).coerceIn(0f, 0.999f)
+                        val ry = (pos.y / rootH).coerceIn(0f, 0.999f)
+                        val maxRw = (1f - rx).coerceAtLeast(0.001f)
+                        val maxRh = (1f - ry).coerceAtLeast(0.001f)
+                        val rw = (size.width / rootW).coerceIn(0.001f, maxRw)
+                        val rh = (size.height / rootH).coerceIn(0.001f, maxRh)
 
-                    val srcX = (rx * blurredBg.width).toInt().coerceIn(0, blurredBg.width - 1)
-                    val srcY = (ry * blurredBg.height).toInt().coerceIn(0, blurredBg.height - 1)
-                    val srcW = (rw * blurredBg.width).toInt().coerceIn(1, blurredBg.width - srcX)
-                    val srcH = (rh * blurredBg.height).toInt().coerceIn(1, blurredBg.height - srcY)
+                        val maxSrcX = (blurredBg.width - 1).coerceAtLeast(0)
+                        val maxSrcY = (blurredBg.height - 1).coerceAtLeast(0)
+                        val srcX = (rx * blurredBg.width).toInt().coerceIn(0, maxSrcX)
+                        val srcY = (ry * blurredBg.height).toInt().coerceIn(0, maxSrcY)
+                        val maxSrcW = (blurredBg.width - srcX).coerceAtLeast(1)
+                        val maxSrcH = (blurredBg.height - srcY).coerceAtLeast(1)
+                        val srcW = (rw * blurredBg.width).toInt().coerceIn(1, maxSrcW)
+                        val srcH = (rh * blurredBg.height).toInt().coerceIn(1, maxSrcH)
 
-                    drawImage(
-                        image = blurredBg,
-                        srcOffset = IntOffset(srcX, srcY),
-                        srcSize = IntSize(srcW, srcH),
-                        dstOffset = IntOffset.Zero,
-                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
-                        alpha = 0.88f,
-                        filterQuality = FilterQuality.Low
-                    )
-                } else if (blurredBg != null) {
-                    drawImage(
-                        image = blurredBg,
-                        srcOffset = IntOffset.Zero,
-                        srcSize = IntSize(blurredBg.width, blurredBg.height),
-                        dstOffset = IntOffset.Zero,
-                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
-                        alpha = 0.82f,
-                        filterQuality = FilterQuality.Low
-                    )
+                        drawImage(
+                            image = blurredBg,
+                            srcOffset = IntOffset(srcX, srcY),
+                            srcSize = IntSize(srcW, srcH),
+                            dstOffset = IntOffset.Zero,
+                            dstSize = IntSize(size.width.roundToInt().coerceAtLeast(1), size.height.roundToInt().coerceAtLeast(1)),
+                            alpha = 1.0f,
+                            filterQuality = FilterQuality.Low
+                        )
+                    } else if (blurredBg != null && size.width > 0f && size.height > 0f) {
+                        drawImage(
+                            image = blurredBg,
+                            srcOffset = IntOffset.Zero,
+                            srcSize = IntSize(blurredBg.width, blurredBg.height),
+                            dstOffset = IntOffset.Zero,
+                            dstSize = IntSize(size.width.roundToInt().coerceAtLeast(1), size.height.roundToInt().coerceAtLeast(1)),
+                            alpha = 1.0f,
+                            filterQuality = FilterQuality.Low
+                        )
+                    } else {
+                        drawRect(fallbackBrush)
+                    }
                 }
-                drawRect(color = Color(0xFF04060A).copy(alpha = 0.38f))
+
+                // Luminous frosted glass sheen and depth tint
+                val glassTop = if (isInteractiveHover) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.08f)
+                val glassBottom = if (isInteractiveHover) Color(0xFF04060A).copy(alpha = 0.35f) else Color(0xFF04060A).copy(alpha = 0.22f)
+                drawRect(
+                    brush = Brush.verticalGradient(listOf(glassTop, glassBottom))
+                )
             }
-            .background(bgBrush)
             .border(borderStroke, shape)
             .drawWithContent {
                 drawContent()
@@ -2398,7 +2406,7 @@ fun LiquidGlassCard(
 fun LiquidGlassBox(
     modifier: Modifier = Modifier,
     shape: RoundedCornerShape = RoundedCornerShape(10.dp),
-    backgroundColor: Color = Color(0xFF0A0C10).copy(alpha = 0.28f),
+    backgroundColor: Color = Color(0xFF0A0C10).copy(alpha = 0.20f),
     borderColor: Color = Color.White.copy(alpha = 0.14f),
     hoverBorderColor: Color = Color.White.copy(alpha = 0.40f),
     isSelected: Boolean = false,
@@ -2416,26 +2424,10 @@ fun LiquidGlassBox(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isInteractiveHover = isHovered && onClick != null
 
-    val currentTopBg = when {
-        isSelected -> selectedBgColor
-        isInteractiveHover -> Color.White.copy(alpha = 0.12f)
-        else -> backgroundColor.copy(alpha = (backgroundColor.alpha * 0.90f).coerceIn(0.08f, 0.60f))
-    }
-
-    val currentBottomBg = when {
-        isSelected -> Color.Black.copy(alpha = 0.45f)
-        isInteractiveHover -> Color.Black.copy(alpha = 0.40f)
-        else -> Color(0xFF040507).copy(alpha = 0.45f)
-    }
-
     val currentBorder = when {
         isSelected -> selectedBorderColor
         isInteractiveHover -> hoverBorderColor
         else -> borderColor
-    }
-
-    val bgBrush = remember(currentTopBg, currentBottomBg) {
-        Brush.verticalGradient(listOf(currentTopBg, currentBottomBg))
     }
 
     val borderStroke = remember(isSelected, isInteractiveHover, currentBorder) {
@@ -2445,7 +2437,7 @@ fun LiquidGlassBox(
                     Color.White.copy(alpha = 0.90f),
                     Color.White.copy(alpha = 0.65f),
                     Color.White.copy(alpha = 0.30f),
-                    Color(0xFF040507).copy(alpha = 0.85f)
+                    Color(0xFF040507).copy(alpha = 0.70f)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(300f, 300f)
@@ -2455,24 +2447,33 @@ fun LiquidGlassBox(
                     Color.White.copy(alpha = 0.80f),
                     Color.White.copy(alpha = 0.50f),
                     Color.White.copy(alpha = 0.20f),
-                    Color(0xFF040507).copy(alpha = 0.80f)
+                    Color(0xFF040507).copy(alpha = 0.60f)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(300f, 300f)
             )
             else -> Brush.linearGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.45f),
-                    Color.White.copy(alpha = 0.20f),
-                    currentBorder.copy(alpha = 0.10f),
-                    Color(0xFF06080C).copy(alpha = 0.38f),
-                    Color(0xFF020305).copy(alpha = 0.70f)
+                    Color.White.copy(alpha = 0.50f),
+                    Color.White.copy(alpha = 0.22f),
+                    currentBorder.copy(alpha = 0.12f),
+                    Color(0xFF06080C).copy(alpha = 0.30f),
+                    Color(0xFF020305).copy(alpha = 0.50f)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(300f, 300f)
             )
         }
         BorderStroke(1.dp, borderBrush)
+    }
+
+    val fallbackBrush = remember(backgroundColor) {
+        Brush.verticalGradient(
+            listOf(
+                backgroundColor.copy(alpha = 0.25f),
+                Color(0xFF040507).copy(alpha = 0.45f)
+            )
+        )
     }
 
     Box(
@@ -2489,43 +2490,65 @@ fun LiquidGlassBox(
             }
             .clip(shape)
             .drawBehind {
-                if (blurredBg != null && boxRootWindowSize != null && boxRootWindowSize!!.width > 0 && boxRootWindowSize!!.height > 0 && boxWindowPos != null) {
-                    val rootW = boxRootWindowSize!!.width.toFloat()
-                    val rootH = boxRootWindowSize!!.height.toFloat()
-                    val pos = boxWindowPos!!
-                    val rx = (pos.x / rootW).coerceIn(0f, 1f)
-                    val ry = (pos.y / rootH).coerceIn(0f, 1f)
-                    val rw = (size.width / rootW).coerceIn(0.001f, 1f - rx)
-                    val rh = (size.height / rootH).coerceIn(0.001f, 1f - ry)
+                runCatching {
+                    if (blurredBg != null && boxRootWindowSize != null && boxRootWindowSize!!.width > 0 && boxRootWindowSize!!.height > 0 && boxWindowPos != null && size.width > 0f && size.height > 0f) {
+                        val rootW = boxRootWindowSize!!.width.toFloat()
+                        val rootH = boxRootWindowSize!!.height.toFloat()
+                        val pos = boxWindowPos!!
+                        val rx = (pos.x / rootW).coerceIn(0f, 0.999f)
+                        val ry = (pos.y / rootH).coerceIn(0f, 0.999f)
+                        val maxRw = (1f - rx).coerceAtLeast(0.001f)
+                        val maxRh = (1f - ry).coerceAtLeast(0.001f)
+                        val rw = (size.width / rootW).coerceIn(0.001f, maxRw)
+                        val rh = (size.height / rootH).coerceIn(0.001f, maxRh)
 
-                    val srcX = (rx * blurredBg.width).toInt().coerceIn(0, blurredBg.width - 1)
-                    val srcY = (ry * blurredBg.height).toInt().coerceIn(0, blurredBg.height - 1)
-                    val srcW = (rw * blurredBg.width).toInt().coerceIn(1, blurredBg.width - srcX)
-                    val srcH = (rh * blurredBg.height).toInt().coerceIn(1, blurredBg.height - srcY)
+                        val maxSrcX = (blurredBg.width - 1).coerceAtLeast(0)
+                        val maxSrcY = (blurredBg.height - 1).coerceAtLeast(0)
+                        val srcX = (rx * blurredBg.width).toInt().coerceIn(0, maxSrcX)
+                        val srcY = (ry * blurredBg.height).toInt().coerceIn(0, maxSrcY)
+                        val maxSrcW = (blurredBg.width - srcX).coerceAtLeast(1)
+                        val maxSrcH = (blurredBg.height - srcY).coerceAtLeast(1)
+                        val srcW = (rw * blurredBg.width).toInt().coerceIn(1, maxSrcW)
+                        val srcH = (rh * blurredBg.height).toInt().coerceIn(1, maxSrcH)
 
-                    drawImage(
-                        image = blurredBg,
-                        srcOffset = IntOffset(srcX, srcY),
-                        srcSize = IntSize(srcW, srcH),
-                        dstOffset = IntOffset.Zero,
-                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
-                        alpha = 0.85f,
-                        filterQuality = FilterQuality.Low
-                    )
-                } else if (blurredBg != null) {
-                    drawImage(
-                        image = blurredBg,
-                        srcOffset = IntOffset.Zero,
-                        srcSize = IntSize(blurredBg.width, blurredBg.height),
-                        dstOffset = IntOffset.Zero,
-                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
-                        alpha = 0.78f,
-                        filterQuality = FilterQuality.Low
+                        drawImage(
+                            image = blurredBg,
+                            srcOffset = IntOffset(srcX, srcY),
+                            srcSize = IntSize(srcW, srcH),
+                            dstOffset = IntOffset.Zero,
+                            dstSize = IntSize(size.width.roundToInt().coerceAtLeast(1), size.height.roundToInt().coerceAtLeast(1)),
+                            alpha = 1.0f,
+                            filterQuality = FilterQuality.Low
+                        )
+                    } else if (blurredBg != null && size.width > 0f && size.height > 0f) {
+                        drawImage(
+                            image = blurredBg,
+                            srcOffset = IntOffset.Zero,
+                            srcSize = IntSize(blurredBg.width, blurredBg.height),
+                            dstOffset = IntOffset.Zero,
+                            dstSize = IntSize(size.width.roundToInt().coerceAtLeast(1), size.height.roundToInt().coerceAtLeast(1)),
+                            alpha = 1.0f,
+                            filterQuality = FilterQuality.Low
+                        )
+                    } else {
+                        drawRect(fallbackBrush)
+                    }
+
+                    val glassTop = when {
+                        isSelected -> Color.White.copy(alpha = 0.22f)
+                        isInteractiveHover -> Color.White.copy(alpha = 0.16f)
+                        else -> Color.White.copy(alpha = 0.08f)
+                    }
+                    val glassBottom = when {
+                        isSelected -> Color(0xFF04060A).copy(alpha = 0.35f)
+                        isInteractiveHover -> Color(0xFF04060A).copy(alpha = 0.30f)
+                        else -> Color(0xFF04060A).copy(alpha = 0.20f)
+                    }
+                    drawRect(
+                        brush = Brush.verticalGradient(listOf(glassTop, glassBottom))
                     )
                 }
-                drawRect(color = Color(0xFF04060A).copy(alpha = 0.35f))
             }
-            .background(bgBrush)
             .border(borderStroke, shape)
             .drawWithContent {
                 drawContent()

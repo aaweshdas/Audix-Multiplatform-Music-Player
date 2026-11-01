@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.brahmkshatriya.echo.common.models.EchoMediaItem
 import dev.brahmkshatriya.echo.common.models.ImageHolder
+import dev.brahmkshatriya.echo.desktop.ui.screens.LiquidGlassCard
+import dev.brahmkshatriya.echo.desktop.ui.screens.LiquidGlassBox
 
 @Composable
 fun MediaCard(
@@ -60,18 +62,15 @@ fun MediaCard(
         }
     }
 
-    Card(
+    LiquidGlassCard(
+        shape = RoundedCornerShape(14.dp),
         modifier = modifier
             .width(cardWidth.dp)
             .hoverable(interactionSource)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isHovered) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f),
-            contentColor = Color.White
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isHovered) 6.dp else 0.dp)
+            .pointerHoverIcon(PointerIcon.Hand),
+        backgroundColor = if (isHovered) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f),
+        borderColor = if (isHovered) Color.White.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.10f),
+        onClick = onClick
     ) {
         Column(
             modifier = Modifier.padding(10.dp)

@@ -212,6 +212,17 @@ for erd in ext_res_dirs:
         with open(os.path.join(erd, name), 'wb') as ef:
             ef.write(data)
 
+# Copy moviebox resources to portable and app resource directories on disk
+mb_res_dirs = [
+    os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\resources\moviebox'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\build\compose\binaries\main\app\Audix\app\resources\moviebox')
+]
+for mrd in mb_res_dirs:
+    os.makedirs(mrd, exist_ok=True)
+    if os.path.exists(mb_dir):
+        for mbf in os.listdir(mb_dir):
+            shutil.copy2(os.path.join(mb_dir, mbf), os.path.join(mrd, mbf))
+
 # Update desktopApp-desktop JARs with latest extensions
 desktopapp_jars = [
     os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\desktopApp-desktop-4130d35d0d637cce842324b8b1d9432.jar'),

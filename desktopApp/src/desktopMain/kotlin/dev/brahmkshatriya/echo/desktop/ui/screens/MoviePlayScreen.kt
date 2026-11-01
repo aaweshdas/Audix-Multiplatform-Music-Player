@@ -45,6 +45,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.SortByAlpha
+import dev.brahmkshatriya.echo.desktop.ui.movie.MovieSortOrder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LiveTv
@@ -134,6 +138,13 @@ fun MoviePlayScreen(
     var selectedVibe by remember { mutableStateOf("All") }
     var selectedFranchise by remember { mutableStateOf<MovieBoxCollection?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var selectedLetter by remember { mutableStateOf("All") }
+    var sortOrder by remember { mutableStateOf(MovieSortOrder.NAME_ASC) }
+    var groupByLetter by remember { mutableStateOf(true) }
+
+    val alphabetList = remember {
+        listOf("All", "#") + ('A'..'Z').map { it.toString() }
+    }
 
     var selectedMovieForModal by remember { mutableStateOf<MovieBoxItem?>(null) }
     var selectedChannelForModal by remember { mutableStateOf<MovieBoxLiveChannel?>(null) }
@@ -153,10 +164,10 @@ fun MoviePlayScreen(
     val tabs = listOf("All", "Movies", "TV Shows", "4K Ultra HD", "Franchises", "Live TV")
     val vibes = listOf("All", "🔥 Adrenaline", "🧠 Sci-Fi", "❤️ Romance", "🌑 Dark Thrillers", "😂 Comedy", "🌸 Anime", "👻 Horror")
 
-    // Filter movies based on search, tab, vibe, franchise
-    val displayMovies = remember(selectedTab, selectedVibe, selectedFranchise, searchQuery, allMovies) {
+    // Base filtering based on search, tab, vibe, franchise
+    val baseFilteredMovies = remember(selectedTab, selectedVibe, selectedFranchise, searchQuery, allMovies) {
         val q = searchQuery.trim()
-        if (q.isNotBlank()) {
+        var list = if (q.isNotBlank()) {
             allMovies.filter { m ->
                 m.title.contains(q, ignoreCase = true) ||
                 m.genre.contains(q, ignoreCase = true) ||
@@ -164,10 +175,14 @@ fun MoviePlayScreen(
                 m.description.contains(q, ignoreCase = true)
             }
         } else {
-            var filtered = when (selectedTab) {
+            when (selectedTab) {
                 "Movies" -> allMovies.filter { it.type == "movie" }
                 "TV Shows" -> allMovies.filter { it.type == "series" }
-                "4K Ultra HD" -> allMovies.filter { it.qualityBadge.contains("4k", ignoreCase = true) || it.qualityBadge.contains("uhd", ignoreCase = true) || it.genre.contains("Action", true) }
+                "4K Ultra HD" -> allMovies.filter {
+                    it.qualityBadge.contains("4k", ignoreCase = true) ||
+                    it.qualityBadge.contains("uhd", ignoreCase = true) ||
+                    it.genre.contains("Action", true)
+                }
                 "Franchises" -> {
                     val activeFranchise = selectedFranchise
                     if (activeFranchise != null) {
@@ -180,24 +195,83 @@ fun MoviePlayScreen(
                 }
                 else -> allMovies
             }
+        }
 
-            if (selectedVibe != "All") {
-                val vibeKeyword = when (selectedVibe) {
-                    "🔥 Adrenaline" -> "Action"
-                    "🧠 Sci-Fi" -> "Sci-Fi"
-                    "❤️ Romance" -> "Romance"
-                    "🌑 Dark Thrillers" -> "Thriller"
-                    "😂 Comedy" -> "Comedy"
-                    "🌸 Anime" -> "Animation"
-                    "👻 Horror" -> "Horror"
-                    else -> ""
-                }
-                if (vibeKeyword.isNotBlank()) {
-                    filtered = filtered.filter { it.genre.contains(vibeKeyword, ignoreCase = true) }
-                }
+        if (selectedVibe != "All" && q.isBlank()) {
+            val vibeKeyword = when (selectedVibe) {
+                "🔥 Adrenaline" -> "Action"
+                "🧠 Sci-Fi" -> "Sci-Fi"
+                "❤️ Romance" -> "Romance"
+                "🌑 Dark Thrillers" -> "Thriller"
+                "😂 Comedy" -> "Comedy"
+                "🌸 Anime" -> "Animation"
+                "👻 Horror" -> "Horror"
+                else -> ""
             }
+            if (vibeKeyword.isNotBlank()) {
+                list = list.filter { it.genre.contains(vibeKeyword, ignoreCase = true) }
+            }
+        }
 
-            filtered
+        list
+    }
+
+    // Precalculate letter counts for A-Z ribbon
+    val letterCounts = remember(baseFilteredMovies) {
+        val counts = mutableMapOf<String, Int>()
+        counts["All"] = baseFilteredMovies.size
+        for (c in 'A'..'Z') {
+            val s = c.toString()
+            counts[s] = baseFilteredMovies.count { m ->
+                val clean = m.title.trim()
+                val withoutArticle = clean.removePrefix("The ").removePrefix("A ").removePrefix("An ").trim()
+                clean.startsWith(s, ignoreCase = true) || withoutArticle.startsWith(s, ignoreCase = true)
+            }
+        }
+        counts["#"] = baseFilteredMovies.count { m ->
+            val firstChar = m.title.trim().firstOrNull()?.uppercaseChar() ?: '#'
+            firstChar !in 'A'..'Z'
+        }
+        counts
+    }
+
+    // Filter by selected letter & sort by selected sort order (Defaults to Alphabetical Name A-Z)
+    val displayMovies = remember(baseFilteredMovies, selectedLetter, sortOrder) {
+        val letterFiltered = if (selectedLetter == "All") {
+            baseFilteredMovies
+        } else if (selectedLetter == "#") {
+            baseFilteredMovies.filter { m ->
+                val firstChar = m.title.trim().firstOrNull()?.uppercaseChar() ?: '#'
+                firstChar !in 'A'..'Z'
+            }
+        } else {
+            baseFilteredMovies.filter { m ->
+                val clean = m.title.trim()
+                val withoutArticle = clean.removePrefix("The ").removePrefix("A ").removePrefix("An ").trim()
+                clean.startsWith(selectedLetter, ignoreCase = true) || withoutArticle.startsWith(selectedLetter, ignoreCase = true)
+            }
+        }
+
+        when (sortOrder) {
+            MovieSortOrder.NAME_ASC -> letterFiltered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+            MovieSortOrder.NAME_DESC -> letterFiltered.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+            MovieSortOrder.RATING_DESC -> letterFiltered.sortedByDescending { it.rating.toDoubleOrNull() ?: 0.0 }
+            MovieSortOrder.YEAR_DESC -> letterFiltered.sortedByDescending { it.year.toIntOrNull() ?: 0 }
+            MovieSortOrder.YEAR_ASC -> letterFiltered.sortedBy { it.year.toIntOrNull() ?: 9999 }
+        }
+    }
+
+    // Grouping by starting letter for organized A-Z view
+    val groupedSections = remember(displayMovies, groupByLetter, selectedLetter, sortOrder, searchQuery) {
+        if (groupByLetter && selectedLetter == "All" && sortOrder == MovieSortOrder.NAME_ASC && searchQuery.isBlank()) {
+            displayMovies.groupBy { movie ->
+                val firstChar = movie.title.trim().firstOrNull()?.uppercaseChar() ?: '#'
+                if (firstChar in 'A'..'Z') firstChar.toString() else "#"
+            }.toSortedMap { a, b ->
+                if (a == "#") -1 else if (b == "#") 1 else a.compareTo(b)
+            }
+        } else {
+            null
         }
     }
 
@@ -210,7 +284,15 @@ fun MoviePlayScreen(
     }
     val franchiseListState = rememberLazyListState()
 
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val screenWidth = maxWidth
+        val columns = when {
+            screenWidth >= 1650.dp -> 6
+            screenWidth >= 1350.dp -> 5
+            screenWidth >= 1050.dp -> 4
+            screenWidth >= 720.dp -> 3
+            else -> 2
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -239,7 +321,7 @@ fun MoviePlayScreen(
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "MOVIEBOX CORE • 331+ 4K CINEMA TITLES",
+                                    text = "MOVIEBOX CORE • 1,534+ CINEMA & SERIES TITLES",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFFE11D48),
@@ -409,7 +491,9 @@ fun MoviePlayScreen(
                                     // Watch Stream
                                     Button(
                                         onClick = {
-                                            selectedMovieForModal = heroMovie
+                                            scope.launch {
+                                                MoviePlayRepository.playMovieDirect(heroMovie) { toastMessage = it }
+                                            }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
                                         shape = RoundedCornerShape(10.dp)
@@ -470,10 +554,13 @@ fun MoviePlayScreen(
                     // Search Bar
                     OutlinedTextField(
                         value = searchQuery,
-                        onValueChange = { searchQuery = it },
+                        onValueChange = {
+                            searchQuery = it
+                            if (it.isNotBlank()) selectedLetter = "All"
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                        placeholder = { Text("Search 331+ blockbusters, e.g. Deadpool, Dune, Oppenheimer, Interstellar, Marvel, John Wick...", fontSize = 13.sp) },
+                        placeholder = { Text("Search 1,534+ movies & shows by name, e.g. Avengers, Deadpool, Dune, Oppenheimer, Batman...", fontSize = 13.sp) },
                         leadingIcon = {
                             Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(20.dp))
                         },
@@ -518,9 +605,23 @@ fun MoviePlayScreen(
                                 onClick = {
                                     selectedTab = tab
                                     searchQuery = ""
+                                    selectedLetter = "All"
                                 }
                             )
                         }
+                    }
+
+                    // A-Z Alphabetical Index Filter Ribbon (when not in Live TV)
+                    if (selectedTab != "Live TV") {
+                        AlphabeticalRibbon(
+                            letters = alphabetList,
+                            selectedLetter = selectedLetter,
+                            letterCounts = letterCounts,
+                            onLetterSelected = {
+                                selectedLetter = it
+                                if (it != "All") searchQuery = ""
+                            }
+                        )
                     }
 
                     // Vibe discovery pills (when not in Live TV)
@@ -659,76 +760,184 @@ fun MoviePlayScreen(
             }
 
             // ------------------------------------------------------------------------------------
-            // 6. MOVIE POSTER GRID (331+ Titles)
+            // 6. MOVIE CATALOG GRID & A-Z ALPHABETICAL SECTIONS (1,534+ Titles)
             // ------------------------------------------------------------------------------------
             if (selectedTab != "Live TV") {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        val headerTitle = when {
-                            searchQuery.isNotBlank() -> "Search Results for \"$searchQuery\" (${displayMovies.size} Titles)"
-                            selectedFranchise != null -> "${selectedFranchise?.name} Saga (${displayMovies.size} Titles)"
-                            selectedVibe != "All" -> "$selectedVibe Movies & Shows (${displayMovies.size})"
-                            else -> "$selectedTab Cinema Catalog (${displayMovies.size} Titles)"
+                item(key = "catalog_header_controls") {
+                    val headerTitle = when {
+                        searchQuery.isNotBlank() -> "Search Results for \"$searchQuery\" (${displayMovies.size} Titles)"
+                        selectedLetter != "All" -> "Letter '$selectedLetter' Titles (${displayMovies.size})"
+                        selectedFranchise != null -> "${selectedFranchise?.name} Saga (${displayMovies.size} Titles)"
+                        selectedVibe != "All" -> "$selectedVibe Movies & Shows (${displayMovies.size})"
+                        else -> "$selectedTab Cinema Catalog (${displayMovies.size} Titles)"
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = headerTitle,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Showing ${displayMovies.size} titles • Organized by ${sortOrder.label}",
+                                fontSize = 11.5.sp,
+                                color = Color.White.copy(alpha = 0.70f)
+                            )
                         }
 
-                        Text(
-                            text = headerTitle,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
-                        )
-
-                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                            val screenWidth = maxWidth
-                            val columns = when {
-                                screenWidth >= 1650.dp -> 7
-                                screenWidth >= 1350.dp -> 6
-                                screenWidth >= 1050.dp -> 5
-                                screenWidth >= 750.dp -> 4
-                                else -> 3
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (selectedLetter == "All" && searchQuery.isBlank() && sortOrder == MovieSortOrder.NAME_ASC) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (groupByLetter) Color(0xFFE11D48).copy(alpha = 0.20f) else Color.White.copy(alpha = 0.08f))
+                                        .border(1.dp, if (groupByLetter) Color(0xFFE11D48).copy(alpha = 0.60f) else Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        .clickable { groupByLetter = !groupByLetter }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = if (groupByLetter) "✓ A-Z Grouped" else "Flat Grid",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (groupByLetter) Color.White else Color.White.copy(alpha = 0.75f)
+                                    )
+                                }
                             }
-                            val chunkedMovies = displayMovies.chunked(columns)
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                for (row in chunkedMovies) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                                    ) {
-                                        for (movie in row) {
-                                            Box(modifier = Modifier.weight(1f)) {
-                                                MovieBoxCinemaCard(
-                                                    item = movie,
-                                                    onPlay = {
-                                                        selectedMovieForModal = movie
-                                                    },
-                                                    onSelect = {
-                                                        selectedMovieForModal = movie
-                                                    },
-                                                    onTrailerClick = {
-                                                        val tUrl = MoviePlayRepository.getTrailerUrl(movie.title)
-                                                        MoviePlayRepository.openInBrowser(tUrl)
-                                                        toastMessage = "🎬 Opening Official Trailer for ${movie.title}..."
-                                                    },
-                                                    onSoundtrackClick = {
-                                                        scope.launch {
-                                                            toastMessage = "🎵 Finding Original Soundtrack for ${movie.title}..."
-                                                            val tracks = MoviePlayRepository.resolveSoundtrackForMovie(movie.title)
-                                                            if (tracks.isNotEmpty()) {
-                                                                playerViewModel.playWithQueue(tracks.first(), tracks)
-                                                                toastMessage = "▶ Playing Soundtrack: ${movie.title} (${tracks.size} tracks queued)"
-                                                            } else {
-                                                                toastMessage = "⚠ No audio album found for ${movie.title}"
-                                                            }
-                                                        }
+
+                            if (selectedLetter != "All") {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF38BDF8).copy(alpha = 0.15f))
+                                        .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.40f), RoundedCornerShape(8.dp))
+                                        .clickable { selectedLetter = "All" }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "Reset Letter filter ×",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF38BDF8)
+                                    )
+                                }
+                            }
+
+                            MovieSortSelector(
+                                currentSort = sortOrder,
+                                onSortSelected = { sortOrder = it }
+                            )
+                        }
+                    }
+                }
+
+                if (groupedSections != null) {
+                    for ((letter, letterMovies) in groupedSections) {
+                        item(key = "letter_hdr_$letter") {
+                            AlphabeticalSectionHeader(
+                                letter = letter,
+                                count = letterMovies.size,
+                                onJumpToLetter = { selectedLetter = letter }
+                            )
+                        }
+                        val rows = letterMovies.chunked(columns)
+                        items(
+                            items = rows,
+                            key = { row -> "row_${letter}_${row.first().id}" }
+                        ) { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                for (movie in row) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        MovieBoxCinemaCard(
+                                            item = movie,
+                                            onPlay = {
+                                                scope.launch {
+                                                    MoviePlayRepository.playMovieDirect(movie) { toastMessage = it }
+                                                }
+                                            },
+                                            onSelect = { selectedMovieForModal = movie },
+                                            onTrailerClick = {
+                                                val tUrl = MoviePlayRepository.getTrailerUrl(movie.title)
+                                                MoviePlayRepository.openInBrowser(tUrl)
+                                                toastMessage = "🎬 Opening Official Trailer for ${movie.title}..."
+                                            },
+                                            onSoundtrackClick = {
+                                                scope.launch {
+                                                    toastMessage = "🎵 Finding Original Soundtrack for ${movie.title}..."
+                                                    val tracks = MoviePlayRepository.resolveSoundtrackForMovie(movie.title)
+                                                    if (tracks.isNotEmpty()) {
+                                                        playerViewModel.playWithQueue(tracks.first(), tracks)
+                                                        toastMessage = "▶ Playing Soundtrack: ${movie.title} (${tracks.size} tracks queued)"
+                                                    } else {
+                                                        toastMessage = "⚠ No audio album found for ${movie.title}"
                                                     }
-                                                )
+                                                }
                                             }
-                                        }
-                                        val rem = columns - row.size
-                                        if (rem > 0) {
-                                            for (i in 0 until rem) Spacer(Modifier.weight(1f))
-                                        }
+                                        )
                                     }
                                 }
+                                val rem = columns - row.size
+                                if (rem > 0) {
+                                    for (i in 0 until rem) Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    val rows = displayMovies.chunked(columns)
+                    items(
+                        items = rows,
+                        key = { row -> "row_${row.first().id}" }
+                    ) { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            for (movie in row) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    MovieBoxCinemaCard(
+                                        item = movie,
+                                        onPlay = {
+                                            scope.launch {
+                                                MoviePlayRepository.playMovieDirect(movie) { toastMessage = it }
+                                            }
+                                        },
+                                        onSelect = { selectedMovieForModal = movie },
+                                        onTrailerClick = {
+                                            val tUrl = MoviePlayRepository.getTrailerUrl(movie.title)
+                                            MoviePlayRepository.openInBrowser(tUrl)
+                                            toastMessage = "🎬 Opening Official Trailer for ${movie.title}..."
+                                        },
+                                        onSoundtrackClick = {
+                                            scope.launch {
+                                                toastMessage = "🎵 Finding Original Soundtrack for ${movie.title}..."
+                                                val tracks = MoviePlayRepository.resolveSoundtrackForMovie(movie.title)
+                                                if (tracks.isNotEmpty()) {
+                                                    playerViewModel.playWithQueue(tracks.first(), tracks)
+                                                    toastMessage = "▶ Playing Soundtrack: ${movie.title} (${tracks.size} tracks queued)"
+                                                } else {
+                                                    toastMessage = "⚠ No audio album found for ${movie.title}"
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                            val rem = columns - row.size
+                            if (rem > 0) {
+                                for (i in 0 until rem) Spacer(Modifier.weight(1f))
                             }
                         }
                     }
@@ -807,8 +1016,8 @@ fun MoviePlayScreen(
             SeniorMovieBoxDetailModal(
                 movie = movie,
                 onDismiss = { selectedMovieForModal = null },
-                onStreamSelected = { stream ->
-                    MoviePlayRepository.launchVideoStream(stream.url, movie.title)
+                onStreamSelected = { stream, allStreams ->
+                    MoviePlayRepository.launchVideoStream(stream.url, movie.title, allStreams)
                     toastMessage = "▶ Launching: ${stream.title}..."
                 },
                 onTrailerClick = {
@@ -892,7 +1101,7 @@ fun SeniorMoviePlaySection(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "CINEMA STUDIO • 331+ BLOCKBUSTERS",
+                            text = "CINEMA STUDIO • 1,534+ TITLES",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE11D48),
@@ -1462,7 +1671,7 @@ fun MovieVibePill(
 fun SeniorMovieBoxDetailModal(
     movie: MovieBoxItem,
     onDismiss: () -> Unit,
-    onStreamSelected: (MovieStreamOption) -> Unit,
+    onStreamSelected: (MovieStreamOption, List<MovieStreamOption>) -> Unit,
     onTrailerClick: () -> Unit,
     onPlaySoundtrack: () -> Unit,
     onAddToPlaylist: (Track) -> Unit,
@@ -1589,6 +1798,21 @@ fun SeniorMovieBoxDetailModal(
 
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Button(
+                                    onClick = {
+                                        val best = streams.firstOrNull { !it.isEmbed } ?: streams.firstOrNull()
+                                        if (best != null) {
+                                            onStreamSelected(best, streams)
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Stream Movie Now", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
                                     onClick = onTrailerClick,
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.15f)),
                                     shape = RoundedCornerShape(10.dp)
@@ -1637,7 +1861,7 @@ fun SeniorMovieBoxDetailModal(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .pointerHoverIcon(PointerIcon.Hand)
-                                        .clickable { onStreamSelected(stream) }
+                                        .clickable { onStreamSelected(stream, streams) }
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
@@ -1805,6 +2029,214 @@ fun SeniorMovieDetailModal(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
+// ALPHABETICAL A-Z NAVIGATION & SORTING COMPONENTS
+// =========================================================================
+
+@Composable
+fun AlphabeticalRibbon(
+    letters: List<String>,
+    selectedLetter: String,
+    letterCounts: Map<String, Int>,
+    onLetterSelected: (String) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        contentPadding = PaddingValues(vertical = 4.dp)
+    ) {
+        items(letters, key = { it }) { letter ->
+            val count = letterCounts[letter] ?: 0
+            val isSelected = letter == selectedLetter
+            val hasItems = letter == "All" || count > 0
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        when {
+                            isSelected -> Color(0xFFE11D48)
+                            hasItems -> Color(0xFF0A0C10).copy(alpha = 0.50f)
+                            else -> Color(0xFF0A0C10).copy(alpha = 0.20f)
+                        }
+                    )
+                    .border(
+                        1.dp,
+                        when {
+                            isSelected -> Color(0xFFE11D48)
+                            hasItems -> Color.White.copy(alpha = 0.18f)
+                            else -> Color.White.copy(alpha = 0.05f)
+                        },
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable(enabled = hasItems) { onLetterSelected(letter) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = letter,
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = when {
+                            isSelected -> Color.White
+                            hasItems -> Color.White
+                            else -> Color.White.copy(alpha = 0.30f)
+                        }
+                    )
+                    if (letter != "All" && count > 0) {
+                        Text(
+                            text = "$count",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color.White.copy(alpha = 0.90f) else Color(0xFF38BDF8)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AlphabeticalSectionHeader(
+    letter: String,
+    count: Int,
+    onJumpToLetter: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFE11D48).copy(alpha = 0.20f))
+                    .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.70f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = letter,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
+                )
+            }
+            Text(
+                text = if (letter == "#") "Numbers & Symbols" else "Titles starting with '$letter'",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "$count",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF38BDF8)
+                )
+            }
+        }
+        Text(
+            text = "Focus '$letter' only →",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF38BDF8),
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable { onJumpToLetter() }
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+fun MovieSortSelector(
+    currentSort: MovieSortOrder,
+    onSortSelected: (MovieSortOrder) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF0A0C10).copy(alpha = 0.50f))
+                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(8.dp))
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Default.SortByAlpha, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(15.dp))
+                Text(
+                    text = currentSort.label,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White.copy(alpha = 0.70f), modifier = Modifier.size(16.dp))
+            }
+        }
+
+        if (expanded) {
+            androidx.compose.material3.DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier
+                    .background(Color(0xFF0F172A))
+                    .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.40f), RoundedCornerShape(8.dp))
+            ) {
+                MovieSortOrder.values().forEach { option ->
+                    val isSelected = option == currentSort
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(14.dp))
+                                } else {
+                                    Spacer(Modifier.size(14.dp))
+                                }
+                                Text(
+                                    text = option.label,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) Color(0xFFE11D48) else Color.White
+                                )
+                            }
+                        },
+                        onClick = {
+                            onSortSelected(option)
+                            expanded = false
+                        }
+                    )
                 }
             }
         }

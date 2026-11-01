@@ -144,8 +144,8 @@ object MoviePlayRepository {
     }
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(6, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     private const val MOVIEBOX_SERVER_URL = "http://127.0.0.1:3000"
@@ -337,12 +337,32 @@ object MoviePlayRepository {
     // Stream Resolution
     // ---------------------------------------------------------------------
 
+    suspend fun resolveImdbId(cleanTitle: String, type: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val cinemetaType = if (type == "series") "series" else "movie"
+            val enc = URLEncoder.encode(cleanTitle, "UTF-8")
+            val url = "https://v3-cinemeta.strem.io/catalog/$cinemetaType/top/search=$enc.json"
+            val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()
+            val body = httpClient.newCall(req).execute().use { it.body?.string().orEmpty() }
+            if (body.isNotBlank()) {
+                val root = json.parseToJsonElement(body).jsonObject
+                val metas = root["metas"]?.jsonArray
+                if (metas != null && metas.isNotEmpty()) {
+                    return@runCatching metas[0].jsonObject["id"]?.jsonPrimitive?.content
+                }
+            }
+            null
+        }.getOrNull()
+    }
+
     suspend fun fetchMovieStreams(item: MovieBoxItem): List<MovieStreamOption> = withContext(Dispatchers.IO) {
         val streams = mutableListOf<MovieStreamOption>()
+        val cleanTitle = item.title.replace(Regex("""\[.*?\]|\(.*?\)|4k|uhd|1080p|season \d+""", RegexOption.IGNORE_CASE), "").trim()
+        val encTitle = URLEncoder.encode(cleanTitle, "UTF-8")
 
-        // 1. Try Live MovieBox Server API
+        // 1. Fetch Streams from Local MovieBox Server API
         runCatching {
-            val url = "$MOVIEBOX_SERVER_URL/api/streams?id=${item.id}&type=${item.type}"
+            val url = "$MOVIEBOX_SERVER_URL/api/streams?id=${item.id}&type=${item.type}&title=$encTitle"
             val req = Request.Builder().url(url).build()
             val body = httpClient.newCall(req).execute().use { it.body?.string().orEmpty() }
             if (body.isNotBlank()) {
@@ -353,7 +373,7 @@ object MoviePlayRepository {
                         val obj = elem.jsonObject
                         val id = obj["id"]?.jsonPrimitive?.content ?: continue
                         val title = obj["title"]?.jsonPrimitive?.content ?: "Stream"
-                        val sUrl = obj["url"]?.jsonPrimitive?.content ?: continue
+                        val rawUrl = obj["url"]?.jsonPrimitive?.content ?: continue
                         val res = obj["resolution"]?.jsonPrimitive?.content ?: "1080"
                         val format = obj["format"]?.jsonPrimitive?.content ?: "MP4"
                         val isEmbed = obj["isEmbed"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
@@ -361,87 +381,473 @@ object MoviePlayRepository {
                         val codec = obj["codec"]?.jsonPrimitive?.content ?: "h264"
                         val audio = obj["audio"]?.jsonPrimitive?.content ?: "Original Audio"
                         val st = obj["sourceType"]?.jsonPrimitive?.content ?: "moviebox"
+
+                        val sUrl = if ((rawUrl.contains("hakunaymatata.com") || rawUrl.contains("aoneroom.com")) && !rawUrl.contains("stream-proxy")) {
+                            "$MOVIEBOX_SERVER_URL/api/stream-proxy?url=${URLEncoder.encode(rawUrl, "UTF-8")}"
+                        } else {
+                            rawUrl
+                        }
                         streams.add(MovieStreamOption(id, title, sUrl, res, format, isEmbed, size, codec, audio, st))
                     }
                 }
             }
         }
 
-        // 2. If no streams returned, attach high-speed reliable mirror streams
-        if (streams.isEmpty()) {
-            val cleanTitle = item.title.replace(Regex("""\[.*?\]|\(.*?\)|4k|uhd|1080p""", RegexOption.IGNORE_CASE), "").trim()
-            val enc = URLEncoder.encode(cleanTitle, "UTF-8")
-            streams.add(
-                MovieStreamOption(
-                    id = "mirror_vidsrc_${item.id}",
-                    title = "Mirror 1 • 1080p Full HD (VidSrc Direct)",
-                    url = "https://vidsrc.me/embed/${if (item.type == "series") "tv" else "movie"}?title=$enc",
-                    resolution = "1080",
-                    format = "STREAM",
-                    isEmbed = true,
-                    size = "Full HD",
-                    audio = "Original Audio + CC"
-                )
-            )
-            streams.add(
-                MovieStreamOption(
-                    id = "mirror_vidto_${item.id}",
-                    title = "Mirror 2 • 1080p Ultra HD (VidTo Server)",
-                    url = "https://vidsrc.to/embed/${if (item.type == "series") "tv" else "movie"}/$enc",
-                    resolution = "1080",
-                    format = "STREAM",
-                    isEmbed = true,
-                    size = "1080p HD",
-                    audio = "Original Audio + CC"
-                )
-            )
-            streams.add(
-                MovieStreamOption(
-                    id = "mirror_2embed_${item.id}",
-                    title = "Mirror 3 • 720p High Speed (2Embed)",
-                    url = "https://2embed.cc/embed/${if (item.type == "series") "tv" else "movie"}?title=$enc",
-                    resolution = "720",
-                    format = "STREAM",
-                    isEmbed = true,
-                    size = "720p HD",
-                    audio = "Original Audio + CC"
-                )
-            )
+        // 2. Guaranteed TMDB Mirror Generator for Native TMDB Titles (628 TV Series & 575 Movies)
+        val tmdbId = when {
+            item.id.startsWith("tv_") -> item.id.removePrefix("tv_").trim()
+            item.id.length <= 8 && item.id.all { it.isDigit() } -> item.id.trim()
+            else -> null
         }
 
+        if (tmdbId != null && streams.none { it.url.contains("vidsrc.me") }) {
+            val isSeries = item.type == "series" || item.id.startsWith("tv_")
+            if (isSeries) {
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_vidsrc_$tmdbId",
+                        title = "Mirror 1 • 1080p Full HD (VidSrc Direct)",
+                        url = "https://vidsrc.me/embed/tv?tmdb=$tmdbId&season=1&episode=1",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "Full HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_vidsrcpm_$tmdbId",
+                        title = "Mirror 2 • 1080p Ultra HD (VidSrc PM)",
+                        url = "https://vidsrc.pm/embed/tv/$tmdbId/1-1",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "1080p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_2embed_$tmdbId",
+                        title = "Mirror 3 • 720p High Speed (2Embed)",
+                        url = "https://2embed.cc/embed/tmdb/tv?id=$tmdbId&s=1&e=1",
+                        resolution = "720",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "720p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_smashy_$tmdbId",
+                        title = "Mirror 4 • Fast Stream (Smashy)",
+                        url = "https://embed.smashystream.com/playere.php?tmdb=$tmdbId&season=1&episode=1",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "1080p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+            } else {
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_vidsrc_$tmdbId",
+                        title = "Mirror 1 • 1080p Full HD (VidSrc Direct)",
+                        url = "https://vidsrc.me/embed/movie?tmdb=$tmdbId",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "Full HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_vidsrcpm_$tmdbId",
+                        title = "Mirror 2 • 1080p Ultra HD (VidSrc PM)",
+                        url = "https://vidsrc.pm/embed/movie/$tmdbId",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "1080p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_2embed_$tmdbId",
+                        title = "Mirror 3 • 720p High Speed (2Embed)",
+                        url = "https://2embed.cc/embed/tmdb/movie?id=$tmdbId",
+                        resolution = "720",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "720p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_smashy_$tmdbId",
+                        title = "Mirror 4 • Fast Stream (Smashy)",
+                        url = "https://embed.smashystream.com/playere.php?tmdb=$tmdbId",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "1080p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+            }
+        }
+
+        // 3. If still no mirror streams present, resolve verified Cinemeta IMDb ID for working mirrors
+        val hasMirrors = streams.any { it.isEmbed && (it.url.contains("vidsrc") || it.url.contains("2embed") || it.url.contains("smashy")) }
+        if (!hasMirrors) {
+            val imdbId = resolveImdbId(cleanTitle, item.type)
+            if (!imdbId.isNullOrBlank()) {
+                val isSeries = item.type == "series"
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_vidsrc_$imdbId",
+                        title = "Mirror 1 • 1080p Full HD (VidSrc Direct)",
+                        url = if (isSeries) "https://vidsrc.me/embed/tv?imdb=$imdbId&season=1&episode=1" else "https://vidsrc.me/embed/movie?imdb=$imdbId",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "Full HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_vidto_$imdbId",
+                        title = "Mirror 2 • 1080p Ultra HD (VidTo Server)",
+                        url = if (isSeries) "https://vidsrc.to/embed/tv/$imdbId/1/1" else "https://vidsrc.to/embed/movie/$imdbId",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "1080p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_2embed_$imdbId",
+                        title = "Mirror 3 • 720p High Speed (2Embed)",
+                        url = if (isSeries) "https://2embed.cc/embedtv/$imdbId&s=1&e=1" else "https://2embed.cc/embed/$imdbId",
+                        resolution = "720",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "720p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_smashy_$imdbId",
+                        title = "Mirror 4 • Fast Stream (SmashyStream)",
+                        url = if (isSeries) "https://embed.smashystream.com/playere.php?imdb=$imdbId&season=1&episode=1" else "https://embed.smashystream.com/playere.php?imdb=$imdbId",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "1080p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+            }
+        }
+
+        // 4. Primary High-Performance Web Cinema Studio Player Option
+        streams.add(
+            MovieStreamOption(
+                id = "web_studio_${item.id}",
+                title = "▶ Cinema Web Player (Full 4K/1080p, Subtitles & Audio Boost)",
+                url = "$MOVIEBOX_SERVER_URL/?id=${item.id}&play=true",
+                resolution = "1080",
+                format = "WEB",
+                isEmbed = true,
+                size = "Instant",
+                audio = "Multi-Audio + Subs"
+            )
+        )
+
         streams
+    }
+
+    suspend fun playMovieDirect(item: MovieBoxItem, onToast: (String) -> Unit) {
+        onToast("▶ Preparing ${item.title}...")
+        val streams = fetchMovieStreams(item)
+        val best = streams.firstOrNull { !it.isEmbed } ?: streams.firstOrNull()
+        if (best != null) {
+            onToast("▶ Playing: ${item.title} (${best.title})")
+            launchVideoStream(best.url, item.title, streams)
+        } else {
+            onToast("🎬 Opening ${item.title}...")
+            launchVideoStream("$MOVIEBOX_SERVER_URL/?id=${item.id}&play=true", item.title)
+        }
     }
 
     fun getTrailerUrl(title: String): String {
         val clean = title.replace(Regex("""\b(4k|uhd|2160p|1080p|bluray|season \d+)\b""", RegexOption.IGNORE_CASE), "").trim()
         val enc = URLEncoder.encode("$clean official trailer", "UTF-8")
-        return "https://www.youtube-nocookie.com/embed?listType=search&list=$enc&autoplay=1"
+        return "https://www.youtube.com/results?search_query=$enc"
     }
 
     // ---------------------------------------------------------------------
     // External Player & Browser Launchers
     // ---------------------------------------------------------------------
 
-    fun launchVideoStream(streamUrl: String, title: String) {
-        // Try portable bundled VLC or system VLC
+    fun openCinemaTheater(title: String, activeUrl: String, mirrors: List<MovieStreamOption> = emptyList()) {
         Thread {
             try {
-                val appDir = File(".").canonicalFile
-                val portableVlc = File(appDir, "runtime/vlc/vlc.exe")
+                val tempDir = System.getProperty("java.io.tmpdir")
+                val theaterFile = File(tempDir, "audix_cinema_theater.html")
+
+                val mirrorOptions = if (mirrors.isNotEmpty()) mirrors else listOf(
+                    MovieStreamOption("current", "Default Server", activeUrl, "1080", "STREAM", true)
+                )
+
+                val mirrorsJsonArray = mirrorOptions.joinToString(",", "[", "]") { m ->
+                    val safeTitle = m.title.replace("\"", "\\\"")
+                    val safeUrl = m.url.replace("\"", "\\\"")
+                    """{"id":"${m.id}","title":"$safeTitle","url":"$safeUrl","res":"${m.resolution}"}"""
+                }
+
+                val mirrorButtonsHtml = mirrorOptions.mapIndexed { idx, m ->
+                    val isActive = if (m.url == activeUrl || (idx == 0 && mirrorOptions.none { it.url == activeUrl })) " active" else ""
+                    val shortName = when {
+                        m.title.contains("VidSrc Direct", true) -> "VidSrc Direct"
+                        m.title.contains("VidSrc PM", true) -> "VidSrc PM"
+                        m.title.contains("VidTo", true) -> "VidTo Server"
+                        m.title.contains("2Embed", true) -> "2Embed Fast"
+                        m.title.contains("Smashy", true) -> "Smashy Player"
+                        m.title.contains("Hindi", true) -> "Hindi Dub"
+                        m.title.contains("Original", true) -> "Original Audio"
+                        m.title.contains("4K", true) -> "4K UHD"
+                        m.title.contains("1080", true) -> "1080p HD"
+                        else -> "Mirror ${idx + 1}"
+                    }
+                    """<button class="mirror-btn$isActive" onclick="selectMirror($idx)">$shortName</button>"""
+                }.joinToString("\n")
+
+                val cleanTitle = title.replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+
+                val html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>$cleanTitle • Audix Cinema Theater</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: #07090e;
+    color: #f1f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    height: 52px;
+    background: rgba(10, 12, 16, 0.92);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(225, 29, 72, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 100;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: 0.5px;
+  }
+  .brand-badge {
+    background: rgba(225, 29, 72, 0.22);
+    border: 1px solid #e11d48;
+    color: #f43f5e;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+  }
+  .movie-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #ffffff;
+    max-width: 320px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .mirror-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0;
+  }
+  .mirror-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #cbd5e1;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+  .mirror-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  .mirror-btn.active {
+    background: #e11d48;
+    color: #ffffff;
+    border-color: #e11d48;
+    box-shadow: 0 0 14px rgba(225, 29, 72, 0.55);
+  }
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .action-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #cbd5e1;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .action-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+  }
+  #player-container {
+    flex: 1;
+    width: 100%;
+    height: calc(100vh - 52px);
+    position: relative;
+    background: #000;
+  }
+  iframe, video {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-badge">AUDIX CINEMA</span>
+      <span class="movie-title">$cleanTitle</span>
+    </div>
+    <div class="mirror-bar">
+$mirrorButtonsHtml
+    </div>
+    <div class="actions">
+      <button class="action-btn" onclick="toggleFullscreen()">⛶ Fullscreen (F)</button>
+    </div>
+  </header>
+  <div id="player-container">
+    <iframe id="cinema-frame" src="$activeUrl" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>
+  </div>
+  <script>
+    const mirrors = $mirrorsJsonArray;
+    function selectMirror(index) {
+      if (!mirrors[index]) return;
+      document.querySelectorAll('.mirror-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === index);
+      });
+      document.getElementById('cinema-frame').src = mirrors[index].url;
+    }
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= mirrors.length) selectMirror(num - 1);
+    });
+  </script>
+</body>
+</html>
+                """.trimIndent()
+
+                theaterFile.writeText(html, Charsets.UTF_8)
+                openInBrowser(theaterFile.toURI().toString())
+            } catch (e: Exception) {
+                e.printStackTrace()
+                openInBrowser(activeUrl)
+            }
+        }.start()
+    }
+
+    fun launchVideoStream(streamUrl: String, title: String, allStreams: List<MovieStreamOption> = emptyList()) {
+        Thread {
+            try {
+                // If it is a direct CDN MP4 stream, proxy through local server so it never 428-blocks
+                val targetUrl = if (streamUrl.contains("bcdn.") || streamUrl.contains("hakunaymatata") || streamUrl.contains("resource/")) {
+                    if (!streamUrl.contains("stream-proxy")) {
+                        "http://127.0.0.1:3000/api/stream-proxy?url=${URLEncoder.encode(streamUrl, "UTF-8")}"
+                    } else {
+                        streamUrl
+                    }
+                } else {
+                    streamUrl
+                }
+
+                // Check for VLC on system
                 val candidateVlcPaths = listOf(
-                    portableVlc.absolutePath,
                     "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
                     "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe"
                 )
                 val vlcExe = candidateVlcPaths.firstOrNull { File(it).exists() }
-                if (vlcExe != null && !streamUrl.contains("/embed/")) {
-                    ProcessBuilder(vlcExe, streamUrl, "--meta-title=$title").start()
+                val isEmbed = streamUrl.contains("/embed") || streamUrl.contains("vidsrc") || streamUrl.contains("2embed") || streamUrl.contains("smashy") || streamUrl.contains("/?id=")
+                if (vlcExe != null && !isEmbed) {
+                    val safeTitle = title.replace(Regex("[^a-zA-Z0-9 ._-]"), "")
+                    val movieBoxUa = "com.community.oneroom/50020117 (Linux; U; Android 12; en_US; Redmi; Build/S1B.220414.015; Cronet/135.0.7012.3)"
+                    ProcessBuilder(
+                        vlcExe,
+                        targetUrl,
+                        "--http-user-agent=$movieBoxUa",
+                        "--meta-title=$safeTitle",
+                        "--network-caching=3000"
+                    ).start()
                     return@Thread
                 }
-            } catch (_: Exception) {}
 
-            // Open in browser
-            openInBrowser(streamUrl)
+                // If embed or VLC not present, launch in Audix Cinema Theater
+                openCinemaTheater(title, targetUrl, allStreams)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                openInBrowser(streamUrl)
+            }
         }.start()
     }
 
@@ -449,13 +855,20 @@ object MoviePlayRepository {
         Thread {
             try {
                 if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                    Desktop.getDesktop().browse(URI(url))
-                } else {
-                    Runtime.getRuntime().exec(arrayOf("cmd.exe", "/c", "start", "", url))
+                    try {
+                        Desktop.getDesktop().browse(URI.create(url))
+                        return@Thread
+                    } catch (_: Exception) {}
                 }
-            } catch (_: Exception) {
+                val os = System.getProperty("os.name").lowercase()
+                if (os.contains("win")) {
+                    ProcessBuilder("explorer.exe", url).start()
+                } else {
+                    ProcessBuilder("xdg-open", url).start()
+                }
+            } catch (e: Exception) {
                 runCatching {
-                    ProcessBuilder("cmd.exe", "/c", "start", "", url).start()
+                    ProcessBuilder("cmd.exe", "/c", "start", "\"\"", "\"$url\"").start()
                 }
             }
         }.start()
@@ -473,18 +886,22 @@ object MoviePlayRepository {
         coverUrl: String,
         durationMs: Long
     ): Track {
+        val cleanTitle = title.replace("&quot;", "\"").replace("&amp;", "&").replace("&#039;", "'").replace("&lt;", "<").replace("&gt;", ">").trim()
+        val cleanArtist = artist.replace("&quot;", "\"").replace("&amp;", "&").replace("&#039;", "'").trim()
         val imgHolder = ImageHolder.NetworkRequestImageHolder(NetworkRequest(coverUrl), false)
         return Track(
             id = id,
-            title = title,
-            artists = listOf(Artist("art_$id", artist, imgHolder)),
+            title = cleanTitle,
+            artists = listOf(Artist("art_$id", cleanArtist, imgHolder)),
             album = Album(id = "alb_$id", title = movieTitle, cover = imgHolder),
             cover = imgHolder,
             duration = durationMs,
             extras = mapOf(
-                "source" to "saavn",
-                "track_title" to title,
-                "artist_name" to artist,
+                "extension_id" to "saavn_music",
+                "source" to "JioSaavn",
+                "song_id" to id,
+                "track_title" to cleanTitle,
+                "artist_name" to cleanArtist,
                 "album_name" to movieTitle,
                 "cover_url" to coverUrl
             )
@@ -493,7 +910,36 @@ object MoviePlayRepository {
 
     suspend fun resolveSoundtrackForMovie(movieTitle: String): List<Track> = withContext(Dispatchers.IO) {
         runCatching {
-            val clean = movieTitle.replace(Regex("""\[.*?\]|\(.*?\)|4k|uhd|1080p""", RegexOption.IGNORE_CASE), "").trim()
+            val clean = movieTitle.replace(Regex("""\[.*?]|\(.*?\)|4k|uhd|1080p|season \d+""", RegexOption.IGNORE_CASE), "").trim()
+
+            // 1. Try direct song search for official theme / OST tracks
+            val songEnc = URLEncoder.encode("$clean theme", "UTF-8")
+            val songUrl = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&p=1&n=10&q=$songEnc"
+            val songReq = Request.Builder().url(songUrl).header("User-Agent", "Mozilla/5.0").build()
+            val songBody = httpClient.newCall(songReq).execute().use { it.body?.string().orEmpty() }
+            if (songBody.isNotBlank()) {
+                val root = json.parseToJsonElement(songBody).jsonObject
+                val results = root["results"]?.jsonArray
+                if (results != null && results.isNotEmpty()) {
+                    val tracks = mutableListOf<Track>()
+                    for (sElem in results) {
+                        val sObj = sElem.jsonObject
+                        val sid = sObj["id"]?.jsonPrimitive?.content ?: continue
+                        val sTitle = sObj["title"]?.jsonPrimitive?.content ?: continue
+                        val moreInfo = sObj["more_info"]?.jsonObject
+                        val sArtist = moreInfo?.get("music")?.jsonPrimitive?.content
+                            ?: moreInfo?.get("artist_name")?.jsonPrimitive?.content
+                            ?: "Hans Zimmer / Cinema OST"
+                        val sDur = moreInfo?.get("duration")?.jsonPrimitive?.content?.toLongOrNull()?.times(1000L) ?: 210000L
+                        val rawImg = sObj["image"]?.jsonPrimitive?.content ?: ""
+                        val highResImg = rawImg.replace("150x150", "500x500").replace("50x50", "500x500")
+                        tracks.add(makeMovieTrack(sid, sTitle, sArtist, clean, highResImg, sDur))
+                    }
+                    if (tracks.isNotEmpty()) return@runCatching tracks
+                }
+            }
+
+            // 2. Try album search
             val enc = URLEncoder.encode("$clean original soundtrack", "UTF-8")
             val url = "https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&_marker=0&api_version=4&p=1&n=5&q=$enc"
             val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()

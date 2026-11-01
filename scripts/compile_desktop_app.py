@@ -53,6 +53,9 @@ with zipfile.ZipFile(target_jar, 'r') as zin, zipfile.ZipFile(clean_ref_jar, 'w'
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/ComposableSingletons$EchoScreensaverKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/SearchAndOthersKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$SearchAndOthersKt') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/MoviePlay') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/movie/') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ExtensionsScreenKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/CuratedExtension') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ExtensionViewTab') and
@@ -101,6 +104,8 @@ source_files = [
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\player\MiniPlayer.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\HomeScreen.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screensaver\EchoScreensaver.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\movie\MoviePlayModels.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\MoviePlayScreen.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\SearchAndOthers.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\ExtensionsScreen.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\AudixArtworkEngine.kt'),

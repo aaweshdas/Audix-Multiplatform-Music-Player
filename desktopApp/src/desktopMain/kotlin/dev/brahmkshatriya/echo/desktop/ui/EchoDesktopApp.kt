@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Movie
+import dev.brahmkshatriya.echo.desktop.ui.screens.MoviePlayScreen
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -98,6 +100,7 @@ enum class Screen(
 ) {
     HOME("Home", Icons.Default.Home),
     AI_STUDIO("AI Studio", Icons.Default.AutoAwesome),
+    MOVIE_PLAY("Movie Play", Icons.Default.Movie),
     ROTATION("Rotation", Icons.Default.Whatshot),
     SEARCH("Search", Icons.Default.Search),
     LIBRARY("Library", Icons.Default.LibraryMusic),
@@ -372,6 +375,7 @@ fun EchoDesktopApp() {
                                 when (selectedScreen) {
                                     Screen.HOME -> HomeScreen(onLaunchScreensaver = launchScreensaver)
                                     Screen.AI_STUDIO -> AiStudioScreen(playerViewModel = playerViewModel, settings = settings)
+                                    Screen.MOVIE_PLAY -> MoviePlayScreen(playerViewModel = playerViewModel, settings = settings, onLaunchScreensaver = launchScreensaver)
                                     Screen.ROTATION -> HeavyRotationScreen(playerViewModel = playerViewModel, onLaunchScreensaver = launchScreensaver)
                                     Screen.SEARCH -> SearchScreen()
                                     Screen.LIBRARY -> LibraryScreen()

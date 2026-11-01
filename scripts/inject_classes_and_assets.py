@@ -108,6 +108,9 @@ def update_jar(jar_path):
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/ComposableSingletons$EchoScreensaverKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/SearchAndOthersKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$SearchAndOthersKt') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/MoviePlay') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/movie/') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/player/') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ExtensionsScreenKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$ExtensionsScreenKt') or

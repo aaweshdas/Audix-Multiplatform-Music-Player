@@ -61,6 +61,7 @@ import dev.brahmkshatriya.echo.common.models.*
 import dev.brahmkshatriya.echo.core.extensions.ExtensionManager
 import dev.brahmkshatriya.echo.desktop.download.DesktopDownloadManager
 import dev.brahmkshatriya.echo.desktop.library.DesktopLibraryManager
+import dev.brahmkshatriya.echo.desktop.ui.movie.MovieSoundtrack
 import dev.brahmkshatriya.echo.desktop.library.UserPlaylist
 import dev.brahmkshatriya.echo.desktop.library.toTrack
 import dev.brahmkshatriya.echo.desktop.ui.components.ShelfRow
@@ -455,6 +456,7 @@ fun HomeScreen(
 
     val userPlaylists by libraryManager.playlists.collectAsState()
     var selectedPlaylistForModal by remember { mutableStateOf<CuratedHomePlaylist?>(null) }
+    var selectedMovieForModal by remember { mutableStateOf<MovieSoundtrack?>(null) }
     var selectedShelfForModal by remember { mutableStateOf<Shelf?>(null) }
     var selectedMediaForDetail by remember { mutableStateOf<EchoMediaItem?>(null) }
     var playlistToastMessage by remember { mutableStateOf<String?>(null) }
@@ -593,7 +595,27 @@ fun HomeScreen(
             }
 
             // ------------------------------------------------------------------------------------
+            // 3.5. FLAGSHIP MOVIE PLAY (Curated Blockbuster Cinema Soundtracks & Jukeboxes)
+            // ------------------------------------------------------------------------------------
+            item {
+                SeniorMoviePlaySection(
+                    onPlayMovie = { movie ->
+                        if (movie.tracks.isNotEmpty()) {
+                            playerViewModel.playWithQueue(movie.tracks.first(), movie.tracks)
+                            playlistToastMessage = "▶ Playing Movie Jukebox: ${movie.title} (${movie.tracks.size} tracks queued)"
+                        } else {
+                            playlistToastMessage = "⚠ Loading tracks for ${movie.title}..."
+                        }
+                    },
+                    onSelectMovie = { movie ->
+                        selectedMovieForModal = movie
+                    }
+                )
+            }
+
+            // ------------------------------------------------------------------------------------
             // 4. FLAGSHIP FEATURED & CURATED PLAYLISTS (Continuous Multi-Track Playlists)
+            // ------------------------------------------------------------------------------------
             // ------------------------------------------------------------------------------------
             item {
                 SeniorFeaturedPlaylistsSection(
@@ -888,7 +910,45 @@ fun HomeScreen(
         }
 
         // ========================================================================================
+        // 1.5. MOVIE DETAIL & JUKEBOX MODAL
+        // ========================================================================================
+        selectedMovieForModal?.let { movie ->
+            SeniorMovieDetailModal(
+                movie = movie,
+                onDismiss = { selectedMovieForModal = null },
+                onPlayAll = {
+                    if (movie.tracks.isNotEmpty()) {
+                        playerViewModel.playWithQueue(movie.tracks.first(), movie.tracks)
+                        playlistToastMessage = "▶ Playing Movie Jukebox: ${movie.title} (${movie.tracks.size} tracks queued)"
+                        selectedMovieForModal = null
+                    }
+                },
+                onShufflePlay = {
+                    if (movie.tracks.isNotEmpty()) {
+                        val shuffled = movie.tracks.shuffled()
+                        playerViewModel.playWithQueue(shuffled.first(), shuffled)
+                        playlistToastMessage = "🔀 Shuffled Movie Jukebox: ${movie.title} (${movie.tracks.size} tracks queued)"
+                        selectedMovieForModal = null
+                    }
+                },
+                onPlayTrack = { track ->
+                    val idx = movie.tracks.indexOfFirst { it.id == track.id }
+                    val q = if (idx >= 0) movie.tracks.drop(idx) + movie.tracks.take(idx) else listOf(track)
+                    playerViewModel.playWithQueue(track, q)
+                    playlistToastMessage = "▶ Playing: ${track.title} (${movie.tracks.size} songs in movie jukebox queue)"
+                },
+                onAddToPlaylist = { track ->
+                    trackForPlaylist = track
+                },
+                onDownloadTrack = { track ->
+                    downloadManager.downloadTrack(track)
+                }
+            )
+        }
+
+        // ========================================================================================
         // 1. PLAYLIST DETAIL MODAL
+        // ========================================================================================
         // ========================================================================================
         selectedPlaylistForModal?.let { playlist ->
             SeniorPlaylistDetailModal(
@@ -2759,7 +2819,7 @@ private fun SeniorSourceAndMoodBar(
 }
 
 @Composable
-private fun SeniorFilterPill(
+fun SeniorFilterPill(
     title: String,
     isSelected: Boolean,
     onClick: () -> Unit

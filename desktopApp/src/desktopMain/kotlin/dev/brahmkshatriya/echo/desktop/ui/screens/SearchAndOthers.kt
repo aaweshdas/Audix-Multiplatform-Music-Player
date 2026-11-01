@@ -4638,6 +4638,7 @@ fun SearchScreen(
 
 enum class LibraryTab(val title: String, val icon: ImageVector) {
     FAVORITES("Favorites", Icons.Default.Favorite),
+    MOVIE_PLAY("Movie Play", Icons.Default.Movie),
     PLAYLISTS("Playlists", Icons.Default.LibraryMusic),
     HISTORY("Recent History", Icons.Default.History)
 }
@@ -4965,6 +4966,7 @@ fun LibraryScreen(
                     val isSelected = selectedTab == tab
                     val count = when (tab) {
                         LibraryTab.FAVORITES -> favorites.size
+                        LibraryTab.MOVIE_PLAY -> 16
                         LibraryTab.PLAYLISTS -> playlists.size
                         LibraryTab.HISTORY -> history.size
                     }
@@ -5192,6 +5194,16 @@ fun LibraryScreen(
                                 }
                             }
                         }
+                    }
+                }
+
+                LibraryTab.MOVIE_PLAY -> {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        MoviePlayScreen(
+                            playerViewModel = playerViewModel,
+                            libraryManager = libraryManager,
+                            downloadManager = downloadManager
+                        )
                     }
                 }
 

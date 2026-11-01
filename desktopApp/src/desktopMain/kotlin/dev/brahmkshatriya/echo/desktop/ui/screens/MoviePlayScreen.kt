@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,23 +25,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.LocalMovies
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Theaters
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +67,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -77,15 +81,19 @@ import dev.brahmkshatriya.echo.common.models.Track
 import dev.brahmkshatriya.echo.core.settings.EchoSettings
 import dev.brahmkshatriya.echo.desktop.download.DesktopDownloadManager
 import dev.brahmkshatriya.echo.desktop.library.DesktopLibraryManager
+import dev.brahmkshatriya.echo.desktop.ui.movie.MovieBoxCollection
+import dev.brahmkshatriya.echo.desktop.ui.movie.MovieBoxItem
+import dev.brahmkshatriya.echo.desktop.ui.movie.MovieBoxLiveChannel
 import dev.brahmkshatriya.echo.desktop.ui.movie.MoviePlayRepository
 import dev.brahmkshatriya.echo.desktop.ui.movie.MovieSoundtrack
+import dev.brahmkshatriya.echo.desktop.ui.movie.MovieStreamOption
 import dev.brahmkshatriya.echo.desktop.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 // =========================================================================
-// MOVIE PLAY DEDICATED SCREEN & WORKSTATION
+// MOVIE PLAY CINEMA STUDIO (POWERED BY MOVIEBOX REVERSE ENGINEER CORE)
 // =========================================================================
 
 @Composable
@@ -105,54 +113,92 @@ fun MoviePlayScreen(
             .getOrElse { DesktopDownloadManager.getInstance() }
     }
 
-    val curatedMovies = remember { MoviePlayRepository.getCuratedMovies() }
-    var selectedCategory by remember { mutableStateOf("All") }
+    val allMovies = remember { MoviePlayRepository.getAllMovies() }
+    val franchiseCollections = remember { MoviePlayRepository.getFranchiseCollections() }
+    val liveChannels = remember { MoviePlayRepository.getLiveTvChannels() }
+
+    var selectedTab by remember { mutableStateOf("All") }
+    var selectedVibe by remember { mutableStateOf("All") }
+    var selectedFranchise by remember { mutableStateOf<MovieBoxCollection?>(null) }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedMovieForModal by remember { mutableStateOf<MovieSoundtrack?>(null) }
+
+    var selectedMovieForModal by remember { mutableStateOf<MovieBoxItem?>(null) }
+    var selectedChannelForModal by remember { mutableStateOf<MovieBoxLiveChannel?>(null) }
     var trackForPlaylist by remember { mutableStateOf<Track?>(null) }
     var toastMessage by remember { mutableStateOf<String?>(null) }
 
-    var isSearchingOnline by remember { mutableStateOf(false) }
-    var searchResults by remember { mutableStateOf<List<MovieSoundtrack>>(emptyList()) }
+    var isServerOnline by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val categories = listOf("All", "Bollywood", "South Cinema", "Romantic Hits", "Action & Thriller", "Golden Classics", "Hollywood")
+    // Ensure server is started and check status
+    LaunchedEffect(Unit) {
+        MoviePlayRepository.ensureServerRunning()
+        delay(1000)
+        isServerOnline = MoviePlayRepository.isMovieBoxServerOnline()
+    }
 
-    // Dynamic search debounce
-    LaunchedEffect(searchQuery) {
+    val tabs = listOf("All", "Movies", "TV Shows", "4K Ultra HD", "Franchises", "Live TV")
+    val vibes = listOf("All", "🔥 Adrenaline", "🧠 Sci-Fi", "❤️ Romance", "🌑 Dark Thrillers", "😂 Comedy", "🌸 Anime", "👻 Horror")
+
+    // Filter movies based on search, tab, vibe, franchise
+    val displayMovies = remember(selectedTab, selectedVibe, selectedFranchise, searchQuery, allMovies) {
         val q = searchQuery.trim()
-        if (q.length >= 2) {
-            isSearchingOnline = true
-            delay(350L)
-            searchResults = MoviePlayRepository.searchOnlineMovieSoundtracks(q)
-            isSearchingOnline = false
+        if (q.isNotBlank()) {
+            allMovies.filter { m ->
+                m.title.contains(q, ignoreCase = true) ||
+                m.genre.contains(q, ignoreCase = true) ||
+                m.year.contains(q, ignoreCase = true) ||
+                m.description.contains(q, ignoreCase = true)
+            }
         } else {
-            searchResults = emptyList()
-            isSearchingOnline = false
+            var filtered = when (selectedTab) {
+                "Movies" -> allMovies.filter { it.type == "movie" }
+                "TV Shows" -> allMovies.filter { it.type == "series" }
+                "4K Ultra HD" -> allMovies.filter { it.qualityBadge.contains("4k", ignoreCase = true) || it.qualityBadge.contains("uhd", ignoreCase = true) || it.genre.contains("Action", true) }
+                "Franchises" -> {
+                    val activeFranchise = selectedFranchise
+                    if (activeFranchise != null) {
+                        allMovies.filter { m ->
+                            activeFranchise.keywords.any { kw -> m.title.contains(kw, ignoreCase = true) }
+                        }
+                    } else {
+                        allMovies
+                    }
+                }
+                else -> allMovies
+            }
+
+            if (selectedVibe != "All") {
+                val vibeKeyword = when (selectedVibe) {
+                    "🔥 Adrenaline" -> "Action"
+                    "🧠 Sci-Fi" -> "Sci-Fi"
+                    "❤️ Romance" -> "Romance"
+                    "🌑 Dark Thrillers" -> "Thriller"
+                    "😂 Comedy" -> "Comedy"
+                    "🌸 Anime" -> "Animation"
+                    "👻 Horror" -> "Horror"
+                    else -> ""
+                }
+                if (vibeKeyword.isNotBlank()) {
+                    filtered = filtered.filter { it.genre.contains(vibeKeyword, ignoreCase = true) }
+                }
+            }
+
+            filtered
         }
     }
 
-    val displayMovies = remember(selectedCategory, searchQuery, searchResults) {
-        if (searchQuery.trim().length >= 2 && searchResults.isNotEmpty()) {
-            searchResults
-        } else if (selectedCategory == "All") {
-            curatedMovies
-        } else {
-            curatedMovies.filter { it.genre.equals(selectedCategory, ignoreCase = true) }
-        }
-    }
-
-    // Hero Spotlight Movie (e.g. Animal or Jawan)
-    val heroMovie = curatedMovies.firstOrNull()
+    // Hero Spotlight Movie (top blockbuster e.g. Deadpool & Wolverine or Dune 2)
+    val heroMovie = remember(displayMovies) { displayMovies.firstOrNull() ?: allMovies.firstOrNull() }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp)
+            contentPadding = PaddingValues(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // ------------------------------------------------------------------------------------
-            // 1. HEADER: Title & Cinema Spotlight
+            // 1. HEADER: Title & Cinema Studio Status
             // ------------------------------------------------------------------------------------
             item {
                 Row(
@@ -168,21 +214,38 @@ fun MoviePlayScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFFF43F5E).copy(alpha = 0.15f))
-                                    .border(1.dp, Color(0xFFF43F5E).copy(alpha = 0.40f), RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFE11D48).copy(alpha = 0.15f))
+                                    .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.40f), RoundedCornerShape(6.dp))
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "CINEMA SOUNDTRACKS • FULL MOVIE JUKEBOX",
+                                    text = "MOVIEBOX CORE • 331+ 4K CINEMA TITLES",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFF43F5E),
+                                    color = Color(0xFFE11D48),
                                     letterSpacing = 0.5.sp
                                 )
                             }
+
+                            // Live server status pill
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isServerOnline) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFF38BDF8).copy(alpha = 0.15f))
+                                    .border(1.dp, if (isServerOnline) Color(0xFF10B981).copy(alpha = 0.40f) else Color(0xFF38BDF8).copy(alpha = 0.40f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (isServerOnline) "● Server 3000 Online" else "● Local Master Cache",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isServerOnline) Color(0xFF10B981) else Color(0xFF38BDF8)
+                                )
+                            }
                         }
+
                         Text(
-                            text = "Movie Play",
+                            text = "Movie Play Cinema Studio",
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = (-0.5).sp
@@ -190,26 +253,44 @@ fun MoviePlayScreen(
                             color = Color.White
                         )
                         Text(
-                            text = "Stream entire original motion picture soundtracks & cinema albums in continuous sequence.",
+                            text = "Direct high-speed cinema streams, franchise universes, 4K releases, live TV & continuous soundtrack jukeboxes.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.85f)
                         )
                     }
 
-                    // Screensaver button
-                    LiquidGlassBox(
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onLaunchScreensaver() }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // Action buttons (Open Web Studio / Cinema Screensaver)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        LiquidGlassBox(
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { MoviePlayRepository.openInBrowser("http://127.0.0.1:3000") }
                         ) {
-                            Icon(Icons.Default.Theaters, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(16.dp))
-                            Text("Cinema Mode", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(15.dp))
+                                Text("Web Studio", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            }
+                        }
+
+                        LiquidGlassBox(
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onLaunchScreensaver() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Theaters, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(15.dp))
+                                Text("Cinema Mode", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            }
                         }
                     }
                 }
@@ -218,15 +299,15 @@ fun MoviePlayScreen(
             // ------------------------------------------------------------------------------------
             // 2. HERO CINEMA SPOTLIGHT BANNER
             // ------------------------------------------------------------------------------------
-            if (searchQuery.isBlank() && heroMovie != null) {
+            if (searchQuery.isBlank() && heroMovie != null && selectedTab != "Live TV") {
                 item {
                     LiquidGlassBox(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(210.dp),
+                            .height(220.dp),
                         shape = RoundedCornerShape(20.dp),
                         backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.45f),
-                        borderColor = Color(0xFFF43F5E).copy(alpha = 0.35f)
+                        borderColor = Color(0xFFE11D48).copy(alpha = 0.35f)
                     ) {
                         Row(
                             modifier = Modifier
@@ -235,24 +316,24 @@ fun MoviePlayScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(22.dp)
                         ) {
-                            // Left Poster
+                            // Poster
                             Box(
                                 modifier = Modifier
                                     .width(135.dp)
-                                    .height(174.dp)
-                                    .shadow(12.dp, RoundedCornerShape(14.dp), spotColor = heroMovie.accentColor)
+                                    .height(180.dp)
+                                    .shadow(12.dp, RoundedCornerShape(14.dp), spotColor = Color(0xFFE11D48))
                                     .clip(RoundedCornerShape(14.dp))
                                     .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(14.dp))
                             ) {
                                 AsyncImage(
-                                    model = heroMovie.posterUrl,
+                                    model = heroMovie.coverUrl.ifBlank { heroMovie.bannerUrl },
                                     contentDescription = heroMovie.title,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
 
-                            // Center Info
+                            // Details
                             Column(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -264,14 +345,20 @@ fun MoviePlayScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .background(heroMovie.accentColor.copy(alpha = 0.20f))
-                                            .border(1.dp, heroMovie.accentColor.copy(alpha = 0.60f), RoundedCornerShape(6.dp))
+                                            .background(Color(0xFFE11D48).copy(alpha = 0.20f))
+                                            .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.60f), RoundedCornerShape(6.dp))
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
-                                        Text(heroMovie.bannerBadge, color = heroMovie.accentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(heroMovie.qualityBadge.ifBlank { "4K UHD" }, color = Color(0xFFE11D48), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(13.dp))
+                                        Text("${heroMovie.rating} IMDB", color = Color(0xFFFBBF24), fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                    }
+
                                     Text(
-                                        text = "${heroMovie.year}  •  ${heroMovie.genre}  •  ${heroMovie.tracks.size} SONGS",
+                                        text = "•  ${heroMovie.year}  •  ${heroMovie.duration.ifBlank { "2h" }}  •  ${heroMovie.genre}",
                                         color = Color.White.copy(alpha = 0.70f),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
@@ -282,14 +369,7 @@ fun MoviePlayScreen(
                                     text = heroMovie.title,
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = Color.White
-                                )
-
-                                Text(
-                                    text = "Star Cast: ${heroMovie.starCast}",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF38BDF8),
+                                    color = Color.White,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -306,31 +386,54 @@ fun MoviePlayScreen(
                                 Spacer(Modifier.height(4.dp))
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    // Watch Stream
                                     Button(
                                         onClick = {
-                                            if (heroMovie.tracks.isNotEmpty()) {
-                                                playerViewModel.playWithQueue(heroMovie.tracks.first(), heroMovie.tracks)
-                                                toastMessage = "▶ Playing Movie: ${heroMovie.title} (${heroMovie.tracks.size} tracks queued)"
-                                            }
+                                            selectedMovieForModal = heroMovie
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = heroMovie.accentColor),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
                                         shape = RoundedCornerShape(10.dp)
                                     ) {
                                         Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text("Play Movie Jukebox", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Text("Stream Movie", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     }
 
+                                    // Trailer
                                     Button(
                                         onClick = {
-                                            selectedMovieForModal = heroMovie
+                                            val tUrl = MoviePlayRepository.getTrailerUrl(heroMovie.title)
+                                            MoviePlayRepository.openInBrowser(tUrl)
+                                            toastMessage = "🎬 Opening Official Trailer for ${heroMovie.title}..."
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.12f)),
                                         shape = RoundedCornerShape(10.dp)
                                     ) {
                                         Icon(Icons.Default.Theaters, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text("View Tracklist", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                        Text("Trailer", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                    }
+
+                                    // Jukebox
+                                    Button(
+                                        onClick = {
+                                            scope.launch {
+                                                toastMessage = "🎵 Finding Original Soundtrack for ${heroMovie.title}..."
+                                                val tracks = MoviePlayRepository.resolveSoundtrackForMovie(heroMovie.title)
+                                                if (tracks.isNotEmpty()) {
+                                                    playerViewModel.playWithQueue(tracks.first(), tracks)
+                                                    toastMessage = "▶ Playing Soundtrack: ${heroMovie.title} (${tracks.size} tracks queued)"
+                                                } else {
+                                                    toastMessage = "⚠ No audio album found for ${heroMovie.title}"
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.12f)),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Soundtrack Jukebox", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -340,7 +443,7 @@ fun MoviePlayScreen(
             }
 
             // ------------------------------------------------------------------------------------
-            // 3. SEARCH & GENRE FILTER RAILS
+            // 3. NAVIGATION TABS & VIBE DISCOVERY RAILS
             // ------------------------------------------------------------------------------------
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -350,14 +453,12 @@ fun MoviePlayScreen(
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                        placeholder = { Text("Search any movie soundtrack, e.g. Animal, Aashiqui 2, Jawan, Rockstar, DDLJ...", fontSize = 13.sp) },
+                        placeholder = { Text("Search 331+ blockbusters, e.g. Deadpool, Dune, Oppenheimer, Interstellar, Marvel, John Wick...", fontSize = 13.sp) },
                         leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(20.dp))
                         },
                         trailingIcon = {
-                            if (isSearchingOnline) {
-                                CircularProgressIndicator(color = Color(0xFFF43F5E), strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                            } else if (searchQuery.isNotBlank()) {
+                            if (searchQuery.isNotBlank()) {
                                 IconButton(onClick = { searchQuery = "" }) {
                                     Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.White, modifier = Modifier.size(18.dp))
                                 }
@@ -367,78 +468,185 @@ fun MoviePlayScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFFF43F5E),
+                            focusedBorderColor = Color(0xFFE11D48),
                             unfocusedBorderColor = Color.White.copy(alpha = 0.18f),
                             focusedContainerColor = Color(0xFF0A0C10).copy(alpha = 0.40f),
                             unfocusedContainerColor = Color(0xFF0A0C10).copy(alpha = 0.30f)
                         )
                     )
 
-                    // Category Filter Pills
+                    // Primary Navigation Tabs
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(categories, key = { it }) { cat ->
-                            val isSelected = cat == selectedCategory
-                            val count = when (cat) {
-                                "All" -> curatedMovies.size
-                                else -> curatedMovies.count { it.genre.equals(cat, ignoreCase = true) }
+                        items(tabs, key = { it }) { tab ->
+                            val isSelected = tab == selectedTab
+                            val count = when (tab) {
+                                "All" -> allMovies.size
+                                "Movies" -> allMovies.count { it.type == "movie" }
+                                "TV Shows" -> allMovies.count { it.type == "series" }
+                                "4K Ultra HD" -> allMovies.count { it.qualityBadge.contains("4k", true) || it.genre.contains("Action", true) }
+                                "Franchises" -> franchiseCollections.size
+                                "Live TV" -> liveChannels.size
+                                else -> 0
                             }
 
                             SeniorFilterPill(
-                                title = "$cat ($count)",
+                                title = "$tab ($count)",
                                 isSelected = isSelected,
                                 onClick = {
-                                    selectedCategory = cat
+                                    selectedTab = tab
                                     searchQuery = ""
                                 }
                             )
+                        }
+                    }
+
+                    // Vibe discovery pills (when not in Live TV)
+                    if (selectedTab != "Live TV") {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(vibes, key = { it }) { vibe ->
+                                val isSelected = vibe == selectedVibe
+                                MovieVibePill(
+                                    title = vibe,
+                                    isSelected = isSelected,
+                                    onClick = { selectedVibe = vibe }
+                                )
+                            }
                         }
                     }
                 }
             }
 
             // ------------------------------------------------------------------------------------
-            // 4. MOVIE SOUNDTRACKS GRID
+            // 4. FRANCHISE UNIVERSES ROW (When in All or Franchises tab)
             // ------------------------------------------------------------------------------------
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        text = if (searchQuery.isNotBlank()) "Search Results for \"$searchQuery\" (${displayMovies.size} Movies)" else "$selectedCategory Cinema Soundtracks (${displayMovies.size})",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-
-                    // Responsive rows of movie cards
-                    val chunkedMovies = displayMovies.chunked(4)
-                    for (row in chunkedMovies) {
+            if ((selectedTab == "All" || selectedTab == "Franchises") && searchQuery.isBlank()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            for (movie in row) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    MovieCinemaCard(
-                                        movie = movie,
-                                        onPlay = {
-                                            if (movie.tracks.isNotEmpty()) {
-                                                playerViewModel.playWithQueue(movie.tracks.first(), movie.tracks)
-                                                toastMessage = "▶ Playing Movie: ${movie.title} (${movie.tracks.size} tracks queued)"
+                            Text(
+                                text = "Franchise Universes & Studios (${franchiseCollections.size})",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                            if (selectedFranchise != null) {
+                                Text(
+                                    text = "Clear filter",
+                                    fontSize = 11.5.sp,
+                                    color = Color(0xFF38BDF8),
+                                    modifier = Modifier.clickable { selectedFranchise = null }
+                                )
+                            }
+                        }
+
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(franchiseCollections, key = { it.id }) { col ->
+                                val isSelected = selectedFranchise?.id == col.id
+                                FranchiseCard(
+                                    collection = col,
+                                    isSelected = isSelected,
+                                    onClick = {
+                                        selectedFranchise = if (isSelected) null else col
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ------------------------------------------------------------------------------------
+            // 5. LIVE TV CHANNELS (When in Live TV tab)
+            // ------------------------------------------------------------------------------------
+            if (selectedTab == "Live TV") {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text(
+                            text = "Verified 24/7 Live IPTV Channels (${liveChannels.size})",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+
+                        val chunkedChannels = liveChannels.chunked(3)
+                        for (row in chunkedChannels) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                for (ch in row) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        LiveChannelCard(
+                                            channel = ch,
+                                            onPlay = {
+                                                MoviePlayRepository.launchVideoStream(ch.url, ch.name)
+                                                toastMessage = "▶ Launching Live Stream: ${ch.name}..."
                                             }
-                                        },
-                                        onSelect = {
-                                            selectedMovieForModal = movie
-                                        }
-                                    )
+                                        )
+                                    }
+                                }
+                                val rem = 3 - row.size
+                                if (rem > 0) {
+                                    for (i in 0 until rem) Spacer(Modifier.weight(1f))
                                 }
                             }
-                            // Fill remaining spaces in row
-                            val remaining = 4 - row.size
-                            if (remaining > 0) {
-                                for (i in 0 until remaining) {
-                                    Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+
+            // ------------------------------------------------------------------------------------
+            // 6. MOVIE POSTER GRID (331+ Titles)
+            // ------------------------------------------------------------------------------------
+            if (selectedTab != "Live TV") {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        val headerTitle = when {
+                            searchQuery.isNotBlank() -> "Search Results for \"$searchQuery\" (${displayMovies.size} Titles)"
+                            selectedFranchise != null -> "${selectedFranchise?.name} Saga (${displayMovies.size} Titles)"
+                            selectedVibe != "All" -> "$selectedVibe Movies & Shows (${displayMovies.size})"
+                            else -> "$selectedTab Cinema Catalog (${displayMovies.size} Titles)"
+                        }
+
+                        Text(
+                            text = headerTitle,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+
+                        val chunkedMovies = displayMovies.chunked(4)
+                        for (row in chunkedMovies) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                for (movie in row) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        MovieBoxCinemaCard(
+                                            item = movie,
+                                            onPlay = {
+                                                selectedMovieForModal = movie
+                                            },
+                                            onSelect = {
+                                                selectedMovieForModal = movie
+                                            }
+                                        )
+                                    }
+                                }
+                                val rem = 4 - row.size
+                                if (rem > 0) {
+                                    for (i in 0 until rem) Spacer(Modifier.weight(1f))
                                 }
                             }
                         }
@@ -455,43 +663,44 @@ fun MoviePlayScreen(
                     .padding(bottom = 24.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFF0F172A).copy(alpha = 0.95f))
-                    .border(1.dp, Color(0xFFF43F5E), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0xFFE11D48), RoundedCornerShape(12.dp))
                     .padding(horizontal = 20.dp, vertical = 10.dp)
                     .zIndex(100f)
             ) {
                 Text(text = msg, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
             LaunchedEffect(msg) {
-                delay(3000L)
+                delay(3200L)
                 toastMessage = null
             }
         }
 
-        // Movie Detail Modal
+        // Movie Detail Modal (With working streams, trailer & soundtrack)
         selectedMovieForModal?.let { movie ->
-            SeniorMovieDetailModal(
+            SeniorMovieBoxDetailModal(
                 movie = movie,
                 onDismiss = { selectedMovieForModal = null },
-                onPlayAll = {
-                    if (movie.tracks.isNotEmpty()) {
-                        playerViewModel.playWithQueue(movie.tracks.first(), movie.tracks)
-                        toastMessage = "▶ Playing Movie: ${movie.title} (${movie.tracks.size} tracks queued)"
-                        selectedMovieForModal = null
-                    }
+                onStreamSelected = { stream ->
+                    MoviePlayRepository.launchVideoStream(stream.url, movie.title)
+                    toastMessage = "▶ Launching: ${stream.title}..."
                 },
-                onShufflePlay = {
-                    if (movie.tracks.isNotEmpty()) {
-                        val shuffled = movie.tracks.shuffled()
-                        playerViewModel.playWithQueue(shuffled.first(), shuffled)
-                        toastMessage = "🔀 Shuffled Movie: ${movie.title} (${movie.tracks.size} tracks queued)"
-                        selectedMovieForModal = null
-                    }
+                onTrailerClick = {
+                    val tUrl = MoviePlayRepository.getTrailerUrl(movie.title)
+                    MoviePlayRepository.openInBrowser(tUrl)
+                    toastMessage = "🎬 Opening Official Trailer for ${movie.title}..."
                 },
-                onPlayTrack = { trk ->
-                    val idx = movie.tracks.indexOfFirst { it.id == trk.id }
-                    val q = if (idx >= 0) movie.tracks.drop(idx) + movie.tracks.take(idx) else listOf(trk)
-                    playerViewModel.playWithQueue(trk, q)
-                    selectedMovieForModal = null
+                onPlaySoundtrack = {
+                    scope.launch {
+                        toastMessage = "🎵 Finding Original Soundtrack for ${movie.title}..."
+                        val tracks = MoviePlayRepository.resolveSoundtrackForMovie(movie.title)
+                        if (tracks.isNotEmpty()) {
+                            playerViewModel.playWithQueue(tracks.first(), tracks)
+                            toastMessage = "▶ Playing Soundtrack: ${movie.title} (${tracks.size} tracks queued)"
+                            selectedMovieForModal = null
+                        } else {
+                            toastMessage = "⚠ No audio album found for ${movie.title}"
+                        }
+                    }
                 },
                 onAddToPlaylist = { trk ->
                     trackForPlaylist = trk
@@ -526,11 +735,11 @@ fun SeniorMoviePlaySection(
     val curatedMovies = remember { MoviePlayRepository.getCuratedMovies() }
     var selectedCategory by remember { mutableStateOf("All") }
 
-    val categories = listOf("All", "Bollywood", "South Cinema", "Romantic Hits", "Action & Thriller", "Golden Classics")
+    val categories = listOf("All", "Action", "Sci-Fi", "Drama", "Animation", "Comedy")
 
-    val filteredMovies = remember(selectedCategory) {
+    val filteredMovies = remember(selectedCategory, curatedMovies) {
         if (selectedCategory == "All") curatedMovies
-        else curatedMovies.filter { it.genre.equals(selectedCategory, ignoreCase = true) }
+        else curatedMovies.filter { it.genre.contains(selectedCategory, ignoreCase = true) }
     }
 
     Column(
@@ -543,297 +752,663 @@ fun SeniorMoviePlaySection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFFF43F5E).copy(alpha = 0.15f))
-                            .border(1.dp, Color(0xFFF43F5E).copy(alpha = 0.40f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFE11D48).copy(alpha = 0.20f))
+                            .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.50f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "CINEMA SOUNDTRACKS • CONTINUOUS MOVIE JUKEBOX",
-                            fontSize = 10.sp,
+                            text = "CINEMA STUDIO • 331+ BLOCKBUSTERS",
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF43F5E),
+                            color = Color(0xFFE11D48),
                             letterSpacing = 0.5.sp
                         )
                     }
                 }
                 Text(
-                    text = "Movie Play",
+                    text = "Movie Play & Blockbuster Soundtracks",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.5).sp
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.3).sp
                     ),
                     color = Color.White
                 )
                 Text(
-                    text = "Complete blockbuster film albums & cinema jukeboxes in continuous playback sequence.",
+                    text = "Stream Hollywood & global blockbusters, 4K releases, and complete original motion picture jukeboxes.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White
+                    color = Color.White.copy(alpha = 0.80f)
                 )
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF0A0C10).copy(alpha = 0.30f))
-                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Default.LocalMovies, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(15.dp))
-                    Text("${curatedMovies.size} Movies Curated", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                }
             }
         }
 
-        // Category Filter Rail
+        // Category Pills
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(categories, key = { it }) { cat ->
                 val isSelected = cat == selectedCategory
-                val count = when (cat) {
-                    "All" -> curatedMovies.size
-                    else -> curatedMovies.count { it.genre.equals(cat, ignoreCase = true) }
-                }
-
                 SeniorFilterPill(
-                    title = "$cat ($count)",
+                    title = cat,
                     isSelected = isSelected,
                     onClick = { selectedCategory = cat }
                 )
             }
         }
 
-        // Horizontal Row of Movie Cards
+        // Horizontal Carousel
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 2.dp)
         ) {
             items(filteredMovies, key = { it.id }) { movie ->
-                MovieCinemaCard(
-                    movie = movie,
-                    onPlay = { onPlayMovie(movie) },
-                    onSelect = { onSelectMovie(movie) },
-                    modifier = Modifier.width(220.dp)
-                )
+                Box(modifier = Modifier.width(180.dp)) {
+                    MovieCinemaCard(
+                        movie = movie,
+                        onPlay = { onPlayMovie(movie) },
+                        onSelect = { onSelectMovie(movie) }
+                    )
+                }
             }
         }
     }
 }
 
 // =========================================================================
-// MOVIE CINEMA CARD COMPONENT
+// UI COMPONENTS: CARDS & MODALS
 // =========================================================================
 
 @Composable
-fun MovieCinemaCard(
-    movie: MovieSoundtrack,
+fun MovieBoxCinemaCard(
+    item: MovieBoxItem,
     onPlay: () -> Unit,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier
+    onSelect: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
-    val cardScale by animateFloatAsState(
-        targetValue = if (isHovered) 1.025f else 1.0f,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    val scale by animateFloatAsState(
+        targetValue = if (isHovered) 1.04f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium)
     )
 
-    LiquidGlassBox(
-        modifier = modifier
-            .scale(cardScale)
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(interactionSource = interactionSource, indication = null) {
-                onSelect()
-            },
-        shape = RoundedCornerShape(18.dp),
-        backgroundColor = Color(0xFF0A0C10).copy(alpha = if (isHovered) 0.50f else 0.35f),
-        borderColor = if (isHovered) movie.accentColor.copy(alpha = 0.60f) else Color.White.copy(alpha = 0.12f)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(interactionSource = interactionSource, indication = null) { onSelect() }
     ) {
-        Column(
+        // Poster with glow
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .height(235.dp)
+                .shadow(
+                    elevation = if (isHovered) 18.dp else 6.dp,
+                    shape = RoundedCornerShape(14.dp),
+                    spotColor = Color(0xFFE11D48).copy(alpha = 0.50f)
+                )
+                .clip(RoundedCornerShape(14.dp))
+                .border(
+                    BorderStroke(1.dp, if (isHovered) Color(0xFFE11D48).copy(alpha = 0.80f) else Color.White.copy(alpha = 0.12f)),
+                    shape = RoundedCornerShape(14.dp)
+                )
         ) {
-            // Poster Cover
-            Box(
+            AsyncImage(
+                model = item.coverUrl.ifBlank { item.bannerUrl },
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Top Quality & Rating badges
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                AsyncImage(
-                    model = movie.posterUrl,
-                    contentDescription = movie.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                // Dark gradient scrim
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.25f),
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.85f)
-                                )
-                            )
-                        )
-                )
-
-                // Top badge tag
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.70f))
-                        .border(1.dp, movie.accentColor.copy(alpha = 0.60f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 7.dp, vertical = 2.5.dp)
-                ) {
-                    Text(
-                        text = movie.bannerBadge,
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = movie.accentColor,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-
-                // Bottom-left track count pill
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(8.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(Color.Black.copy(alpha = 0.75f))
-                        .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                        .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.60f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                            contentDescription = null,
-                            tint = movie.accentColor,
-                            modifier = Modifier.size(11.dp)
-                        )
-                        Text(
-                            text = "${movie.tracks.size} TRACKS",
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
+                    Text(item.qualityBadge.ifBlank { "HD" }, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
 
-                // Bottom-right glowing play button
-                val playButtonScale by animateFloatAsState(
-                    targetValue = if (isHovered) 1.10f else 1.0f,
-                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
-                )
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.75f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(11.dp))
+                    Text(item.rating, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Hover quick play button
+            if (isHovered) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                        .scale(playButtonScale)
-                        .size(40.dp)
-                        .shadow(8.dp, CircleShape, spotColor = movie.accentColor)
+                        .size(46.dp)
+                        .align(Alignment.Center)
                         .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(movie.accentColor, movie.accentColor.copy(alpha = 0.75f))
-                            )
-                        )
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                            onPlay()
-                        },
+                        .background(Color(0xFFE11D48))
+                        .clickable { onPlay() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Play Movie Jukebox",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(24.dp))
                 }
             }
+        }
 
-            Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
 
-            // Movie Title & Year
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = movie.title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = movie.year,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.60f)
-                )
-            }
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
 
-            Spacer(Modifier.height(3.dp))
-
-            // Star Cast
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = movie.starCast,
+                text = "${item.year} • ${item.genre.split(",").firstOrNull()?.trim() ?: "Cinema"}",
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF38BDF8),
+                color = Color.White.copy(alpha = 0.70f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(Modifier.height(4.dp))
+            if (item.type == "series") {
+                Text("Series", fontSize = 10.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
 
-            // Director & Composer
+// Legacy MovieCinemaCard
+@Composable
+fun MovieCinemaCard(
+    movie: MovieSoundtrack,
+    onPlay: () -> Unit,
+    onSelect: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isHovered) 1.04f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium)
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(interactionSource = interactionSource, indication = null) { onSelect() }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(235.dp)
+                .shadow(
+                    elevation = if (isHovered) 18.dp else 6.dp,
+                    shape = RoundedCornerShape(14.dp),
+                    spotColor = movie.accentColor.copy(alpha = 0.50f)
+                )
+                .clip(RoundedCornerShape(14.dp))
+                .border(
+                    BorderStroke(1.dp, if (isHovered) movie.accentColor.copy(alpha = 0.80f) else Color.White.copy(alpha = 0.12f)),
+                    shape = RoundedCornerShape(14.dp)
+                )
+        ) {
+            AsyncImage(
+                model = movie.posterUrl,
+                contentDescription = movie.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .border(1.dp, movie.accentColor.copy(alpha = 0.60f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(movie.bannerBadge, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+
+            if (isHovered) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .align(Alignment.Center)
+                        .clip(CircleShape)
+                        .background(movie.accentColor)
+                        .clickable { onPlay() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(24.dp))
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = movie.title,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Text(
+            text = "${movie.year} • ${movie.genre}",
+            fontSize = 11.sp,
+            color = Color.White.copy(alpha = 0.70f)
+        )
+    }
+}
+
+@Composable
+fun FranchiseCard(
+    collection: MovieBoxCollection,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    LiquidGlassBox(
+        shape = RoundedCornerShape(14.dp),
+        isSelected = isSelected,
+        selectedBgColor = Color(0xFFE11D48).copy(alpha = 0.25f),
+        selectedBorderColor = Color(0xFFE11D48),
+        modifier = Modifier
+            .width(200.dp)
+            .height(78.dp)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(text = collection.emoji, fontSize = 24.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = collection.name,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = collection.tagline,
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.70f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LiveChannelCard(
+    channel: MovieBoxLiveChannel,
+    onPlay: () -> Unit
+) {
+    LiquidGlassBox(
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(84.dp)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable { onPlay() }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = 0.10f))
+                    .padding(4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = channel.logo,
+                    contentDescription = channel.name,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444))
+                    )
+                    Text("LIVE ${channel.country}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                }
+                Text(channel.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                Text(channel.category, fontSize = 11.sp, color = Color.White.copy(alpha = 0.65f))
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE11D48)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun MovieVibePill(
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    LiquidGlassBox(
+        shape = RoundedCornerShape(16.dp),
+        isSelected = isSelected,
+        selectedBgColor = Color(0xFFE11D48).copy(alpha = 0.22f),
+        selectedBorderColor = Color(0xFFE11D48).copy(alpha = 0.70f),
+        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.28f),
+        borderColor = Color.White.copy(alpha = 0.12f),
+        hoverBorderColor = Color(0xFFE11D48).copy(alpha = 0.45f),
+        modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             Text(
-                text = movie.directorOrComposer,
-                fontSize = 10.5.sp,
-                color = Color.White.copy(alpha = 0.70f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                text = title,
+                fontSize = 11.5.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.75f)
             )
         }
     }
 }
 
 // =========================================================================
-// SENIOR MOVIE DETAIL MODAL DIALOG
+// DETAIL MODAL: STREAMS, TRAILER, AND SOUNDTRACK JUKEBOX
 // =========================================================================
 
+@Composable
+fun SeniorMovieBoxDetailModal(
+    movie: MovieBoxItem,
+    onDismiss: () -> Unit,
+    onStreamSelected: (MovieStreamOption) -> Unit,
+    onTrailerClick: () -> Unit,
+    onPlaySoundtrack: () -> Unit,
+    onAddToPlaylist: (Track) -> Unit,
+    onDownloadTrack: (Track) -> Unit
+) {
+    var streams by remember { mutableStateOf<List<MovieStreamOption>>(emptyList()) }
+    var isLoadingStreams by remember { mutableStateOf(true) }
+
+    LaunchedEffect(movie.id) {
+        isLoadingStreams = true
+        streams = MoviePlayRepository.fetchMovieStreams(movie)
+        isLoadingStreams = false
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.82f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                onDismiss()
+            }
+            .zIndex(90f),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(820.dp)
+                .heightIn(max = 680.dp)
+                .shadow(28.dp, RoundedCornerShape(22.dp), spotColor = Color(0xFFE11D48))
+                .clip(RoundedCornerShape(22.dp))
+                .background(Color(0xFF0A0C10))
+                .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.40f), RoundedCornerShape(22.dp))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { /* Consume */ }
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(24.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                // Header row
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFE11D48).copy(alpha = 0.20f))
+                                    .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.50f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(movie.qualityBadge.ifBlank { "4K UHD" }, color = Color(0xFFE11D48), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text("MOVIEBOX STREAMING REVERSE CORE", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.70f))
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.12f))
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+
+                // Billboard Banner with Poster & Info
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(150.dp)
+                                .height(200.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(12.dp))
+                        ) {
+                            AsyncImage(
+                                model = movie.coverUrl.ifBlank { movie.bannerUrl },
+                                contentDescription = movie.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(14.dp))
+                                Text("${movie.rating} / 10 IMDB", color = Color(0xFFFBBF24), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("•  ${movie.year}  •  ${movie.duration.ifBlank { "Feature Film" }}", color = Color.White.copy(alpha = 0.70f), fontSize = 12.sp)
+                            }
+
+                            Text(
+                                text = movie.title,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+
+                            Text(
+                                text = "Genres: ${movie.genre}",
+                                fontSize = 12.sp,
+                                color = Color(0xFF38BDF8),
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            Text(
+                                text = movie.description,
+                                fontSize = 12.5.sp,
+                                color = Color.White.copy(alpha = 0.85f),
+                                lineHeight = 17.sp,
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(Modifier.height(6.dp))
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(
+                                    onClick = onTrailerClick,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.15f)),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.Theaters, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Official Trailer", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = onPlaySoundtrack,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Play Soundtrack Jukebox", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Available Stream Mirrors Section
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "Instant Streaming Mirrors (${streams.size})",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+
+                        if (isLoadingStreams) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(color = Color(0xFFE11D48), strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                                Text("Resolving high-speed streaming mirrors...", color = Color.White.copy(alpha = 0.70f), fontSize = 12.sp)
+                            }
+                        } else {
+                            streams.forEach { stream ->
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                        .clickable { onStreamSelected(stream) }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFE11D48).copy(alpha = 0.20f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(18.dp))
+                                            }
+
+                                            Column {
+                                                Text(stream.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                Text(
+                                                    "${stream.format} • ${stream.resolution}p • ${stream.audio}${if (stream.size.isNotBlank()) " • " + stream.size else ""}",
+                                                    fontSize = 11.sp,
+                                                    color = Color.White.copy(alpha = 0.65f)
+                                                )
+                                            }
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color(0xFFE11D48))
+                                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Text("Stream Now", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Legacy SeniorMovieDetailModal
 @Composable
 fun SeniorMovieDetailModal(
     movie: MovieSoundtrack,
@@ -863,38 +1438,60 @@ fun SeniorMovieDetailModal(
         Box(
             modifier = Modifier
                 .width(780.dp)
-                .heightIn(max = 690.dp)
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                    // Prevent dismiss when clicking inside
-                }
+                .heightIn(max = 640.dp)
+                .shadow(24.dp, RoundedCornerShape(20.dp), spotColor = movie.accentColor)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF0F172A))
+                .border(1.dp, movie.accentColor.copy(alpha = 0.40f), RoundedCornerShape(20.dp))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { /* Consume */ }
         ) {
-            LiquidGlassBox(
+            LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(24.dp),
-                backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.75f),
-                borderColor = Color.White.copy(alpha = 0.25f)
+                contentPadding = PaddingValues(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // --------------------------------------------------------------------------------
-                    // MODAL HEADER: Movie Poster + Details + Action Controls
-                    // --------------------------------------------------------------------------------
+                item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Poster Artwork
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(movie.accentColor.copy(alpha = 0.20f))
+                                    .border(1.dp, movie.accentColor.copy(alpha = 0.60f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(movie.bannerBadge, color = movie.accentColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text("CINEMA SOUNDTRACK", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.60f))
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.12f))
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
                         Box(
                             modifier = Modifier
-                                .size(148.dp)
-                                .shadow(12.dp, RoundedCornerShape(16.dp), spotColor = movie.accentColor)
-                                .clip(RoundedCornerShape(16.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(16.dp))
+                                .width(140.dp)
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(12.dp))
                         ) {
                             AsyncImage(
                                 model = movie.posterUrl,
@@ -904,213 +1501,30 @@ fun SeniorMovieDetailModal(
                             )
                         }
 
-                        // Meta details
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(movie.accentColor.copy(alpha = 0.20f))
-                                        .border(1.dp, movie.accentColor.copy(alpha = 0.60f), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(movie.title, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                            Text("Music & Direction: ${movie.directorOrComposer}", fontSize = 12.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Medium)
+                            Text("Cast: ${movie.starCast}", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                            Text(movie.description, fontSize = 12.sp, color = Color.White.copy(alpha = 0.75f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = onPlayAll,
+                                    colors = ButtonDefaults.buttonColors(containerColor = movie.accentColor),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text(movie.bannerBadge, color = movie.accentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Play Jukebox", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                                 }
-                                Text(
-                                    text = "${movie.year}  •  ${movie.genre}",
-                                    color = Color.White.copy(alpha = 0.70f),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-
-                            Text(
-                                text = movie.title,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-
-                            Text(
-                                text = "Star Cast: ${movie.starCast}",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF38BDF8)
-                            )
-
-                            Text(
-                                text = movie.directorOrComposer,
-                                fontSize = 11.sp,
-                                color = Color.White.copy(alpha = 0.75f)
-                            )
-
-                            Text(
-                                text = "${movie.tracks.size} Songs  •  Total Runtime: ${totalMinutes}m ${totalSecRemainder}s",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.White.copy(alpha = 0.60f)
-                            )
-                        }
-
-                        // Close button
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-
-                    // --------------------------------------------------------------------------------
-                    // ACTION BUTTONS: Play Full Movie Jukebox + Shuffle
-                    // --------------------------------------------------------------------------------
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = onPlayAll,
-                            colors = ButtonDefaults.buttonColors(containerColor = movie.accentColor),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f).height(44.dp)
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Play Full Movie Jukebox", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-
-                        Button(
-                            onClick = onShufflePlay,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.12f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f).height(44.dp)
-                        ) {
-                            Icon(Icons.Default.Shuffle, contentDescription = null, tint = Color.White)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Shuffle Soundtrack", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
-
-                    // --------------------------------------------------------------------------------
-                    // TRACKLIST TABLE
-                    // --------------------------------------------------------------------------------
-                    Text(
-                        text = "ORIGINAL MOTION PICTURE TRACKLIST",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.70f),
-                        letterSpacing = 0.8.sp
-                    )
-
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        items(movie.tracks.size) { idx ->
-                            val track = movie.tracks[idx]
-                            val trackDurationSec = (track.duration ?: 0L) / 1000
-                            val trackMin = trackDurationSec / 60
-                            val trackSec = trackDurationSec % 60
-                            val durFormatted = String.format("%d:%02d", trackMin, trackSec)
-
-                            val trkInteraction = remember { MutableInteractionSource() }
-                            val trkHovered by trkInteraction.collectIsHoveredAsState()
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (trkHovered) Color.White.copy(alpha = 0.10f) else Color.Transparent)
-                                    .clickable(interactionSource = trkInteraction, indication = null) {
-                                        onPlayTrack(track)
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // Track Number or Play Icon on hover
-                                Box(
-                                    modifier = Modifier.size(24.dp),
-                                    contentAlignment = Alignment.Center
+                                Button(
+                                    onClick = onShufflePlay,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.14f)),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    if (trkHovered) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = "Play",
-                                            tint = movie.accentColor,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    } else {
-                                        Text(
-                                            text = "${idx + 1}",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White.copy(alpha = 0.60f)
-                                        )
-                                    }
-                                }
-
-                                // Track Title & Artists
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = track.title,
-                                        fontSize = 13.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (trkHovered) movie.accentColor else Color.White,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = track.artists.joinToString { it.name },
-                                        fontSize = 11.sp,
-                                        color = Color.White.copy(alpha = 0.65f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-
-                                // Duration
-                                Text(
-                                    text = durFormatted,
-                                    fontSize = 11.5.sp,
-                                    color = Color.White.copy(alpha = 0.70f)
-                                )
-
-                                // Add to playlist action
-                                IconButton(
-                                    onClick = { onAddToPlaylist(track) },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                                        contentDescription = "Add to Playlist",
-                                        tint = Color.White.copy(alpha = 0.75f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-
-                                // Download action
-                                IconButton(
-                                    onClick = { onDownloadTrack(track) },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Download,
-                                        contentDescription = "Download Track",
-                                        tint = Color.White.copy(alpha = 0.75f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Icon(Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Shuffle", color = Color.White, fontSize = 11.5.sp)
                                 }
                             }
                         }

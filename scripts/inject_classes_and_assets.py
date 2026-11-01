@@ -93,6 +93,16 @@ if os.path.exists(ext_dir):
             extension_jars[ef] = jar_data
     print(f'[3/5] Loaded {len(extension_jars)} extension bundles into classpath resources.')
 
+# Read moviebox resources into classpath
+mb_dir = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\moviebox')
+if os.path.exists(mb_dir):
+    for f in os.listdir(mb_dir):
+        fp = os.path.join(mb_dir, f)
+        if os.path.isfile(fp):
+            with open(fp, 'rb') as mb_f:
+                classes_to_update[f'moviebox/{f}'] = mb_f.read()
+    print(f'[3.5/5] Loaded moviebox catalog & collection assets from {mb_dir}')
+
 def update_jar(jar_path):
     temp_jar = jar_path + '.tmp'
     with zipfile.ZipFile(jar_path, 'r') as zin, zipfile.ZipFile(temp_jar, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
@@ -301,6 +311,14 @@ for portable_zip in portable_zips:
             zout.writestr('Audix-Windows-Portable/Run-Audix-Debug.bat', bat2_bytes)
             for name, data in extension_jars.items():
                 zout.writestr(f'Audix-Windows-Portable/app/resources/extensions/{name}', data)
+
+            # Write moviebox catalog resources into zip
+            if os.path.exists(mb_dir):
+                for f in os.listdir(mb_dir):
+                    fp = os.path.join(mb_dir, f)
+                    if os.path.isfile(fp):
+                        with open(fp, 'rb') as mb_f:
+                            zout.writestr(f'Audix-Windows-Portable/app/resources/moviebox/{f}', mb_f.read())
 
         with open(zip_temp, 'rb') as f_in:
             content = f_in.read()

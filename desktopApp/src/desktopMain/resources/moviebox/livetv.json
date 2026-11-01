@@ -1,0 +1,98 @@
+[
+  {
+    "id": "ch-bloomberg",
+    "name": "Bloomberg TV+",
+    "category": "News",
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Bloomberg_Television_logo.svg/320px-Bloomberg_Television_logo.svg.png",
+    "url": "https://bloomberg.com/media-manifest/streams/us.m3u8",
+    "country": "US"
+  },
+  {
+    "id": "ch-dw-news",
+    "name": "DW News English HD",
+    "category": "News",
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Deutsche_Welle_symbol_2012.svg/320px-Deutsche_Welle_symbol_2012.svg.png",
+    "url": "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8",
+    "country": "DE"
+  },
+  {
+    "id": "ch-redbull",
+    "name": "Red Bull TV Extreme Sports",
+    "category": "Sports",
+    "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/7/77/Red_Bull_TV_logo.svg/320px-Red_Bull_TV_logo.svg.png",
+    "url": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
+    "country": "INT"
+  },
+  {
+    "id": "ch-acc-sports",
+    "name": "ACC Digital Sports Network",
+    "category": "Sports",
+    "logo": "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=200&q=80",
+    "url": "https://raycom-accdn-firetv.amagi.tv/playlist.m3u8",
+    "country": "US"
+  },
+  {
+    "id": "ch-nasa",
+    "name": "NASA TV Live HD",
+    "category": "Documentary",
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/NASA_logo.svg/320px-NASA_logo.svg.png",
+    "url": "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8",
+    "country": "US"
+  },
+  {
+    "id": "ch-adventure-earth",
+    "name": "Adventure Earth HD",
+    "category": "Documentary",
+    "logo": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&q=80",
+    "url": "https://a57e9c69976649b582a8d7604c00e69a.mediatailor.us-east-1.amazonaws.com/v1/master/44f73ba4d03e9607dcd9bebdcb8494d86964f1d8/RlaxxTV-eu_AdventureEarth/playlist.m3u8",
+    "country": "US"
+  },
+  {
+    "id": "ch-00s-replay",
+    "name": "00s Replay Blockbuster Movies",
+    "category": "Movies",
+    "logo": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=200&q=80",
+    "url": "https://jmp2.uk/plu-62ba60f059624e000781c436.m3u8",
+    "country": "US"
+  },
+  {
+    "id": "ch-4ever-cinema",
+    "name": "4ever Cinema Full HD",
+    "category": "Movies",
+    "logo": "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=200&q=80",
+    "url": "http://stream.mcquack.net/258/index.m3u8",
+    "country": "INT"
+  },
+  {
+    "id": "ch-free-movies-247",
+    "name": "24 Hour Free Movies",
+    "category": "Movies",
+    "logo": "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=200&q=80",
+    "url": "https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8",
+    "country": "US"
+  },
+  {
+    "id": "ch-4ever-theater",
+    "name": "4ever Theater Entertainment",
+    "category": "Entertainment",
+    "logo": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&q=80",
+    "url": "http://stream.mcquack.net/259/index.m3u8",
+    "country": "INT"
+  },
+  {
+    "id": "ch-4ever-music",
+    "name": "4ever Music 1080p",
+    "category": "Music",
+    "logo": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&q=80",
+    "url": "http://stream.mcquack.net/257/index.m3u8",
+    "country": "INT"
+  },
+  {
+    "id": "ch-1hd-music",
+    "name": "1HD Music Television",
+    "category": "Music",
+    "logo": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&q=80",
+    "url": "http://176.118.197.101/1HD/index.m3u8",
+    "country": "INT"
+  }
+]

@@ -291,11 +291,11 @@ fun EchoDesktopApp() {
                     }
 
                     if (!isScreensaverActive) {
-                        val mouseExitEnabled = settings?.getBoolean("screensaver_mouse_exit", true) ?: true
+                        val mouseExitEnabled = settings?.getBoolean("screensaver_mouse_exit", false) ?: false
                         val exitTime = mouseExitedAt.get()
                         if (mouseExitEnabled && !isMouseInsideApp.get() && exitTime > 0L) {
                             val outsideDuration = now - exitTime
-                            if (outsideDuration >= 2500L) {
+                            if (outsideDuration >= 30000L) {
                                 launchScreensaver()
                             }
                         }

@@ -342,7 +342,9 @@ fun main() {
                                         javax.swing.SwingUtilities.invokeLater {
                                             windowVisibleState.value = true
                                             windowState.isMinimized = false
-                                            activeWindow?.let { win ->
+                                            val win = activeWindow ?: java.awt.Window.getWindows().firstOrNull { it is java.awt.Frame }
+                                            if (win != null) {
+                                                activeWindow = win
                                                 win.isVisible = true
                                                 if (win is java.awt.Frame) {
                                                     win.extendedState = java.awt.Frame.NORMAL
@@ -415,30 +417,34 @@ fun main() {
                 onAction = {
                     windowVisibleState.value = true
                     windowState.isMinimized = false
-                    activeWindow?.let { win ->
-                        win.isVisible = true
-                        if (win is java.awt.Frame) {
-                            win.extendedState = java.awt.Frame.NORMAL
+                    val win = activeWindow ?: java.awt.Window.getWindows().firstOrNull { it is java.awt.Frame }
+                    win?.let { w ->
+                        activeWindow = w
+                        w.isVisible = true
+                        if (w is java.awt.Frame) {
+                            w.extendedState = java.awt.Frame.NORMAL
                         }
-                        win.isAlwaysOnTop = true
-                        win.toFront()
-                        win.isAlwaysOnTop = false
-                        win.requestFocus()
+                        w.isAlwaysOnTop = true
+                        w.toFront()
+                        w.isAlwaysOnTop = false
+                        w.requestFocus()
                     }
                 },
                 menu = {
                     Item("Show Audix", onClick = {
                         windowVisibleState.value = true
                         windowState.isMinimized = false
-                        activeWindow?.let { win ->
-                            win.isVisible = true
-                            if (win is java.awt.Frame) {
-                                win.extendedState = java.awt.Frame.NORMAL
+                        val win = activeWindow ?: java.awt.Window.getWindows().firstOrNull { it is java.awt.Frame }
+                        win?.let { w ->
+                            activeWindow = w
+                            w.isVisible = true
+                            if (w is java.awt.Frame) {
+                                w.extendedState = java.awt.Frame.NORMAL
                             }
-                            win.isAlwaysOnTop = true
-                            win.toFront()
-                            win.isAlwaysOnTop = false
-                            win.requestFocus()
+                            w.isAlwaysOnTop = true
+                            w.toFront()
+                            w.isAlwaysOnTop = false
+                            w.requestFocus()
                         }
                     })
                     Item("Play / Pause", onClick = { playerViewModel.togglePlayPause() })
@@ -592,15 +598,8 @@ fun main() {
                 activeWindow = this@Window.window
                 log("Main window registered: ${this@Window.window}")
                 currentFrame?.let { win ->
-                    win.isResizable = false
-                    val screenBounds = win.graphicsConfiguration?.bounds
-                        ?: java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds
-                    val targetW = minOf(1652, (screenBounds.width * 0.8609).toInt().coerceAtLeast(1024))
-                    val targetH = minOf(903, (screenBounds.height * 0.8369).toInt().coerceAtLeast(640))
-                    win.setSize(targetW, targetH)
-                    val left = screenBounds.x + ((screenBounds.width - targetW) / 2).coerceAtLeast(0)
-                    val top = screenBounds.y + ((screenBounds.height - targetH) / 2).coerceAtLeast(30)
-                    win.setLocation(left, top)
+                    win.toFront()
+                    win.requestFocus()
                 }
             }
             DisposableEffect(currentFrame) {
@@ -619,7 +618,6 @@ fun main() {
                     if (currentFrame != null && listener != null) {
                         currentFrame.removeWindowStateListener(listener)
                     }
-                    activeWindow = null
                 }
             }
                         LaunchedEffect(Unit) {

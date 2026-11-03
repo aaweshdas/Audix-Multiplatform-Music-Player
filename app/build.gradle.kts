@@ -46,12 +46,12 @@ android {
             initWith(getByName("release"))
             signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".nightly"
-            resValue("string", "app_name", "Audix")
+            resValue("string", "app_name", "Nightly")
         }
         create("stable") {
             initWith(getByName("release"))
             signingConfig = signingConfigs.getByName("debug")
-            resValue("string", "app_name", "Audix")
+            resValue("string", "app_name", "Nightly")
         }
     }
 
@@ -63,6 +63,13 @@ android {
     androidResources {
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = true
+    }
+
+    packaging {
+        resources {
+            excludes += "META-INF/echo-extension.json"
+            excludes += "META-INF/*.version"
+        }
     }
 }
 

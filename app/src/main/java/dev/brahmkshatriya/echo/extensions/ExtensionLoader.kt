@@ -76,11 +76,10 @@ class ExtensionLoader(
     val fileIgnoreFlow = MutableSharedFlow<File?>()
     private val repository = CombinedRepository(
         scope, app.context, fileIgnoreFlow, parser,
-        UnifiedExtension.metadata to unified,
-        OfflineExtension.metadata to lazy { OfflineExtension(app.context) },
-//        TestExtension.metadata to lazy { TestExtension() },
-//        DownloadExtension.metadata to lazy { DownloadExtension(app.context) }
-//        TrackerTestExtension.metadata to Injectable { TrackerTestExtension() },
+        *(listOf(
+            UnifiedExtension.metadata to unified,
+            OfflineExtension.metadata to lazy { OfflineExtension(app.context) }
+        ) + AudixBuiltInExtensions.getBuiltIns()).toTypedArray()
     )
 
     private val settings = app.settings

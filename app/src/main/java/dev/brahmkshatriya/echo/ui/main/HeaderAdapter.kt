@@ -19,6 +19,9 @@ import dev.brahmkshatriya.echo.ui.common.GridAdapter
 import dev.brahmkshatriya.echo.ui.extensions.list.ExtensionsListBottomSheet
 import dev.brahmkshatriya.echo.ui.extensions.login.LoginUserListViewModel
 import dev.brahmkshatriya.echo.ui.settings.SettingsBottomSheet
+import dev.brahmkshatriya.echo.ui.movie.CinemaDetailsBottomSheet
+import dev.brahmkshatriya.echo.ui.movie.CinemaStudioBottomSheet
+import dev.brahmkshatriya.echo.ui.movie.MoviePlayRepository
 import dev.brahmkshatriya.echo.utils.ContextUtils.observe
 import dev.brahmkshatriya.echo.utils.image.ImageUtils.loadAsCircle
 import dev.brahmkshatriya.echo.utils.ui.scrolling.ScrollAnimRecyclerAdapter
@@ -44,6 +47,18 @@ class HeaderAdapter(
 
         binding.accountsCont.setOnClickListener {
             SettingsBottomSheet().show(parentFragmentManager, null)
+        }
+
+        binding.btnCinemaStudio.setOnClickListener {
+            CinemaStudioBottomSheet().show(parentFragmentManager, null)
+        }
+
+        binding.btnInstantMix.setOnClickListener {
+            dev.brahmkshatriya.echo.ui.ai.AiStudioBottomSheet().show(parentFragmentManager, null)
+        }
+
+        binding.btnViewAllMovies.setOnClickListener {
+            CinemaStudioBottomSheet().show(parentFragmentManager, null)
         }
         return holder
     }
@@ -88,6 +103,13 @@ class HeaderAdapter(
         accountsCont.setLoopedLongClick(all, { all.find { it.second } }) {
             ext ?: return@setLoopedLongClick
             viewModel.setLoginUser(it.first.toEntity(ext.type, ext.id))
+        }
+
+        if (rvHeaderMovies.adapter == null) {
+            val movies = MoviePlayRepository.getMovies(context)
+            rvHeaderMovies.adapter = CinemaStudioBottomSheet.CinemaAdapter(movies) { movie ->
+                CinemaDetailsBottomSheet.newInstance(movie).show(fragment.parentFragmentManager, null)
+            }
         }
     }
 

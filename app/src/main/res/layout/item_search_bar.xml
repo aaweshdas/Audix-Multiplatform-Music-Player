@@ -8,8 +8,9 @@
     android:hint="@string/search"
     android:paddingStart="0dp"
     android:paddingEnd="12dp"
-    app:backgroundTint="@color/amoled_bg_semi"
+    app:backgroundTint="@color/audix_bg_card"
     app:defaultMarginsEnabled="false"
     app:navigationIcon="@drawable/ic_search_outline"
-    app:strokeColor="?colorSurfaceContainerHighest"
-    app:strokeWidth="1dp" />
+    app:navigationIconTint="@color/audix_cyan"
+    app:strokeColor="#22334F"
+    app:strokeWidth="1.2dp" />

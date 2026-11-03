@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/audix_bg_surface"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:paddingBottom="36dp">
+
+        <!-- Top Drag Indicator -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/shape_rounded_4dp"
+            android:backgroundTint="#334155" />
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="✨ Audix AI Studio"
+                android:textColor="@color/audix_white"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_audix_badge_soundstage"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:text="AUDIO ALCHEMY"
+                android:textColor="@color/audix_cyan_bright"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Craft custom mood soundscapes, generate AI playlists from prompts, and fine-tune your sonic energy profile."
+            android:textColor="@color/audix_text_secondary"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp" />
+
+        <!-- Prompt Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="#111A2E"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="#22334F"
+            app:strokeWidth="1.2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PROMPT TO SOUNDTRACK"
+                    android:textColor="@color/audix_cyan_bright"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.06" />
+
+                <EditText
+                    android:id="@+id/aiPromptInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_audix_card_glass"
+                    android:hint="e.g. Midnight drive through Neo-Tokyo synthwave"
+                    android:paddingHorizontal="14dp"
+                    android:textColor="@color/audix_white"
+                    android:textColorHint="@color/audix_text_secondary"
+                    android:textSize="13sp" />
+
+                <!-- Preset Tags Horizontal Scroll -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tagCyberpunk"
+                            android:layout_width="wrap_content"
+                            android:layout_height="28dp"
+                            android:background="@drawable/bg_audix_pill_filter"
+                            android:gravity="center"
+                            android:paddingHorizontal="10dp"
+                            android:text="⚡ Cyberpunk"
+                            android:textColor="@color/audix_white"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/tagLofi"
+                            android:layout_width="wrap_content"
+                            android:layout_height="28dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_audix_pill_filter"
+                            android:gravity="center"
+                            android:paddingHorizontal="10dp"
+                            android:text="☕ Midnight Lo-Fi"
+                            android:textColor="@color/audix_white"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/tagFocus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="28dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_audix_pill_filter"
+                            android:gravity="center"
+                            android:paddingHorizontal="10dp"
+                            android:text="🧠 Deep Focus"
+                            android:textColor="@color/audix_white"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/tagWorkout"
+                            android:layout_width="wrap_content"
+                            android:layout_height="28dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_audix_pill_filter"
+                            android:gravity="center"
+                            android:paddingHorizontal="10dp"
+                            android:text="🔥 Gym Berserk"
+                            android:textColor="@color/audix_white"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnGenerateAi"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="14dp"
+                    android:backgroundTint="@color/audix_cyan"
+                    android:text="⚡ Generate AI Sonic Mix"
+                    android:textColor="#070A12"
+                    android:textSize="13.5sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="14dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Mood Equalizer / Sonic Sliders -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="SONIC AFFINITY SLIDERS"
+            android:textColor="@color/audix_text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <!-- Energy Slider -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="70dp"
+                android:layout_height="wrap_content"
+                android:text="Energy"
+                android:textColor="@color/audix_white"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderEnergy"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:value="85"
+                android:valueFrom="0"
+                android:valueTo="100"
+                app:thumbColor="@color/audix_cyan"
+                app:trackColorActive="@color/audix_cyan"
+                app:trackColorInactive="#22334F" />
+        </LinearLayout>
+
+        <!-- Euphoria Slider -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="70dp"
+                android:layout_height="wrap_content"
+                android:text="Euphoria"
+                android:textColor="@color/audix_white"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderEuphoria"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:value="75"
+                android:valueFrom="0"
+                android:valueTo="100"
+                app:thumbColor="@color/audix_crimson"
+                app:trackColorActive="@color/audix_crimson"
+                app:trackColorInactive="#22334F" />
+        </LinearLayout>
+
+        <!-- Warmth Slider -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="70dp"
+                android:layout_height="wrap_content"
+                android:text="Warmth"
+                android:textColor="@color/audix_white"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderWarmth"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:value="60"
+                android:valueFrom="0"
+                android:valueTo="100"
+                app:thumbColor="@color/audix_emerald"
+                app:trackColorActive="@color/audix_emerald"
+                app:trackColorInactive="#22334F" />
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="130dp"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="10dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardBackgroundColor="#0E1626"
+    app:cardCornerRadius="16dp"
+    app:strokeColor="#22334F"
+    app:strokeWidth="1.2dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Poster with 4K badge -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="185dp">
+
+            <ImageView
+                android:id="@+id/moviePoster"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="Movie Poster"
+                tools:src="@drawable/bg_audix_header_card" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/gradient_track"
+                android:rotation="180" />
+
+            <!-- Quality Badge -->
+            <TextView
+                android:id="@+id/movieBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="8dp"
+                android:background="@drawable/bg_audix_badge_soundstage"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:text="1080p HD"
+                android:textColor="@color/audix_cyan_bright"
+                android:textSize="8sp"
+                android:textStyle="bold" />
+
+            <!-- Play Overlay -->
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="8dp"
+                android:background="@drawable/bg_audix_play_neon"
+                android:padding="6dp"
+                android:src="@drawable/ic_play"
+                app:tint="@color/audix_white"
+                android:contentDescription="Play Movie" />
+        </FrameLayout>
+
+        <!-- Movie Title and Metadata -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/movieTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/audix_white"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                tools:text="12 Angry Men" />
+
+            <TextView
+                android:id="@+id/movieSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/audix_text_secondary"
+                android:textSize="10sp"
+                tools:text="1957 • Crime" />
+        </LinearLayout>
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/audix_bg_surface"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="32dp">
+
+        <!-- Top Banner Header with Close -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="220dp">
+
+            <ImageView
+                android:id="@+id/movieBanner"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="Movie Banner"
+                tools:src="@drawable/bg_audix_header_card" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#A6070A12" />
+
+            <!-- Poster and Title Details Overlay -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:gravity="bottom"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="90dp"
+                    android:layout_height="130dp"
+                    app:cardBackgroundColor="#0D1322"
+                    app:cardCornerRadius="12dp"
+                    app:strokeColor="#22334F"
+                    app:strokeWidth="1.2dp">
+
+                    <ImageView
+                        android:id="@+id/moviePoster"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:contentDescription="Poster" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/movieBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_audix_badge_soundstage"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="2dp"
+                        android:text="CINEMA 4K"
+                        android:textColor="@color/audix_cyan_bright"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/movieTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:textColor="@color/audix_white"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        tools:text="12 Angry Men" />
+
+                    <TextView
+                        android:id="@+id/movieMeta"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/audix_text_secondary"
+                        android:textSize="11.5sp"
+                        tools:text="1957 • 96 min • ★ 8.5" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- Actions Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="16dp">
+
+            <!-- Watch Stream Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWatchStream"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:backgroundTint="@color/audix_crimson"
+                android:text="🎬 Watch Movie (4K)"
+                android:textColor="@color/audix_white"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                app:cornerRadius="14dp" />
+
+            <!-- Soundtracks Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSoundtracks"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:backgroundTint="#131B2E"
+                android:text="🎵 Soundtracks"
+                android:textColor="@color/audix_cyan_bright"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                app:cornerRadius="14dp"
+                app:strokeColor="#22334F"
+                app:strokeWidth="1.2dp" />
+        </LinearLayout>
+
+        <!-- Genre Pill -->
+        <TextView
+            android:id="@+id/movieGenre"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_audix_badge_cinema"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="3dp"
+            android:textColor="@color/audix_crimson"
+            android:textSize="10.5sp"
+            android:textStyle="bold"
+            tools:text="Crime • Drama • Classic" />
+
+        <!-- Synopsis Title -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="16dp"
+            android:text="SYNOPSIS"
+            android:textColor="@color/audix_cyan_bright"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <!-- Synopsis Description -->
+        <TextView
+            android:id="@+id/movieDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="6dp"
+            android:lineSpacingExtra="3dp"
+            android:textColor="#CBD5E1"
+            android:textSize="13sp"
+            tools:text="The jury in a New York City murder trial is frustrated by a single member whose skeptical caution forces them to more carefully consider the evidence." />
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

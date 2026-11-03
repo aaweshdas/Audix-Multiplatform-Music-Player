@@ -66,8 +66,11 @@ import androidx.compose.ui.zIndex
 import dev.brahmkshatriya.echo.core.settings.EchoSettings
 import dev.brahmkshatriya.echo.desktop.ui.screens.LiquidGlassBox
 import dev.brahmkshatriya.echo.desktop.ui.screens.LiquidGlassCard
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
@@ -107,6 +110,9 @@ sealed class VoiceSearchStatus {
 }
 
 object AudixVoiceSearchService {
+
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val lock = Any()
 
     private fun decodeXor(bytes: ByteArray, xorKey: Int = 0x5A): String =
         String(ByteArray(bytes.size) { i -> (bytes[i].toInt() xor xorKey).toByte() }, Charsets.UTF_8)
@@ -159,31 +165,37 @@ object AudixVoiceSearchService {
 
     /**
      * Start recording microphone input (16kHz, 16-bit, Mono PCM).
+     * Non-blocking: starts background stream in serviceScope and immediately returns Result.success.
      */
-    suspend fun startRecording(): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
+    fun startRecording(): Result<Unit> {
+        return try {
             stopRecordingInternal()
 
             val format = AudioFormat(16000.0f, 16, 1, true, false)
             val info = DataLine.Info(TargetDataLine::class.java, format)
             if (!AudioSystem.isLineSupported(info)) {
                 _status.value = VoiceSearchStatus.Error("Microphone hardware line not supported on this device.")
-                return@withContext Result.failure(IllegalStateException("Audio line not supported"))
+                return Result.failure(IllegalStateException("Audio line not supported"))
             }
 
             val line = AudioSystem.getLine(info) as TargetDataLine
             line.open(format)
             line.start()
             targetLine = line
-            recordedPcmStream.reset()
+            synchronized(lock) {
+                recordedPcmStream.reset()
+            }
             _status.value = VoiceSearchStatus.Recording
+            _amplitude.value = 0f
 
-            recordingJob = launch(Dispatchers.IO) {
+            recordingJob = serviceScope.launch {
                 val buffer = ByteArray(2048)
                 while (isActive && targetLine?.isOpen == true) {
                     val bytesRead = line.read(buffer, 0, buffer.size)
                     if (bytesRead > 0) {
-                        recordedPcmStream.write(buffer, 0, bytesRead)
+                        synchronized(lock) {
+                            recordedPcmStream.write(buffer, 0, bytesRead)
+                        }
 
                         // Calculate RMS amplitude for real-time visualizer
                         var sum = 0.0
@@ -211,8 +223,10 @@ object AudixVoiceSearchService {
      * Stop recording and package captured PCM into a standard 16kHz WAV container.
      */
     fun stopRecording(): ByteArray? {
-        stopRecordingInternal()
-        val pcm = recordedPcmStream.toByteArray()
+        val pcm = synchronized(lock) {
+            stopRecordingInternal()
+            recordedPcmStream.toByteArray()
+        }
         if (pcm.isEmpty()) return null
         return createWavBytes(pcm, sampleRate = 16000, channels = 1, bitsPerSample = 16)
     }
@@ -225,11 +239,12 @@ object AudixVoiceSearchService {
 
     private fun stopRecordingInternal() {
         try {
+            val line = targetLine
+            targetLine = null
+            line?.stop()
+            line?.close()
             recordingJob?.cancel()
             recordingJob = null
-            targetLine?.stop()
-            targetLine?.close()
-            targetLine = null
         } catch (e: Exception) {
             // Ignore line closing errors
         }
@@ -444,40 +459,66 @@ fun AudixVoiceSearchModal(
     val status by AudixVoiceSearchService.status.collectAsState()
     val amplitude by AudixVoiceSearchService.amplitude.collectAsState()
 
-    var isRecordingActive by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var hasDetectedSpeech by remember { mutableStateOf(false) }
+    var silenceStartTime by remember { mutableStateOf(0L) }
+
+    fun finishAndSearch() {
+        if (isSubmitting) return
+        val currentStatus = AudixVoiceSearchService.status.value
+        if (currentStatus !is VoiceSearchStatus.Recording) return
+        isSubmitting = true
+        coroutineScope.launch {
+            try {
+                val wav = AudixVoiceSearchService.stopRecording()
+                if (wav != null && wav.size > 2000) {
+                    val res = AudixVoiceSearchService.transcribe(wav, settings)
+                    if (res.isSuccess) {
+                        val query = res.getOrThrow().trim()
+                        if (query.isNotBlank()) {
+                            onQueryTranscribed(query)
+                            onDismiss()
+                            return@launch
+                        }
+                    }
+                } else {
+                    AudixVoiceSearchService.cancelRecording()
+                }
+            } catch (e: Exception) {
+                // Keep error state displayed
+            } finally {
+                isSubmitting = false
+            }
+        }
+    }
 
     // Start recording immediately on modal open
     LaunchedEffect(Unit) {
-        val res = AudixVoiceSearchService.startRecording()
-        if (res.isSuccess) {
-            isRecordingActive = true
+        hasDetectedSpeech = false
+        silenceStartTime = 0L
+        AudixVoiceSearchService.startRecording()
+    }
+
+    // Auto-detect speech and trigger auto-search after ~1.6s of silence once speech was heard
+    LaunchedEffect(amplitude, status) {
+        if (status is VoiceSearchStatus.Recording) {
+            val now = System.currentTimeMillis()
+            if (amplitude > 0.04f) {
+                hasDetectedSpeech = true
+                silenceStartTime = 0L
+            } else if (hasDetectedSpeech) {
+                if (silenceStartTime == 0L) {
+                    silenceStartTime = now
+                } else if (now - silenceStartTime > 1600L) {
+                    finishAndSearch()
+                }
+            }
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
             AudixVoiceSearchService.cancelRecording()
-        }
-    }
-
-    fun finishAndSearch() {
-        if (!isRecordingActive) return
-        isRecordingActive = false
-        coroutineScope.launch {
-            val wav = AudixVoiceSearchService.stopRecording()
-            if (wav != null && wav.isNotEmpty()) {
-                val res = AudixVoiceSearchService.transcribe(wav, settings)
-                if (res.isSuccess) {
-                    val query = res.getOrThrow()
-                    if (query.isNotBlank()) {
-                        onQueryTranscribed(query)
-                        onDismiss()
-                    }
-                }
-            } else {
-                AudixVoiceSearchService.cancelRecording()
-                onDismiss()
-            }
         }
     }
 
@@ -541,7 +582,7 @@ fun AudixVoiceSearchModal(
 
                 Spacer(Modifier.height(4.dp))
 
-                // Microphone Animated Visualizer Island
+                // Microphone Animated Visualizer Island (Clickable to finish and search)
                 Box(
                     modifier = Modifier.size(130.dp),
                     contentAlignment = Alignment.Center
@@ -558,7 +599,7 @@ fun AudixVoiceSearchModal(
 
                     val dynamicScale = if (status is VoiceSearchStatus.Recording) {
                         1.0f + (amplitude * 0.45f)
-                    } else if (status is VoiceSearchStatus.Transcribing) {
+                    } else if (status is VoiceSearchStatus.Transcribing || isSubmitting) {
                         pulseScale
                     } else 1.0f
 
@@ -578,14 +619,21 @@ fun AudixVoiceSearchModal(
                             )
                     )
 
-                    // Inner Frosted Mic Orb
+                    // Inner Frosted Mic Orb (Clickable to stop and transcribe)
                     LiquidGlassBox(
                         shape = CircleShape,
-                        modifier = Modifier.size(76.dp),
-                        borderColor = if (status is VoiceSearchStatus.Recording) Color(0xFFE11D48) else Color(0xFF38BDF8)
+                        modifier = Modifier
+                            .size(76.dp)
+                            .pointerHoverIcon(PointerIcon.Hand),
+                        borderColor = if (status is VoiceSearchStatus.Recording) Color(0xFFE11D48) else Color(0xFF38BDF8),
+                        onClick = {
+                            if (status is VoiceSearchStatus.Recording) {
+                                finishAndSearch()
+                            }
+                        }
                     ) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            if (status is VoiceSearchStatus.Transcribing) {
+                            if (status is VoiceSearchStatus.Transcribing || isSubmitting) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(34.dp),
                                     strokeWidth = 3.dp,
@@ -594,7 +642,7 @@ fun AudixVoiceSearchModal(
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.Mic,
-                                    contentDescription = "Microphone",
+                                    contentDescription = "Microphone (Tap to search)",
                                     tint = if (status is VoiceSearchStatus.Recording) Color(0xFFE11D48) else Color.White,
                                     modifier = Modifier.size(36.dp)
                                 )
@@ -610,11 +658,11 @@ fun AudixVoiceSearchModal(
 
                 // Dynamic Status Text
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val statusText = when (status) {
-                        is VoiceSearchStatus.Recording -> "Listening... Speak a movie, song, or artist"
-                        is VoiceSearchStatus.Transcribing -> "Transcribing audio with Groq Whisper LPU..."
-                        is VoiceSearchStatus.Success -> "Search: \"${(status as VoiceSearchStatus.Success).transcript}\""
-                        is VoiceSearchStatus.Error -> (status as VoiceSearchStatus.Error).error
+                    val statusText = when {
+                        isSubmitting || status is VoiceSearchStatus.Transcribing -> "Transcribing audio with Groq Whisper LPU..."
+                        status is VoiceSearchStatus.Recording -> if (hasDetectedSpeech) "Listening... (Tap orb or 'Done' to finish)" else "Listening... Speak a movie, song, or artist"
+                        status is VoiceSearchStatus.Success -> "Search: \"${(status as VoiceSearchStatus.Success).transcript}\""
+                        status is VoiceSearchStatus.Error -> (status as VoiceSearchStatus.Error).error
                         else -> "Initializing Microphone..."
                     }
 
@@ -644,7 +692,9 @@ fun AudixVoiceSearchModal(
                     // Cancel
                     LiquidGlassBox(
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .pointerHoverIcon(PointerIcon.Hand),
                         borderColor = Color.White.copy(alpha = 0.20f),
                         onClick = {
                             AudixVoiceSearchService.cancelRecording()
@@ -665,7 +715,9 @@ fun AudixVoiceSearchModal(
                     if (status is VoiceSearchStatus.Recording) {
                         LiquidGlassBox(
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .pointerHoverIcon(PointerIcon.Hand),
                             borderColor = Color(0xFFE11D48),
                             isSelected = true,
                             selectedBgColor = Color(0xFFE11D48).copy(alpha = 0.35f),
@@ -689,13 +741,14 @@ fun AudixVoiceSearchModal(
                     } else if (status is VoiceSearchStatus.Error) {
                         LiquidGlassBox(
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .pointerHoverIcon(PointerIcon.Hand),
                             borderColor = Color(0xFF38BDF8),
                             onClick = {
-                                coroutineScope.launch {
-                                    AudixVoiceSearchService.startRecording()
-                                    isRecordingActive = true
-                                }
+                                hasDetectedSpeech = false
+                                silenceStartTime = 0L
+                                AudixVoiceSearchService.startRecording()
                             }
                         ) {
                             Row(

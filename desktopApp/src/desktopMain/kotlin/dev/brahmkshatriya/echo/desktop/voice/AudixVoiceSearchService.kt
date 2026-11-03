@@ -94,6 +94,8 @@ import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.DataLine
 import javax.sound.sampled.TargetDataLine
+import kotlin.math.abs
+import kotlin.math.round
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -128,6 +130,9 @@ object AudixVoiceSearchService {
 
     // Verified Deepgram Production Key
     val VERIFIED_DEEPGRAM_KEY = decodeXor(byteArrayOf(62, 105, 99, 56, 62, 56, 111, 63, 57, 111, 60, 99, 111, 104, 108, 104, 59, 98, 56, 60, 56, 105, 104, 56, 62, 98, 56, 106, 57, 56, 59, 109, 111, 59, 109, 59, 56, 104, 105, 106))
+
+    private const val ENTERTAINMENT_PROMPT =
+        "Search query for movies, cinema, songs, tracks, artists, albums, Bollywood, Hollywood: Deadpool & Wolverine, Oppenheimer, Dune, Interstellar, The Dark Knight, Avatar, Inception, Arijit Singh, Diljit Dosanjh, Taylor Swift, Karan Aujla, Shreya Ghoshal, Badass, Pushpa 2, Kalki 2898 AD, Animal, Leo, Anirudh Ravichander, Sid Sriram, Weeknd, Drake, Coldplay, Billie Eilish, Bruno Mars, Kendrick Lamar."
 
     private val groqKeyIndex = AtomicInteger(0)
 
@@ -197,7 +202,7 @@ object AudixVoiceSearchService {
                             recordedPcmStream.write(buffer, 0, bytesRead)
                         }
 
-                        // Calculate RMS amplitude for real-time visualizer
+                        // Calculate RMS amplitude with perceptual boost for visualizer
                         var sum = 0.0
                         var i = 0
                         while (i < bytesRead - 1) {
@@ -206,8 +211,9 @@ object AudixVoiceSearchService {
                             i += 2
                         }
                         val rms = sqrt(sum / (bytesRead / 2).coerceAtLeast(1))
-                        val normalized = (rms / 32767.0).toFloat().coerceIn(0f, 1f)
-                        _amplitude.value = normalized
+                        // Perceptual scale: typical human voice RMS is 200..3500
+                        val perceptual = (rms / 3500.0).toFloat().coerceIn(0f, 1f)
+                        _amplitude.value = perceptual
                     }
                 }
             }
@@ -220,7 +226,82 @@ object AudixVoiceSearchService {
     }
 
     /**
-     * Stop recording and package captured PCM into a standard 16kHz WAV container.
+     * Process raw captured PCM audio:
+     * 1. Inspect peak level.
+     * 2. Apply Dynamic Audio Normalization (boosts quiet voice up to studio clarity, ~80% full scale).
+     * 3. Apply VAD Silence Trimming (removes leading and trailing dead silence while protecting word beginnings & endings).
+     */
+    private fun processPcmAudio(rawPcm: ByteArray, sampleRate: Int = 16000): ByteArray? {
+        if (rawPcm.size < 3200) return null // Less than 100ms
+
+        val numSamples = rawPcm.size / 2
+        val samples = ShortArray(numSamples)
+        var maxPeak = 0
+
+        for (i in 0 until numSamples) {
+            val s = ((rawPcm[i * 2 + 1].toInt() shl 8) or (rawPcm[i * 2].toInt() and 0xFF)).toShort()
+            samples[i] = s
+            val peak = abs(s.toInt())
+            if (peak > maxPeak) maxPeak = peak
+        }
+
+        // If the peak amplitude is lower than 50, microphone captured effectively zero vocal sound
+        if (maxPeak < 50) {
+            return null
+        }
+
+        // Dynamic Peak Normalization: target 26,000 peak (~80% full scale, plenty of headroom)
+        val targetPeak = 26000.0f
+        val gain = (targetPeak / maxPeak.toFloat()).coerceIn(1.0f, 25.0f)
+
+        val normalized = ShortArray(numSamples)
+        for (i in 0 until numSamples) {
+            val boosted = round(samples[i] * gain).toInt()
+            normalized[i] = boosted.coerceIn(-32768, 32767).toShort()
+        }
+
+        // VAD Silence Trimming using 50ms frames (800 samples for 16kHz)
+        val frameSize = (sampleRate / 20).coerceAtLeast(1)
+        val numFrames = numSamples / frameSize
+        var firstSpeechFrame = -1
+        var lastSpeechFrame = -1
+        val vocalThreshold = 1400 // Normalized scale threshold (~4.3%)
+
+        for (f in 0 until numFrames) {
+            val frameStart = f * frameSize
+            var framePeak = 0
+            for (i in 0 until frameSize) {
+                val peak = abs(normalized[frameStart + i].toInt())
+                if (peak > framePeak) framePeak = peak
+            }
+            if (framePeak >= vocalThreshold) {
+                if (firstSpeechFrame == -1) firstSpeechFrame = f
+                lastSpeechFrame = f
+            }
+        }
+
+        if (firstSpeechFrame == -1) {
+            firstSpeechFrame = 0
+            lastSpeechFrame = numFrames - 1
+        }
+
+        // Add 200ms pre-roll (4 frames) to prevent clipped word beginnings,
+        // and 350ms post-roll (7 frames) to prevent trailing word cutoff
+        val startSample = ((firstSpeechFrame - 4) * frameSize).coerceAtLeast(0)
+        val endSample = ((lastSpeechFrame + 8) * frameSize).coerceAtMost(numSamples)
+        val outputSampleCount = (endSample - startSample).coerceAtLeast(1)
+
+        val out = ByteArray(outputSampleCount * 2)
+        for (i in 0 until outputSampleCount) {
+            val s = normalized[startSample + i]
+            out[i * 2] = (s.toInt() and 0xFF).toByte()
+            out[i * 2 + 1] = ((s.toInt() shr 8) and 0xFF).toByte()
+        }
+        return out
+    }
+
+    /**
+     * Stop recording and package captured PCM into a normalized 16kHz WAV container.
      */
     fun stopRecording(): ByteArray? {
         val pcm = synchronized(lock) {
@@ -228,7 +309,8 @@ object AudixVoiceSearchService {
             recordedPcmStream.toByteArray()
         }
         if (pcm.isEmpty()) return null
-        return createWavBytes(pcm, sampleRate = 16000, channels = 1, bitsPerSample = 16)
+        val processedPcm = processPcmAudio(pcm, sampleRate = 16000) ?: return null
+        return createWavBytes(processedPcm, sampleRate = 16000, channels = 1, bitsPerSample = 16)
     }
 
     fun cancelRecording() {
@@ -275,14 +357,14 @@ object AudixVoiceSearchService {
             _status.value = VoiceSearchStatus.Error(err)
             return@withContext Result.failure(Exception(err))
         } else {
-            // Default: Groq Pool first (fastest, free forever)
+            // Default: Groq Pool first with Whisper Large V3
             val groqRes = transcribeWithGroqPool(wavBytes, settings)
             if (groqRes.isSuccess) {
                 val t = groqRes.getOrThrow()
                 _status.value = VoiceSearchStatus.Success(t)
                 return@withContext Result.success(t)
             }
-            // Fallback to Deepgram
+            // Fallback to Deepgram Nova-2
             val dgRes = transcribeWithDeepgram(wavBytes, settings)
             if (dgRes.isSuccess) {
                 val t = dgRes.getOrThrow()
@@ -302,46 +384,51 @@ object AudixVoiceSearchService {
         var lastError: Exception? = null
         val totalAttempts = keys.size
 
+        // Prioritize Whisper Large V3 flagship for maximum phonetic accuracy and name recognition
+        val models = listOf("whisper-large-v3", "whisper-large-v3-turbo")
+
         for (attempt in 0 until totalAttempts) {
             val key = keys[Math.floorMod(groqKeyIndex.getAndIncrement(), keys.size)]
-            try {
-                val boundary = "----AudixVoiceBoundary" + System.currentTimeMillis()
-                val requestBody = MultipartBody.Builder(boundary)
-                    .setType(MultipartBody.FORM)
-                    .addFormDataPart("model", "whisper-large-v3-turbo")
-                    .addFormDataPart("temperature", "0.0")
-                    .addFormDataPart(
-                        "file",
-                        "voice_input.wav",
-                        wavBytes.toRequestBody("audio/wav".toMediaType())
-                    )
-                    .build()
+            for (model in models) {
+                try {
+                    val boundary = "----AudixVoiceBoundary" + System.currentTimeMillis()
+                    val requestBody = MultipartBody.Builder(boundary)
+                        .setType(MultipartBody.FORM)
+                        .addFormDataPart("model", model)
+                        .addFormDataPart("temperature", "0.0")
+                        .addFormDataPart("prompt", ENTERTAINMENT_PROMPT)
+                        .addFormDataPart(
+                            "file",
+                            "voice_input.wav",
+                            wavBytes.toRequestBody("audio/wav".toMediaType())
+                        )
+                        .build()
 
-                val request = Request.Builder()
-                    .url("https://api.groq.com/openai/v1/audio/transcriptions")
-                    .header("Authorization", "Bearer $key")
-                    .header("User-Agent", "Audix-Desktop/1.0.3 (Windows NT 10.0; Win64; x64)")
-                    .post(requestBody)
-                    .build()
+                    val request = Request.Builder()
+                        .url("https://api.groq.com/openai/v1/audio/transcriptions")
+                        .header("Authorization", "Bearer $key")
+                        .header("User-Agent", "Audix-Desktop/1.0.3 (Windows NT 10.0; Win64; x64)")
+                        .post(requestBody)
+                        .build()
 
-                httpClient.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val body = response.body?.string() ?: ""
-                        val root = jsonParser.parseToJsonElement(body).jsonObject
-                        val text = root["text"]?.jsonPrimitive?.content?.trim() ?: ""
-                        val clean = cleanTranscript(text)
-                        if (clean.isNotBlank()) {
-                            return Result.success(clean)
+                    httpClient.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body?.string() ?: ""
+                            val root = jsonParser.parseToJsonElement(body).jsonObject
+                            val text = root["text"]?.jsonPrimitive?.content?.trim() ?: ""
+                            val clean = cleanTranscript(text)
+                            if (clean.isNotBlank()) {
+                                return Result.success(clean)
+                            }
+                        } else {
+                            val code = response.code
+                            val errorBody = response.body?.string() ?: ""
+                            lastError = Exception("Groq HTTP $code: $errorBody")
                         }
-                    } else {
-                        val code = response.code
-                        val errorBody = response.body?.string() ?: ""
-                        lastError = Exception("Groq HTTP $code: $errorBody")
-                        // Continue to try next key in rotation
                     }
+                } catch (e: Exception) {
+                    lastError = e
                 }
-            } catch (e: Exception) {
-                lastError = e
             }
         }
 
@@ -353,8 +440,9 @@ object AudixVoiceSearchService {
         if (key.isBlank()) return Result.failure(IllegalStateException("Deepgram key is blank"))
 
         return try {
+            val url = "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=false&keywords=movie:2&keywords=song:2&keywords=artist:2&keywords=album:2"
             val request = Request.Builder()
-                .url("https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true")
+                .url(url)
                 .header("Authorization", "Token $key")
                 .header("Content-Type", "audio/wav")
                 .header("User-Agent", "Audix-Desktop/1.0.3")
@@ -385,10 +473,53 @@ object AudixVoiceSearchService {
         }
     }
 
-    private fun cleanTranscript(raw: String): String {
-        return raw.trim()
+    private val HALLUCINATION_PATTERNS = listOf(
+        "thank you", "thank you for watching", "thanks for watching",
+        "please subscribe", "like and subscribe", "subscribe to my channel",
+        "subscribe", "amara.org", "subtitles by", "translated by",
+        "[music]", "[applause]", "[silence]", "(bell ringing)", "(music playing)"
+    )
+
+    fun cleanTranscript(raw: String): String {
+        var text = raw.trim()
             .removePrefix("\"").removeSuffix("\"")
-            .removePrefix(".").removeSuffix(".")
+            .removePrefix("'").removeSuffix("'")
+            .trim()
+
+        val lower = text.lowercase().trimEnd('.', '!', '?', ',', ' ')
+        for (pattern in HALLUCINATION_PATTERNS) {
+            if (lower == pattern || lower.startsWith("$pattern.") || lower.startsWith("$pattern!")) {
+                return ""
+            }
+        }
+
+        // Strip conversational command prefixes:
+        // "search for interstellar" -> "interstellar"
+        // "play deadpool" -> "deadpool"
+        // "look for song bad blood" -> "bad blood"
+        val prefixes = listOf(
+            "search for movie ", "search for song ", "search for track ", "search for artist ", "search for ",
+            "search movie ", "search song ", "search track ", "search artist ", "search ",
+            "play movie ", "play song ", "play track ", "play artist ", "play ",
+            "find movie ", "find song ", "find track ", "find ",
+            "look for movie ", "look for song ", "look for ",
+            "listen to song ", "listen to "
+        )
+
+        for (p in prefixes) {
+            if (text.startsWith(p, ignoreCase = true)) {
+                val candidate = text.substring(p.length).trim()
+                if (candidate.isNotBlank()) {
+                    text = candidate
+                    break
+                }
+            }
+        }
+
+        return text
+            .removePrefix("\"").removeSuffix("\"")
+            .removePrefix("'").removeSuffix("'")
+            .trimEnd('.', '!', '?', ',', ';', ':')
             .trim()
     }
 
@@ -462,6 +593,7 @@ fun AudixVoiceSearchModal(
     var isSubmitting by remember { mutableStateOf(false) }
     var hasDetectedSpeech by remember { mutableStateOf(false) }
     var silenceStartTime by remember { mutableStateOf(0L) }
+    var elapsedSeconds by remember { mutableStateOf(0) }
 
     fun finishAndSearch() {
         if (isSubmitting) return
@@ -485,7 +617,7 @@ fun AudixVoiceSearchModal(
                     AudixVoiceSearchService.cancelRecording()
                 }
             } catch (e: Exception) {
-                // Keep error state displayed
+                // error displayed via VoiceSearchStatus
             } finally {
                 isSubmitting = false
             }
@@ -496,20 +628,34 @@ fun AudixVoiceSearchModal(
     LaunchedEffect(Unit) {
         hasDetectedSpeech = false
         silenceStartTime = 0L
+        elapsedSeconds = 0
         AudixVoiceSearchService.startRecording()
     }
 
-    // Auto-detect speech and trigger auto-search after ~1.6s of silence once speech was heard
+    // Live elapsed seconds timer
+    LaunchedEffect(status) {
+        if (status is VoiceSearchStatus.Recording) {
+            while (isActive) {
+                delay(1000L)
+                elapsedSeconds++
+            }
+        }
+    }
+
+    // High-tolerance Voice Activity Detection:
+    // Requires clear speech (amplitude > 0.08f), and grants a comfortable 3.2s pause buffer
+    // so user speech is never truncated mid-phrase.
     LaunchedEffect(amplitude, status) {
         if (status is VoiceSearchStatus.Recording) {
             val now = System.currentTimeMillis()
-            if (amplitude > 0.04f) {
+            if (amplitude > 0.08f) {
                 hasDetectedSpeech = true
                 silenceStartTime = 0L
             } else if (hasDetectedSpeech) {
                 if (silenceStartTime == 0L) {
                     silenceStartTime = now
-                } else if (now - silenceStartTime > 1600L) {
+                } else if (now - silenceStartTime > 3200L) {
+                    // 3.2 seconds of clear pause after vocal speech -> auto-finish
                     finishAndSearch()
                 }
             }
@@ -560,7 +706,7 @@ fun AudixVoiceSearchModal(
                         borderColor = Color(0xFFE11D48).copy(alpha = 0.60f)
                     ) {
                         Text(
-                            text = "AI VOICE SEARCH • GROQ & DEEPGRAM",
+                            text = "AI VOICE SEARCH • GROQ WHISPER V3",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE11D48),
@@ -659,8 +805,14 @@ fun AudixVoiceSearchModal(
                 // Dynamic Status Text
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     val statusText = when {
-                        isSubmitting || status is VoiceSearchStatus.Transcribing -> "Transcribing audio with Groq Whisper LPU..."
-                        status is VoiceSearchStatus.Recording -> if (hasDetectedSpeech) "Listening... (Tap orb or 'Done' to finish)" else "Listening... Speak a movie, song, or artist"
+                        isSubmitting || status is VoiceSearchStatus.Transcribing -> "Transcribing speech with Whisper Large V3..."
+                        status is VoiceSearchStatus.Recording -> {
+                            if (hasDetectedSpeech) {
+                                "Vocal detected • Tap orb or Done when finished (${String.format("%02d:%02d", elapsedSeconds / 60, elapsedSeconds % 60)})"
+                            } else {
+                                "Listening... Speak a movie or song name (${String.format("%02d:%02d", elapsedSeconds / 60, elapsedSeconds % 60)})"
+                            }
+                        }
                         status is VoiceSearchStatus.Success -> "Search: \"${(status as VoiceSearchStatus.Success).transcript}\""
                         status is VoiceSearchStatus.Error -> (status as VoiceSearchStatus.Error).error
                         else -> "Initializing Microphone..."
@@ -669,13 +821,13 @@ fun AudixVoiceSearchModal(
                     Text(
                         text = statusText,
                         color = if (status is VoiceSearchStatus.Error) Color(0xFFF87171) else Color.White,
-                        fontSize = 14.5.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center
                     )
 
                     Text(
-                        text = "Powered by Whisper Large V3 Turbo & Deepgram Nova-2",
+                        text = "High-Fidelity Studio Audio • Whisper Large V3 & Nova-2",
                         color = Color.White.copy(alpha = 0.50f),
                         fontSize = 11.sp
                     )
@@ -748,6 +900,7 @@ fun AudixVoiceSearchModal(
                             onClick = {
                                 hasDetectedSpeech = false
                                 silenceStartTime = 0L
+                                elapsedSeconds = 0
                                 AudixVoiceSearchService.startRecording()
                             }
                         ) {

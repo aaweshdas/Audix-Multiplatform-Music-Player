@@ -77,6 +77,15 @@ kotlin {
 
 dependencies {
     implementation(project(":common"))
+    implementation(project(":extensions:spotify"))
+    implementation(project(":extensions:saavn"))
+    implementation(project(":extensions:youtube"))
+    implementation(project(":extensions:soundcloud"))
+    implementation(project(":extensions:radiobrowser"))
+    implementation(project(":extensions:genius"))
+    implementation(project(":extensions:lrclib"))
+    implementation(project(":extensions:musixmatch"))
+    implementation(project(":extensions:lastfm"))
     // implementation(project(":core"))
     implementation(libs.kotlin.reflect)
     implementation(libs.bundles.androidx)

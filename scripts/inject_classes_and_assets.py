@@ -249,16 +249,20 @@ for dj in desktopapp_jars:
         print(f'   Updated {dj} with all extension bundles.')
 
 # Update the current portable zip (Audix-v1.0.3-Windows-Portable.zip)
+zip_v104 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.4-Windows-Portable.zip')
 zip_v103 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.3-Windows-Portable.zip')
 zip_v102 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.2-Windows-Portable.zip')
 zip_v101 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.1-Windows-Portable.zip')
+if not os.path.exists(zip_v104):
+    if os.path.exists(zip_v103):
+        shutil.copy2(zip_v103, zip_v104)
 if not os.path.exists(zip_v103):
     if os.path.exists(zip_v102):
         shutil.copy2(zip_v102, zip_v103)
     elif os.path.exists(zip_v101):
         shutil.copy2(zip_v101, zip_v103)
 
-portable_zips = [zip_v103]
+portable_zips = [zip_v104, zip_v103]
 for portable_zip in portable_zips:
     if os.path.exists(portable_zip):
         print(f'[5/5] Updating portable distribution zip: {portable_zip}...')

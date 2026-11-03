@@ -84,7 +84,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Audix"
-            packageVersion = "1.0.3"
+            packageVersion = "1.0.4"
             description = "Audix - High-Fidelity Music Player"
             vendor = "Audix"
             copyright = "© 2026 Audix"

@@ -1,12 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Audix Cosmic Obsidian & Liquid Glass Palette -->
+    <color name="audix_bg">#070A12</color>
+    <color name="audix_bg_surface">#0D1322</color>
+    <color name="audix_bg_card">#111A2E</color>
+    <color name="audix_bg_overlay">#182238</color>
+    <color name="audix_border">#1E2B45</color>
+    <color name="audix_border_highlight">#38BDF8</color>
+
+    <!-- Audix Signature Accents -->
+    <color name="audix_cyan">#06B6D4</color>
+    <color name="audix_cyan_bright">#38BDF8</color>
+    <color name="audix_crimson">#E11D48</color>
+    <color name="audix_purple">#8B5CF6</color>
+    <color name="audix_gold">#FBBF24</color>
+    <color name="audix_emerald">#10B981</color>
+
+    <!-- High-Contrast Typography -->
+    <color name="audix_white">#FFFFFF</color>
+    <color name="audix_text_primary">#FFFFFF</color>
+    <color name="audix_text_secondary">#94A3B8</color>
+    <color name="audix_text_muted">#64748B</color>
+
+    <!-- Base Compatibility Definitions -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="app_color">#22bbff</color>
-    <color name="app_color_highlight">#BFD5FF</color>
-    <color name="app_color_shadow">#22bbff</color>
-    <color name="amoled_bg">@color/white</color>
-    <color name="amoled_bg_semi">#54FFFFFF</color>
-    <color name="amoled_fg">@color/black</color>
-    <color name="amoled_fg_semi">#14000000</color>
+    <color name="app_color">#06B6D4</color>
+    <color name="app_color_highlight">#38BDF8</color>
+    <color name="app_color_shadow">#06B6D4</color>
+    <color name="amoled_bg">#070A12</color>
+    <color name="amoled_bg_semi">#80070A12</color>
+    <color name="amoled_fg">#FFFFFFFF</color>
+    <color name="amoled_fg_semi">#33FFFFFF</color>
 </resources>

@@ -8,11 +8,11 @@ PFX = ROOT / "build" / "AudixCodeSigning.pfx"
 PASSWORD = "AudixRelease2026!"
 
 targets = [
-    ROOT / "release-artifacts" / "Audix-v1.0.3-Windows-Installer.exe",
-    ROOT / "release-artifacts" / "Audix-v1.0.3-Windows-Installer.msi",
+    ROOT / "release-artifacts" / "Audix-v1.0.4-Windows-Installer.exe",
+    ROOT / "release-artifacts" / "Audix-v1.0.4-Windows-Installer.msi",
     ROOT / "release-artifacts" / "Audix-Windows-Portable" / "Audix.exe",
     ROOT / "desktopApp" / "build" / "compose" / "binaries" / "main" / "app" / "Audix" / "Audix.exe",
-    Path(os.path.expanduser(r"~\Downloads\Audix-v1.0.3-Windows-Installer.exe"))
+    Path(os.path.expanduser(r"~\Downloads\Audix-v1.0.4-Windows-Installer.exe"))
 ]
 
 print("============================================================")

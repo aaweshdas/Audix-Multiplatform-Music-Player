@@ -1,5 +1,8 @@
 package dev.brahmkshatriya.echo.desktop.ui.screens
 
+import dev.brahmkshatriya.echo.desktop.voice.AudixVoiceSearchTriggerButton
+import dev.brahmkshatriya.echo.desktop.voice.AudixVoiceSearchModal
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -3817,6 +3820,7 @@ fun SearchScreen(
 
     // Local text input state for seamless physical keyboard input
     var queryInput by remember { mutableStateOf(query) }
+    var showVoiceSearchModal by remember { mutableStateOf(false) }
     var hasSearched by remember { mutableStateOf(false) }
     var trackForPlaylist by remember { mutableStateOf<Track?>(null) }
         val libraryManager = remember {
@@ -4048,6 +4052,12 @@ fun SearchScreen(
                                 color = Color.White
                             )
                         }
+
+                        // Voice Search Trigger
+                        AudixVoiceSearchTriggerButton(
+                            tint = Color(0xFF38BDF8),
+                            onClick = { showVoiceSearchModal = true }
+                        )
 
                         // Clear button
                         if (queryInput.isNotBlank()) {
@@ -4608,6 +4618,20 @@ fun SearchScreen(
                     extensionManager = extensionManager,
                     onAddToPlaylist = { trackForPlaylist = it },
                     onDownloadTrack = { downloadManager.downloadTrack(it) }
+                )
+            }
+
+            if (showVoiceSearchModal) {
+                val echoSettings = remember {
+                    runCatching { org.koin.mp.KoinPlatformTools.defaultContext().get().get<dev.brahmkshatriya.echo.core.settings.EchoSettings>() }.getOrNull()
+                }
+                AudixVoiceSearchModal(
+                    settings = echoSettings,
+                    onDismiss = { showVoiceSearchModal = false },
+                    onQueryTranscribed = { voiceQuery ->
+                        queryInput = voiceQuery
+                        executeSearch(voiceQuery)
+                    }
                 )
             }
         }
@@ -8933,7 +8957,7 @@ private fun RenderAboutAndDiagnosticsCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Audix Native Edition", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
-                Text("Audix v1.0.3-UNIFIED (Windows x64 Build)", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 12.5.sp)
+                Text("Audix v1.0.4-UNIFIED (Windows x64 Build)", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 12.5.sp)
                 Spacer(Modifier.height(3.dp))
                 Text("Multiplatform Kotlin 2.2 • Jetpack Compose Desktop 1.8.2 • VLCJ / LibVLC 4.8.3", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.45f))
             }

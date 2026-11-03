@@ -1,6 +1,9 @@
 <resources>
     <style name="Default" parent="Base.Theme.Echo">
-        <item name="navBarForeground">?colorOnPrimary</item>
-        <item name="navBarBackground">?colorControlActivated</item>
+        <item name="echoBackground">@color/audix_bg</item>
+        <item name="navBackground">@color/audix_bg_surface</item>
+        <item name="navBarForeground">@color/audix_cyan</item>
+        <item name="navBarBackground">@color/audix_bg_card</item>
+        <item name="android:colorBackground">@color/audix_bg</item>
     </style>
 </resources>

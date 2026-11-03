@@ -2,7 +2,7 @@
 
     <style name="Base.Theme.Echo" parent="Theme.Material3Expressive.DynamicColors.DayNight.NoActionBar">
         <item name="android:windowSplashScreenBackground" tools:targetApi="s">
-            @color/amoled_bg
+            @color/audix_bg
         </item>
         <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">
             @drawable/art_splash_anim
@@ -14,7 +14,7 @@
         <item name="android:windowSplashScreenBrandingImage" tools:targetApi="s">
             @drawable/art_brand
         </item>
-        <item name="android:colorBackground">?echoBackground</item>
+        <item name="android:colorBackground">@color/audix_bg</item>
         <item name="snackbarStyle">@style/EchoSnackBar</item>
         <item name="android:dialogTheme">@style/EchoDialog</item>
         <item name="materialAlertDialogTheme">@style/EchoAlertDialog</item>
@@ -27,28 +27,31 @@
         <item name="circularProgressIndicatorStyle">@style/EchoCircularProgressIndicator</item>
         <item name="linearProgressIndicatorStyle">@style/EchoLinearProgressIndicator</item>
 
-        <item name="echoBackground">?colorSurface</item>
-        <item name="navBackground">?colorSurfaceContainer</item>
+        <item name="echoBackground">@color/audix_bg</item>
+        <item name="navBackground">@color/audix_bg_surface</item>
 
-        <item name="itemCoverSize">96dp</item>
-        <item name="itemCorner">8dp</item>
+        <item name="itemCoverSize">100dp</item>
+        <item name="itemCorner">16dp</item>
     </style>
 
     <style name="Default" parent="Base.Theme.Echo">
-        <item name="navBarForeground">?colorSecondary</item>
-        <item name="navBarBackground">?colorPrimaryInverse</item>
+        <item name="echoBackground">@color/audix_bg</item>
+        <item name="navBackground">@color/audix_bg_surface</item>
+        <item name="navBarForeground">@color/audix_cyan</item>
+        <item name="navBarBackground">@color/audix_bg_card</item>
+        <item name="android:colorBackground">@color/audix_bg</item>
     </style>
 
     <style name="Amoled" parent="Default">
-        <item name="echoBackground">@color/amoled_bg</item>
-        <item name="navBackground">?colorSurfaceContainerLowest</item>
+        <item name="echoBackground">@color/audix_bg</item>
+        <item name="navBackground">@color/audix_bg_surface</item>
     </style>
 
     <style name="BigCover" parent="Default">
-        <item name="itemCoverSize">128dp</item>
+        <item name="itemCoverSize">136dp</item>
     </style>
 
     <style name="AmoledBigCover" parent="Amoled">
-        <item name="itemCoverSize">128dp</item>
+        <item name="itemCoverSize">136dp</item>
     </style>
 </resources>

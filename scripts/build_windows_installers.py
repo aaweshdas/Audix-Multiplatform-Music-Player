@@ -39,7 +39,7 @@ def build_installer(pkg_type: str, dest_dir: Path):
         "--app-image", str(APP_IMAGE_DIR),
         "--dest", str(dest_dir),
         "--name", "Audix",
-        "--app-version", "1.0.3",
+        "--app-version", "1.0.4",
         "--vendor", "Audix",
         "--description", "Audix - High-Fidelity Music Player",
         "--copyright", "Copyright 2026 Audix",
@@ -81,16 +81,20 @@ def main():
 
     if msi_files:
         latest_msi = sorted(msi_files, key=lambda f: f.stat().st_mtime, reverse=True)[0]
-        shutil.copy2(latest_msi, RELEASE_DIR / "Audix-v1.0.3-Windows-Installer.msi")
-        print(f"[OK] Copied MSI to release-artifacts: {latest_msi.name} -> Audix-v1.0.3-Windows-Installer.msi")
+        shutil.copy2(latest_msi, RELEASE_DIR / "Audix-v1.0.4-Windows-Installer.msi")
+        print(f"[OK] Copied MSI to release-artifacts: {latest_msi.name} -> Audix-v1.0.4-Windows-Installer.msi")
 
     if exe_files:
         latest_exe = sorted(exe_files, key=lambda f: f.stat().st_mtime, reverse=True)[0]
-        shutil.copy2(latest_exe, RELEASE_DIR / "Audix-v1.0.3-Windows-Installer.exe")
-        print(f"[OK] Copied EXE to release-artifacts: {latest_exe.name} -> Audix-v1.0.3-Windows-Installer.exe")
+        shutil.copy2(latest_exe, RELEASE_DIR / "Audix-v1.0.4-Windows-Installer.exe")
+        print(f"[OK] Copied EXE to release-artifacts: {latest_exe.name} -> Audix-v1.0.4-Windows-Installer.exe")
 
     # Clean up obsolete or duplicate installer files in release-artifacts
     for obsolete in [
+        RELEASE_DIR / "Audix-v1.0.3-Windows-Installer.msi",
+        RELEASE_DIR / "Audix-v1.0.3-Windows-Installer.exe",
+        RELEASE_DIR / "Audix-v1.0.3-Windows-Portable.zip",
+        RELEASE_DIR / "Audix-v1.0.3-Windows-Trusted-Setup.zip",
         RELEASE_DIR / "Audix-v1.0.2-Windows-Installer.msi",
         RELEASE_DIR / "Audix-v1.0.2-Windows-Installer.exe",
         RELEASE_DIR / "Audix-v1.0.2-Windows-Portable.zip",
@@ -112,7 +116,7 @@ def main():
     old_apk = RELEASE_DIR / "Audix-v1.0.2-Android.apk"
     if not old_apk.exists():
         old_apk = RELEASE_DIR / "Audix-v1.0.1-Android.apk"
-    new_apk = RELEASE_DIR / "Audix-v1.0.3-Android.apk"
+    new_apk = RELEASE_DIR / "Audix-v1.0.4-Android.apk"
     if old_apk.exists() and not new_apk.exists():
         old_apk.rename(new_apk)
         print(f"[OK] Renamed {old_apk.name} -> {new_apk.name}")
@@ -124,9 +128,9 @@ def main():
         subprocess.run([sys.executable, str(sign_script)], check=False)
 
     # Re-package trusted setup zip
-    zip_path = RELEASE_DIR / "Audix-v1.0.3-Windows-Trusted-Setup.zip"
+    zip_path = RELEASE_DIR / "Audix-v1.0.4-Windows-Trusted-Setup.zip"
     files_to_pack = [
-        (RELEASE_DIR / "Audix-v1.0.3-Windows-Installer.exe", "Audix-v1.0.3-Windows-Installer.exe"),
+        (RELEASE_DIR / "Audix-v1.0.4-Windows-Installer.exe", "Audix-v1.0.4-Windows-Installer.exe"),
         (RELEASE_DIR / "Install-Audix-Trusted.bat", "Install-Audix-Trusted.bat"),
         (RELEASE_DIR / "Audix-Certificate.cer", "Audix-Certificate.cer"),
         (RELEASE_DIR / "README-SETUP.txt", "README-SETUP.txt")

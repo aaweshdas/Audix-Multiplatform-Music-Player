@@ -484,7 +484,7 @@ fun main() {
                     kotlin.system.exitProcess(0)
                 }
             },
-            title = "Audix v1.0.3-UNIFIED",
+            title = "Audix v1.0.4-UNIFIED",
             icon = logoPainter,
             state = windowState,
             resizable = false,

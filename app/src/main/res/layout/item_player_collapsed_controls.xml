@@ -5,20 +5,24 @@
     android:id="@+id/player_collapsed_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dp"
-    android:background="@drawable/shape_rounded_item_corner">
+    android:layout_marginHorizontal="10dp"
+    android:layout_marginVertical="6dp"
+    android:elevation="10dp"
+    android:background="@drawable/bg_audix_miniplayer_dock">
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="@dimen/collapsed_cover_size"
         android:layout_gravity="end"
-        android:padding="8dp">
+        android:gravity="center_vertical"
+        android:paddingEnd="10dp">
 
         <FrameLayout
             android:id="@+id/collapsedPlayPauseContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center">
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_audix_play_neon">
 
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:id="@+id/collapsedPlayingIndicator"
@@ -27,16 +31,17 @@
                 android:layout_gravity="center"
                 android:clickable="false"
                 android:indeterminate="true"
-                app:indicatorSize="36dp" />
+                app:indicatorColor="@color/audix_white"
+                app:indicatorSize="34dp" />
 
             <com.google.android.material.checkbox.MaterialCheckBox
                 android:id="@+id/collapsedTrackPlayPause"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
                 android:background="@drawable/ripple_44dp"
                 android:button="@drawable/anim_play_pause"
                 android:contentDescription="@string/play"
-                app:buttonTint="@color/button_player" />
+                app:buttonTint="@color/audix_white" />
 
         </FrameLayout>
 
@@ -45,34 +50,12 @@
             style="?attr/materialIconButtonStyle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
             android:contentDescription="@string/close"
             android:padding="8dp"
             android:background="@drawable/ripple_44dp"
             app:icon="@drawable/ic_close"
-            app:iconSize="24dp"
-            app:iconTint="@color/button_player"
-            tools:ignore="DuplicateClickableBoundsCheck" />
+            app:iconTint="@color/audix_text_secondary" />
     </LinearLayout>
 
-    <com.google.android.material.progressindicator.LinearProgressIndicator
-        android:id="@+id/collapsed_buffer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:alpha="0.5"
-        android:progress="40"
-        app:indicatorColor="?attr/colorTertiary"
-        app:indicatorTrackGapSize="0dp"
-        app:trackColor="?attr/colorOnSurface"
-        app:trackThickness="2dp" />
-
-    <com.google.android.material.progressindicator.LinearProgressIndicator
-        android:id="@+id/collapsed_seekbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:progress="20"
-        app:indicatorColor="?attr/colorTertiary"
-        app:trackColor="@android:color/transparent"
-        app:trackThickness="2dp" />
 </FrameLayout>

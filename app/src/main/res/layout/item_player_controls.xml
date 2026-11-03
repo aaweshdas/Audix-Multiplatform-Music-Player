@@ -31,6 +31,8 @@
 
             <TextView
                 android:id="@+id/trackTitle"
+                android:textColor="@color/audix_white"
+                android:letterSpacing="-0.02"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:ellipsize="marquee"
@@ -43,6 +45,7 @@
 
             <TextView
                 android:id="@+id/trackArtist"
+                android:textColor="@color/audix_text_secondary"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
@@ -85,7 +88,7 @@
                 android:layout_marginHorizontal="12dp"
                 android:alpha="0.5"
                 android:progress="40"
-                app:indicatorColor="?attr/colorTertiary"
+                app:indicatorColor="@color/audix_cyan_bright"
                 app:indicatorTrackGapSize="0dp"
                 app:trackColor="?attr/colorOnSurface"
                 app:trackThickness="2dp" />
@@ -101,10 +104,10 @@
                 android:value="0.5"
                 app:labelBehavior="gone"
                 app:minTouchTargetSize="90dp"
-                app:thumbColor="?attr/colorTertiary"
+                app:thumbColor="@color/audix_cyan"
                 app:thumbHeight="20dp"
                 app:thumbWidth="20dp"
-                app:trackColorActive="?attr/colorTertiary"
+                app:trackColorActive="@color/audix_cyan"
                 app:trackColorInactive="@android:color/transparent"
                 app:trackHeight="2dp"
                 app:trackStopIndicatorSize="0dp" />
@@ -176,6 +179,7 @@
 
         <FrameLayout
             android:id="@+id/playPauseContainer"
+            android:background="@drawable/bg_audix_play_neon"
             android:layout_width="72dp"
             android:layout_height="72dp"
             app:layout_constraintBottom_toBottomOf="parent"

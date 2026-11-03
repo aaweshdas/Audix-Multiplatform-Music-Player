@@ -80,6 +80,7 @@ with zipfile.ZipFile(target_jar, 'r') as zin, zipfile.ZipFile(clean_ref_jar, 'w'
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/ShelfRow') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/ComposableSingletons$ShelfRow') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/components/MediaCard') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/voice/') and
             not item.filename.startswith('dev/brahmkshatriya/echo/core/extensions/builtin/LocalMusicExtension')):
             zout.writestr(item, zin.read(item.filename))
 
@@ -112,6 +113,7 @@ source_files = [
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\DesktopBackgroundManager.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ai\AudixAiService.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\screens\AiStudioScreen.kt'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\voice\AudixVoiceSearchService.kt'),
     os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\kotlin\dev\brahmkshatriya\echo\desktop\ui\EchoDesktopApp.kt')
 ]
 

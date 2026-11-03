@@ -64,6 +64,13 @@ class HeaderAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) = with(holder.binding) {
         super.onBindViewHolder(holder, position)
         val context = root.context
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        val greetingStr = when (hour) {
+            in 4..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            else -> "Good evening"
+        }
+        headerGreeting.text = greetingStr
         title.text = extension?.name ?: context.getString(R.string.app_name)
         extensions.loadBigIcon(extension?.metadata?.icon, R.drawable.ic_extension_32dp)
         extensionsCont.setLoopedLongClick(

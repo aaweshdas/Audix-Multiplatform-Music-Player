@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="amoled_bg">@color/black</color>
-    <color name="amoled_bg_semi">#54000000</color>
-    <color name="amoled_fg">@color/white</color>
-    <color name="amoled_fg_semi">#1AFFFFFF</color>
+    <color name="amoled_bg">#070A12</color>
+    <color name="amoled_bg_semi">#80070A12</color>
+    <color name="amoled_fg">#FFFFFFFF</color>
+    <color name="amoled_fg_semi">#33FFFFFF</color>
+    <color name="app_color">#06B6D4</color>
+    <color name="app_color_highlight">#38BDF8</color>
+    <color name="app_color_shadow">#06B6D4</color>
 </resources>

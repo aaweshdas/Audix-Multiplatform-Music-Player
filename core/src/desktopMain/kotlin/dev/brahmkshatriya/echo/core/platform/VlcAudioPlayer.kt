@@ -137,11 +137,11 @@ class VlcAudioPlayer(
             candidateDirs.add(java.io.File(appBaseDir, "app/runtime/vlc"))
 
             // Installed application locations
-            System.getenv("ProgramFiles")?.let { candidateDirs.add(java.io.File(it, "Audix/runtime/vlc")) }
-            System.getenv("ProgramFiles(x86)")?.let { candidateDirs.add(java.io.File(it, "Audix/runtime/vlc")) }
-            System.getenv("LOCALAPPDATA")?.let { candidateDirs.add(java.io.File(it, "Programs/Audix/runtime/vlc")) }
-            candidateDirs.add(java.io.File("C:\\Program Files\\Audix\\runtime\\vlc"))
-            candidateDirs.add(java.io.File("C:\\Program Files (x86)\\Audix\\runtime\\vlc"))
+            System.getenv("ProgramFiles")?.let { candidateDirs.add(java.io.File(it, "Nightly/runtime/vlc")) }
+            System.getenv("ProgramFiles(x86)")?.let { candidateDirs.add(java.io.File(it, "Nightly/runtime/vlc")) }
+            System.getenv("LOCALAPPDATA")?.let { candidateDirs.add(java.io.File(it, "Programs/Nightly/runtime/vlc")) }
+            candidateDirs.add(java.io.File("C:\\Program Files\\Nightly\\runtime\\vlc"))
+            candidateDirs.add(java.io.File("C:\\Program Files (x86)\\Nightly\\runtime\\vlc"))
 
             // 2. Fallback: Official System VideoLAN installation paths
             candidateDirs.add(java.io.File("C:\\Program Files\\VideoLAN\\VLC"))
@@ -488,7 +488,7 @@ class VlcAudioPlayer(
             add(":drop-late-frames=true")
             add(":no-video")
             val ua = source.request.headers["User-Agent"]
-                ?: "Audix/1.0.0 (Windows; OpenJDK 21)"
+                ?: "Nightly/1.0.0 (Windows; OpenJDK 21)"
             add(":http-user-agent=${cleanOpt(ua)}")
             source.request.headers["Referer"]?.let { if (it.isNotBlank()) add(":http-referrer=${cleanOpt(it)}") }
             source.request.headers["Origin"]?.let { if (it.isNotBlank()) add(":http-origin=${cleanOpt(it)}") }

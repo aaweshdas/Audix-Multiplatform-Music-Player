@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
- * Audix Artwork Engine
+ * Nightly Artwork Engine
  *
  * Centralized high-definition artwork extraction, normalization, and online resolution engine
  * for Artists, Albums, and Tracks.
@@ -176,7 +176,7 @@ object AudixArtworkEngine {
             val encoded = URLEncoder.encode(cleanName, "UTF-8")
             val req = Request.Builder()
                 .url("https://api.deezer.com/search/artist?q=$encoded&limit=1")
-                .header("User-Agent", "Audix/1.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0 (Windows; OpenJDK 21)")
                 .build()
             httpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -203,7 +203,7 @@ object AudixArtworkEngine {
             val encoded = URLEncoder.encode(cleanName, "UTF-8")
             val req = Request.Builder()
                 .url("https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=1&q=$encoded")
-                .header("User-Agent", "Audix/1.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0 (Windows; OpenJDK 21)")
                 .build()
             httpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -254,7 +254,7 @@ object AudixArtworkEngine {
             val encoded = URLEncoder.encode(query, "UTF-8")
             val req = Request.Builder()
                 .url("https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=1&q=$encoded")
-                .header("User-Agent", "Audix/1.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0 (Windows; OpenJDK 21)")
                 .build()
             httpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -280,7 +280,7 @@ object AudixArtworkEngine {
             val encoded = URLEncoder.encode(query, "UTF-8")
             val req = Request.Builder()
                 .url("https://itunes.apple.com/search?term=$encoded&entity=album&limit=1")
-                .header("User-Agent", "Audix/1.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0 (Windows; OpenJDK 21)")
                 .build()
             httpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -306,7 +306,7 @@ object AudixArtworkEngine {
             val encoded = URLEncoder.encode(query, "UTF-8")
             val req = Request.Builder()
                 .url("https://api.deezer.com/search?q=$encoded&limit=1")
-                .header("User-Agent", "Audix/1.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0 (Windows; OpenJDK 21)")
                 .build()
             httpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -349,7 +349,7 @@ object AudixArtworkEngine {
             val encoded = URLEncoder.encode(query, "UTF-8")
             val req = Request.Builder()
                 .url("https://itunes.apple.com/search?term=$encoded&entity=song&limit=1")
-                .header("User-Agent", "Audix/1.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0 (Windows; OpenJDK 21)")
                 .build()
             httpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -374,7 +374,7 @@ object AudixArtworkEngine {
             val encoded = URLEncoder.encode(query, "UTF-8")
             val req = Request.Builder()
                 .url("https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&ctx=android&p=1&n=1&q=$encoded")
-                .header("User-Agent", "Audix/1.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0 (Windows; OpenJDK 21)")
                 .build()
             httpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -473,3 +473,6 @@ object AudixArtworkEngine {
         }
     }
 }
+
+
+typealias NightlyArtworkEngine = AudixArtworkEngine

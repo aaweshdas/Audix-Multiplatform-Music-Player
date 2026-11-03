@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "TRACKER",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Display your Now Playing song, album art, and playback progress in your Discord profile.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

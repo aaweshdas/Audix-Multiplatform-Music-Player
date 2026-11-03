@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "MUSIC",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Stream millions of Bollywood, English, and Regional hits in crystal-clear 320kbps audio.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

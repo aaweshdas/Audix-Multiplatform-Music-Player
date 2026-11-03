@@ -331,7 +331,7 @@ class JarExtensionRepository @JvmOverloads constructor(
                         c.instanceFollowRedirects = false
                         c.connectTimeout = 15000
                         c.readTimeout = 30000
-                        c.setRequestProperty("User-Agent", "Audix/1.0 (Windows; Desktop)")
+                        c.setRequestProperty("User-Agent", "Nightly/1.0 (Windows; Desktop)")
                         c.connect()
                         val responseCode = c.responseCode
                         if (responseCode in 300..399) {

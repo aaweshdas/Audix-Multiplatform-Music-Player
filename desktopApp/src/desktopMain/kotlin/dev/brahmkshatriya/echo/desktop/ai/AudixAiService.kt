@@ -306,7 +306,7 @@ object AudixAiService {
     private fun queryGeminiForCuration(prompt: String, apiKey: String, model: String): ParsedCuration {
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
         val systemPrompt = """
-            You are Audix AI DJ, an elite music curator.
+            You are Nightly AI DJ, an elite music curator.
             Analyze the user's music vibe prompt: "$prompt"
             Respond ONLY with a valid raw JSON object (no markdown code fences, no extra words).
             The JSON MUST adhere to this exact schema:
@@ -392,7 +392,7 @@ object AudixAiService {
               "story": "2-3 sentences about the backstory, production, or context of this song",
               "lyricalMeaning": "2 sentences explaining the lyrical themes, emotional metaphors, and mood",
               "musicalDna": "Key instrumentation, vocal timbre, rhythm, and genre blending notes",
-              "djCommentary": "A witty, charismatic 1-2 sentence spoken DJ intro as if Audix DJ is introducing the track live",
+              "djCommentary": "A witty, charismatic 1-2 sentence spoken DJ intro as if Nightly DJ is introducing the track live",
               "estimatedKey": "e.g. F Minor or C# Major",
               "estimatedBpm": 120,
               "moodTags": ["Mood1", "Mood2", "Mood3"]
@@ -439,7 +439,7 @@ object AudixAiService {
                 story = obj["story"]?.jsonPrimitive?.content ?: "A standout release in $artist's repertoire, showcasing refined studio mixing and evocative dynamics.",
                 lyricalMeaning = obj["lyricalMeaning"]?.jsonPrimitive?.content ?: "Explores themes of personal reflection, momentum, and visceral emotional currents.",
                 musicalDna = obj["musicalDna"]?.jsonPrimitive?.content ?: "Balanced harmonic frequencies, dynamic compression, and articulate stereo width.",
-                djCommentary = obj["djCommentary"]?.jsonPrimitive?.content ?: "Next on Audix Studio Radio, let's dive into $title by $artist. Pure acoustic magic.",
+                djCommentary = obj["djCommentary"]?.jsonPrimitive?.content ?: "Next on Nightly Studio Radio, let's dive into $title by $artist. Pure acoustic magic.",
                 estimatedKey = obj["estimatedKey"]?.jsonPrimitive?.content ?: "E Minor",
                 estimatedBpm = obj["estimatedBpm"]?.jsonPrimitive?.content?.toIntOrNull() ?: 118,
                 moodTags = obj["moodTags"]?.jsonArray?.mapNotNull { it.jsonPrimitive.content } ?: listOf("Deep", "Atmospheric")
@@ -546,7 +546,7 @@ object AudixAiService {
                 )
             )
             else -> ParsedCuration(
-                title = "Audix Signature Panorama",
+                title = "Nightly Signature Panorama",
                 description = "Masterfully balanced studio tracks matching '$prompt' with pristine stereo resolution.",
                 tempo = "95 - 115 BPM",
                 energyLevel = "Balanced",
@@ -590,7 +590,7 @@ object AudixAiService {
             story = "'$title' represents an exemplary studio creation by $artist, celebrated for crisp multi-track arrangement, dynamic vocal headroom, and seamless mixing.",
             lyricalMeaning = "The composition explores themes of perseverance, atmospheric intimacy, and resonant human emotion, amplified by nuanced harmonic shifts.",
             musicalDna = "Rich low-end warmth balanced with transparent high frequencies, articulate stereo separation, and rhythmic cadence at ~$estimatedBpm BPM.",
-            djCommentary = "You're tuned into Audix Studio Master soundstage. Up next is '$title' by $artist — lean back and let the acoustics take over.",
+            djCommentary = "You're tuned into Nightly Studio Master soundstage. Up next is '$title' by $artist — lean back and let the acoustics take over.",
             estimatedKey = estimatedKey,
             estimatedBpm = estimatedBpm,
             moodTags = listOf("Studio Master", "Dynamic", "Acoustic")
@@ -642,3 +642,6 @@ object AudixAiService {
         val searchQueries: List<String>
     )
 }
+
+
+typealias NightlyAiService = AudixAiService

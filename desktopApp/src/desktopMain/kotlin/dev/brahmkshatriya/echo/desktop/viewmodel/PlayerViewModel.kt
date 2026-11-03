@@ -474,8 +474,8 @@ class PlayerViewModel(
     }
 
     fun sanitizeTrackLocally(track: Track): Track {
-        var currentArtist = track.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name
-            ?: track.extras["artist_name"]?.takeIf { !isGarbageArtist(it) && it != "Audix Hi-Res Audio" } ?: ""
+        var currentArtist = track.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }?.name
+            ?: track.extras["artist_name"]?.takeIf { !isGarbageArtist(it) && it != "Nightly Hi-Res Audio" } ?: ""
         var cleanedTitle = cleanTrackTitle(track.title, currentArtist)
 
         // If artist is missing or garbage, check if title is formatted as "Artist - Title"
@@ -489,15 +489,15 @@ class PlayerViewModel(
 
         val validArtists = track.artists
             .map { cleanArtistName(it.name) }
-            .filterNot { isGarbageArtist(it) || it == "Audix Hi-Res Audio" }
+            .filterNot { isGarbageArtist(it) || it == "Nightly Hi-Res Audio" }
             .distinct()
             .map { Artist(id = it, name = it) }
 
         val finalArtists = when {
             validArtists.isNotEmpty() -> validArtists
-            currentArtist.isNotBlank() && !isGarbageArtist(currentArtist) && currentArtist != "Audix Hi-Res Audio" -> listOf(Artist(id = currentArtist, name = currentArtist))
+            currentArtist.isNotBlank() && !isGarbageArtist(currentArtist) && currentArtist != "Nightly Hi-Res Audio" -> listOf(Artist(id = currentArtist, name = currentArtist))
             else -> {
-                val extraArtist = track.extras["artist_name"]?.let { cleanArtistName(it) }?.takeIf { !isGarbageArtist(it) && it != "Audix Hi-Res Audio" }
+                val extraArtist = track.extras["artist_name"]?.let { cleanArtistName(it) }?.takeIf { !isGarbageArtist(it) && it != "Nightly Hi-Res Audio" }
                 if (extraArtist != null) listOf(Artist(id = extraArtist, name = extraArtist)) else emptyList()
             }
         }
@@ -523,7 +523,7 @@ class PlayerViewModel(
             )
         }
         val currentAlb = track.album?.takeIf { !isGarbageAlbum(it.title) }
-        val finalArtistsToSet = if (finalArtists.isNotEmpty()) finalArtists else listOf(Artist(id = "Audix Hi-Res Audio", name = "Audix Hi-Res Audio"))
+        val finalArtistsToSet = if (finalArtists.isNotEmpty()) finalArtists else listOf(Artist(id = "Nightly Hi-Res Audio", name = "Nightly Hi-Res Audio"))
 
         return track.copy(
             title = cleanedTitle.ifBlank { track.title },
@@ -911,7 +911,7 @@ class PlayerViewModel(
         if (!trackId.isNullOrBlank() && trackId.length in 6..32 && !trackId.contains(" ") && !trackId.startsWith("http") && !trackId.matches(REGEX_YOUTUBE_ID)) {
             val directResult = runCatching {
                 val url = "https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=$trackId"
-                val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+                val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
                 okHttpClient.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) return@use null
                     val body = resp.body?.string() ?: return@use null
@@ -958,7 +958,7 @@ class PlayerViewModel(
             val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=8&q=$encoded"
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)")
                 .build()
 
             val body = okHttpClient.newCall(req).execute().use { resp ->
@@ -997,7 +997,7 @@ class PlayerViewModel(
             val enc = chosen["encrypted_media_url"]?.jsonPrimitive?.content?.takeIf { it != "false" && it.isNotBlank() }
                 ?: if (!sid.isNullOrBlank()) {
                     val dUrl = "https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=$sid"
-                    val dReq = Request.Builder().url(dUrl).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+                    val dReq = Request.Builder().url(dUrl).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
                     runCatching {
                         okHttpClient.newCall(dReq).execute().use { resp ->
                             val dRoot = jsonParser.parseToJsonElement(resp.body?.string() ?: "").jsonObject
@@ -1182,7 +1182,7 @@ class PlayerViewModel(
 
             // 3. Studio Engine fallback (JioSaavn 320kbps -> SoundCloud)
             val localCleaned = sanitizeTrackLocally(track)
-            val rawArtist = localCleaned.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
+            val rawArtist = localCleaned.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }?.name ?: ""
             val cleanTitle = cleanTrackTitle(localCleaned.title, rawArtist)
             val searchQuery = if (rawArtist.isNotBlank()) "$cleanTitle $rawArtist" else cleanTitle
 
@@ -1208,7 +1208,7 @@ class PlayerViewModel(
             val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=8&q=$encoded"
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)")
                 .build()
             val body = okHttpClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return@runCatching null
@@ -1280,7 +1280,7 @@ class PlayerViewModel(
             val url = "https://itunes.apple.com/search?term=$encoded&media=music&limit=5"
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)")
                 .build()
             val body = okHttpClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return@runCatching null
@@ -1345,7 +1345,7 @@ class PlayerViewModel(
     }
 
     fun needsOnlineEnrichment(track: Track): Boolean {
-        val hasValidArtist = track.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }
+        val hasValidArtist = track.artists.any { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }
         if (!hasValidArtist) return true
 
         val t = track.title
@@ -1372,7 +1372,7 @@ class PlayerViewModel(
         val cacheKey = track.id.ifBlank { "${track.title}_${track.artists.firstOrNull()?.name}" }
         metadataEnrichmentCache[cacheKey]?.let { return@withContext it }
 
-        var rawArtist = track.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
+        var rawArtist = track.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }?.name ?: ""
         var cleanTitle = cleanTrackTitle(track.title, rawArtist)
 
         if (rawArtist.isBlank() && (track.title.contains(" - ") || track.title.contains(" – "))) {
@@ -1390,7 +1390,7 @@ class PlayerViewModel(
         val saavnTrack = searchJioSaavnMetadata(query, cleanTitle, rawArtist, track.duration)
         if (saavnTrack != null) {
             val chosenTitle = if (track.title.isNotBlank() && !isSpamTitle(track.title)) track.title else saavnTrack.title
-            val chosenArtists = if (track.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) track.artists else saavnTrack.artists
+            val chosenArtists = if (track.artists.any { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }) track.artists else saavnTrack.artists
             val merged = track.copy(
                 title = chosenTitle,
                 artists = chosenArtists,
@@ -1427,7 +1427,7 @@ class PlayerViewModel(
         val itunesTrack = searchITunesMetadata(query, cleanTitle, rawArtist, track.duration)
         if (itunesTrack != null) {
             val chosenTitle = if (track.title.isNotBlank() && !isSpamTitle(track.title)) track.title else itunesTrack.title
-            val chosenArtists = if (track.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) track.artists else itunesTrack.artists
+            val chosenArtists = if (track.artists.any { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }) track.artists else itunesTrack.artists
             val merged = track.copy(
                 title = chosenTitle,
                 artists = chosenArtists,
@@ -1561,7 +1561,7 @@ class PlayerViewModel(
                 // 3.5 Authentic Studio Master Fast Path (JioSaavn 320kbps CD Master)
                 // Always resolve studio master first to bypass video dialogues, intro cutscenes, and amateur audio
                 if (mediaToPlay == null) {
-                    val rawArtist = workingTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
+                    val rawArtist = workingTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }?.name ?: ""
                     val cleanTitle = cleanTrackTitle(workingTrack.title, rawArtist)
                     if (cleanTitle.isNotBlank()) {
                         val searchQuery = if (rawArtist.isNotBlank()) "$cleanTitle $rawArtist" else cleanTitle
@@ -1573,7 +1573,7 @@ class PlayerViewModel(
                             println("[PlayerViewModel] Upgraded to pure 320kbps Studio Master for '$cleanTitle' by '$rawArtist' (${sources.size} sources)")
                             mediaToPlay = Streamable.Media.Server(sources, merged = false)
                             val chosenTitle = if (workingTrack.title.isNotBlank() && !isSpamTitle(workingTrack.title)) workingTrack.title else resolvedTrack.title
-                            val chosenArtists = if (workingTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) workingTrack.artists else resolvedTrack.artists
+                            val chosenArtists = if (workingTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }) workingTrack.artists else resolvedTrack.artists
                             val cleanAlb = workingTrack.album?.takeIf { !isGarbageAlbum(it.title) } ?: resolvedTrack.album?.takeIf { !isGarbageAlbum(it.title) }
                             loadedTrack = workingTrack.copy(
                                 title = cleanTrackTitle(chosenTitle, chosenArtists.firstOrNull()?.name ?: ""),
@@ -1649,9 +1649,9 @@ class PlayerViewModel(
                                             val resolvedMedia = client.loadStreamableMedia(server, false)
                                             if (resolvedMedia is Streamable.Media.Server && resolvedMedia.sources.isNotEmpty()) {
                                                 mediaToPlay = resolvedMedia
-                                                val cleanLoadedArtists = loaded.artists.filterNot { isGarbageArtist(it.name) || it.name == "Audix Hi-Res Audio" }
+                                                val cleanLoadedArtists = loaded.artists.filterNot { isGarbageArtist(it.name) || it.name == "Nightly Hi-Res Audio" }
                                                 val chosenTitle = if (workingTrack.title.isNotBlank() && !isSpamTitle(workingTrack.title)) workingTrack.title else cleanTrackTitle(loaded.title, "")
-                                                val chosenArtists = if (workingTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) workingTrack.artists else cleanLoadedArtists.ifEmpty { workingTrack.artists }
+                                                val chosenArtists = if (workingTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }) workingTrack.artists else cleanLoadedArtists.ifEmpty { workingTrack.artists }
                                                 val chosenCover = when {
                                                     workingTrack.cover != null && !isLowResOrGenericCover(extractTrackCoverUrl(workingTrack)) -> workingTrack.cover
                                                     loaded.cover != null && !isLowResOrGenericCover(extractTrackCoverUrl(loaded)) -> loaded.cover
@@ -1681,7 +1681,7 @@ class PlayerViewModel(
 
                 // 5. Studio Engine Fallback (JioSaavn -> SoundCloud)
                 if (mediaToPlay == null) {
-                    val rawArtist = loadedTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
+                    val rawArtist = loadedTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }?.name ?: ""
                     val cleanTitle = cleanTrackTitle(loadedTrack.title, rawArtist)
                     val searchQuery = if (rawArtist.isNotBlank()) "$cleanTitle $rawArtist" else cleanTitle
 
@@ -1693,7 +1693,7 @@ class PlayerViewModel(
                     if (saavnResult != null) {
                         val (resolvedTrack, sources) = saavnResult
                         val chosenTitle = if (loadedTrack.title.isNotBlank() && !isSpamTitle(loadedTrack.title)) loadedTrack.title else resolvedTrack.title
-                        val chosenArtists = if (loadedTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) loadedTrack.artists else resolvedTrack.artists
+                        val chosenArtists = if (loadedTrack.artists.any { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }) loadedTrack.artists else resolvedTrack.artists
                         val cleanAlb = loadedTrack.album?.takeIf { !isGarbageAlbum(it.title) } ?: resolvedTrack.album?.takeIf { !isGarbageAlbum(it.title) }
                         loadedTrack = loadedTrack.copy(
                             title = cleanTrackTitle(chosenTitle, chosenArtists.firstOrNull()?.name ?: ""),
@@ -1724,7 +1724,7 @@ class PlayerViewModel(
 
                 // 5.5 Universal YouTube Search Fallback
                 if (mediaToPlay == null) {
-                    val rawArtist = loadedTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
+                    val rawArtist = loadedTrack.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }?.name ?: ""
                     val cleanTitle = cleanTrackTitle(loadedTrack.title, rawArtist)
                     val vid = loadedTrack.extras["video_id"] ?: if (loadedTrack.id.matches(REGEX_YOUTUBE_ID)) loadedTrack.id else null
                     val ytDirect = if (!vid.isNullOrBlank()) withTimeoutOrNull(3000L) { resolveYouTubeDirectStream(vid) } else null
@@ -1809,7 +1809,7 @@ class PlayerViewModel(
     private suspend fun playStudioFallback(track: Track): Boolean = withContext(Dispatchers.IO) {
         val ok = runCatching {
             val localCleaned = sanitizeTrackLocally(track)
-            val rawArtist = localCleaned.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }?.name ?: ""
+            val rawArtist = localCleaned.artists.firstOrNull { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }?.name ?: ""
             val cleanTitle = cleanTrackTitle(localCleaned.title, rawArtist)
             val searchQuery = if (rawArtist.isNotBlank()) "$cleanTitle $rawArtist" else cleanTitle
 
@@ -1819,7 +1819,7 @@ class PlayerViewModel(
             if (saavnResult != null) {
                 val (resolvedTrack, sources) = saavnResult
                 val chosenTitle = if (localCleaned.title.isNotBlank() && !isSpamTitle(localCleaned.title)) localCleaned.title else resolvedTrack.title
-                val chosenArtists = if (localCleaned.artists.any { !isGarbageArtist(it.name) && it.name != "Audix Hi-Res Audio" }) localCleaned.artists else resolvedTrack.artists
+                val chosenArtists = if (localCleaned.artists.any { !isGarbageArtist(it.name) && it.name != "Nightly Hi-Res Audio" }) localCleaned.artists else resolvedTrack.artists
                 val cleanAlb = localCleaned.album?.takeIf { !isGarbageAlbum(it.title) } ?: resolvedTrack.album?.takeIf { !isGarbageAlbum(it.title) }
                 val finalTrack = sanitizeTrackLocally(localCleaned.copy(
                     title = cleanTrackTitle(chosenTitle, chosenArtists.firstOrNull()?.name ?: ""),

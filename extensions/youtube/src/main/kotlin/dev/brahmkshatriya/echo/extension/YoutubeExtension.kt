@@ -254,7 +254,7 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
                 listOf(Artist(id = artistName, name = artistName))
             } else emptyList()
 
-            val finalArtists = if (artistList.isNotEmpty()) artistList else listOf(Artist(id = "Audix Hi-Res Audio", name = "Audix Hi-Res Audio"))
+            val finalArtists = if (artistList.isNotEmpty()) artistList else listOf(Artist(id = "Nightly Hi-Res Audio", name = "Nightly Hi-Res Audio"))
 
             Track(
                 id = videoId,
@@ -496,8 +496,8 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
         return low in setOf(
             "song", "video", "episode", "podcast", "youtube music", "unknown artist",
             "t-series", "sony music india", "zee music company", "speed records",
-            "yrf", "tips official", "aditya music", "saregama music", "audix music",
-            "audix hi-res audio", "various artists"
+            "yrf", "tips official", "aditya music", "saregama music", "nightly music",
+            "nightly hi-res audio", "various artists"
         ) || low.startsWith("user-")
     }
 
@@ -818,7 +818,7 @@ class YoutubeExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=8&q=$encoded"
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)")
                 .build()
 
             val body = client.newCall(req).execute().use { it.body.string() }

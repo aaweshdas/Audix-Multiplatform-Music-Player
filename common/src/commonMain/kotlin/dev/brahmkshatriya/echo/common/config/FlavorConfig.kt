@@ -1,10 +1,10 @@
 package dev.brahmkshatriya.echo.common.config
 
 /**
- * Centralized branding configuration for dual-flavor support (Echo / Audix).
+ * Centralized branding configuration for dual-flavor support (Echo / Nightly).
  */
 object FlavorConfig {
-    const val FLAVOR_NAME = "Audix"
+    const val FLAVOR_NAME = "Nightly"
     const val LEGACY_FLAVOR_NAME = "Echo"
     const val APP_AUTHOR = "$FLAVOR_NAME Community"
     const val DESKTOP_APP_NAME = "$FLAVOR_NAME Desktop"

@@ -345,4 +345,21 @@ for portable_zip in portable_zips:
             pass
         print(f'   Updated {portable_zip} successfully with all {len(extension_jars)} extensions.')
 
+        # Synchronize Nightly distribution artifacts
+        portable_dir = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable')
+        audix_exe = os.path.join(portable_dir, 'Audix.exe')
+        nightly_exe = os.path.join(portable_dir, 'Nightly.exe')
+        if os.path.exists(audix_exe):
+            shutil.copy2(audix_exe, nightly_exe)
+        
+        audix_cfg = os.path.join(portable_dir, r'app\Audix.cfg')
+        nightly_cfg = os.path.join(portable_dir, r'app\Nightly.cfg')
+        if os.path.exists(audix_cfg):
+            shutil.copy2(audix_cfg, nightly_cfg)
+
+        nightly_zip = os.path.join(PROJECT_ROOT, r'release-artifacts\Nightly-v1.0.4-Windows-Portable.zip')
+        if os.path.exists(portable_zip):
+            shutil.copy2(portable_zip, nightly_zip)
+            print(f'   Synchronized {nightly_zip} successfully.')
+
 print("Injection complete!")

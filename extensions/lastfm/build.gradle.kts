@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "TRACKER",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Automatic playback scrobbling and listening history tracking to Last.fm.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

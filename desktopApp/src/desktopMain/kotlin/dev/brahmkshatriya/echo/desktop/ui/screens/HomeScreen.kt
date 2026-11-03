@@ -263,7 +263,7 @@ private val curatedFlagshipArtists = listOf(
 // ------------------------------------------------------------------------------------------------
 private fun ImageHolder?.toCoverUrl(): String? = AudixArtworkEngine.toCoverUrl(this)
 
-private fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Audix Artist"): String {
+private fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Nightly Artist"): String {
     if (artists.isNullOrEmpty()) return fallback
     val filtered = artists.map { it.name.trim() }.filterNot { name ->
         name.isBlank() ||
@@ -276,7 +276,7 @@ private fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "
         name.equals("YouTube Music", true) ||
         name.equals("Spotify Artist", true) ||
         name.equals("Various Artists", true) ||
-        name.equals("Audix Artist", true) ||
+        name.equals("Nightly Artist", true) || name.equals("Nightly Artist", true) ||
         name.equals("Music Video", true) ||
         name.equals("T-Series", true) ||
         name.equals("SonyMusicIndiaVEVO", true) ||
@@ -1152,7 +1152,7 @@ private fun getCuratedHomePlaylists(): List<CuratedHomePlaylist> {
         CuratedHomePlaylist(
             id = "curated_top_hits",
             title = "Today's Top Global Hits",
-            curator = "Audix Editorial",
+            curator = "Nightly Editorial",
             description = "The hottest chart-toppers dominating streaming worldwide right now.",
             coverUrl = "https://c.saavncdn.com/396/The-Highlights-English-2021-20240207045714-500x500.jpg",
             badge = "CHART TOPPER",
@@ -1174,7 +1174,7 @@ private fun getCuratedHomePlaylists(): List<CuratedHomePlaylist> {
         CuratedHomePlaylist(
             id = "curated_bollywood_hits",
             title = "Bollywood Romance & Hits",
-            curator = "Audix Desi Beats",
+            curator = "Nightly Desi Beats",
             description = "Timeless romantic ballads, soulful melodies, and modern Bollywood anthems.",
             coverUrl = "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
             badge = "BOLLYWOOD HITS",
@@ -1216,7 +1216,7 @@ private fun getCuratedHomePlaylists(): List<CuratedHomePlaylist> {
         CuratedHomePlaylist(
             id = "curated_edm_surge",
             title = "EDM & Workout Power Surge",
-            curator = "Audix Rave",
+            curator = "Nightly Rave",
             description = "High-octane club anthems and workout adrenaline boosters for non-stop energy.",
             coverUrl = "https://c.saavncdn.com/562/Different-World-English-2018-20181130144209-500x500.jpg",
             badge = "HIGH ENERGY",
@@ -1945,7 +1945,7 @@ private fun SeniorPlaylistTrackRow(
 
     val coverUrl = remember(track) { track.extractCoverUrl() }
     val durationText = remember(track.duration) { formatTrackDuration(track.duration) }
-    val artistName = remember(track.artists) { formatArtistsForDisplay(track.artists, "Audix Artist") }
+    val artistName = remember(track.artists) { formatArtistsForDisplay(track.artists, "Nightly Artist") }
     val albumTitle = remember(track.album) { track.album?.title ?: "Single" }
 
     Row(
@@ -2645,13 +2645,13 @@ private fun SeniorExecutiveMasthead(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // LEFT COLUMN: Audix Brand Logo, Greeting & Dynamic Soundscape Subline
+            // LEFT COLUMN: Nightly Brand Logo, Greeting & Dynamic Soundscape Subline
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.weight(1f, fill = false)
             ) {
-                // Audix Official Brand Logo Badge (Square shape, proportioned according to text height)
+                // Nightly Official Brand Logo Badge (Square shape, proportioned according to text height)
                 LiquidGlassBox(
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.size(64.dp)
@@ -2660,7 +2660,7 @@ private fun SeniorExecutiveMasthead(
                         if (logoBitmap != null) {
                             Image(
                                 bitmap = logoBitmap,
-                                contentDescription = "Audix Logo",
+                                contentDescription = "Nightly Logo",
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(4.dp)
@@ -2670,7 +2670,7 @@ private fun SeniorExecutiveMasthead(
                         } else {
                             Icon(
                                 imageVector = Icons.Default.GraphicEq,
-                                contentDescription = "Audix Logo",
+                                contentDescription = "Nightly Logo",
                                 tint = Color(0xFF38BDF8),
                                 modifier = Modifier.size(32.dp)
                             )
@@ -4733,7 +4733,7 @@ private fun SeniorMatrixTrackCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = formatArtistsForDisplay(track.artists, "Audix Artist"),
+                    text = formatArtistsForDisplay(track.artists, "Nightly Artist"),
                     color = Color.White,
                     fontSize = 11.sp,
                     maxLines = 1,
@@ -4888,7 +4888,7 @@ private fun SeniorRotationTrackRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = formatArtistsForDisplay(track.artists, "Audix Artist"),
+                    text = formatArtistsForDisplay(track.artists, "Nightly Artist"),
                     color = Color.White,
                     fontSize = 11.5.sp,
                     maxLines = 1,
@@ -5603,7 +5603,7 @@ private fun SeniorLiquidMusicCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = formatArtistsForDisplay(track.artists, "Audix Artist"),
+                    text = formatArtistsForDisplay(track.artists, "Nightly Artist"),
                     fontSize = 11.5.sp,
                     color = Color.White,
                     maxLines = 1,
@@ -5777,7 +5777,7 @@ private fun SeniorLiquidAlbumCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = formatArtistsForDisplay(album.artists, "Audix Artist"),
+                    text = formatArtistsForDisplay(album.artists, "Nightly Artist"),
                     fontSize = 11.5.sp,
                     color = Color.White,
                     maxLines = 1,

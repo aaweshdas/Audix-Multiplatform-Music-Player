@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "LYRICS",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Comprehensive song lyrics, liner notes, and track annotations from Genius.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

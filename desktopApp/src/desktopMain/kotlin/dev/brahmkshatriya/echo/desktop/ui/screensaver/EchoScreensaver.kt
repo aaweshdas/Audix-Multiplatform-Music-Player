@@ -573,15 +573,15 @@ private fun RenderMosaicCardScreensaver(
                             val rawTitle = track?.title
                             val displayTitle = if (!rawTitle.isNullOrBlank()) {
                                 rawTitle.replace(Regex("""\s*[\(\[\{].*?(?:official|music\s*video|video|audio|lyrics|lyric\s*video|feat|ft\.|hd|4k|remaster|visualizer|live|full\s*song|from\s*["']|soundtrack|ost).*?[\)\]\}]""", RegexOption.IGNORE_CASE), "").substringBefore("|").substringBefore("//").trim().ifBlank { rawTitle.trim() }
-                            } else "Audix Hi-Res Audio"
+                            } else "Nightly Hi-Res Audio"
 
                             val rawArtists = track?.artists?.map { it.name.trim() }?.filterNot {
-                                it.isBlank() || it.equals("Song", true) || it.equals("Video", true) || it.equals("Episode", true) || it.equals("Unknown Artist", true) || it.equals("YouTube Music", true) || it.equals("Audix Artist", true)
+                                it.isBlank() || it.equals("Song", true) || it.equals("Video", true) || it.equals("Episode", true) || it.equals("Unknown Artist", true) || it.equals("YouTube Music", true) || it.equals("Nightly Artist", true)
                             }
                             val displayArtist = if (!rawArtists.isNullOrEmpty()) {
                                 rawArtists.joinToString(", ")
                             } else {
-                                track?.extras?.get("artist_name")?.takeIf { !it.equals("Song", true) && !it.equals("Video", true) } ?: "Audix Hi-Res Audio"
+                                track?.extras?.get("artist_name")?.takeIf { !it.equals("Song", true) && !it.equals("Video", true) } ?: "Nightly Hi-Res Audio"
                             }
 
                             Column(

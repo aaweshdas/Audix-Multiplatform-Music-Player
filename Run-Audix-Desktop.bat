@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title Audix Desktop
+title Nightly Desktop
 
 set "SCRIPT_DIR=%~dp0"
 set "PORTABLE_DIR=%SCRIPT_DIR%release-artifacts\Audix-Windows-Portable"
@@ -11,6 +11,10 @@ for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":49876" ^| findstr "L
     taskkill /F /PID %%a >nul 2>&1
 )
 taskkill /F /IM Audix.exe >nul 2>&1
+taskkill /F /IM Nightly.exe >nul 2>&1
+if exist "%USERPROFILE%\.echo_nightly_data\session.token" (
+    del /f /q "%USERPROFILE%\.echo_nightly_data\session.token" >nul 2>&1
+)
 if exist "%USERPROFILE%\.echo_audix_data\session.token" (
     del /f /q "%USERPROFILE%\.echo_audix_data\session.token" >nul 2>&1
 )
@@ -25,7 +29,7 @@ if exist "%PORTABLE_DIR%\app\resources\extensions\*.jar" (
 set "PATH=%PORTABLE_DIR%\runtime\vlc;%PORTABLE_DIR%\app;%PORTABLE_DIR%;!PATH!"
 set "VLC_PLUGIN_PATH=%PORTABLE_DIR%\runtime\vlc\plugins"
 
-:: 4. Launch Audix Desktop with Direct3D Hardware Acceleration & 1024MB Memory Pool
+:: 4. Launch Nightly Desktop with Direct3D Hardware Acceleration & 1024MB Memory Pool
 cd /d "%PORTABLE_DIR%"
 if exist "%PORTABLE_DIR%\Audix.exe" (
     start "" "%PORTABLE_DIR%\Audix.exe"

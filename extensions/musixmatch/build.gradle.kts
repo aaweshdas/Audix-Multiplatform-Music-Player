@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "LYRICS",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Time-synced lyrics with line-by-line scrolling synchronization for Now Playing songs.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

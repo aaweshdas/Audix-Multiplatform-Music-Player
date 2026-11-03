@@ -44,7 +44,7 @@ class RadioBrowserExtension : ExtensionClient, HomeFeedClient, SearchFeedClient,
         runCatching {
             val req = Request.Builder()
                 .url("$apiBase/$endpoint")
-                .header("User-Agent", "Audix/1.0.0 (Audix Multiplatform Music Player)")
+                .header("User-Agent", "Nightly/1.0.0 (Nightly Multiplatform Music Player)")
                 .build()
             val body = client.newCall(req).execute().use { it.body.string() }
             val array = json.parseToJsonElement(body).jsonArray
@@ -311,7 +311,7 @@ class RadioBrowserExtension : ExtensionClient, HomeFeedClient, SearchFeedClient,
                 // If not in extras, query station detail
                 val req = Request.Builder()
                     .url("$apiBase/stations/byuuid/${streamable.id}")
-                    .header("User-Agent", "Audix/1.0.0")
+                    .header("User-Agent", "Nightly/1.0.0")
                     .build()
                 runCatching {
                     client.newCall(req).execute().use { resp ->

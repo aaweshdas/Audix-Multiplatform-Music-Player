@@ -100,7 +100,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 // =========================================================================
-// AUDIX HIGH-FIDELITY VOICE SEARCH ENGINE (GROQ WHISPER + DEEPGRAM NOVA-2)
+// NIGHTLY HIGH-FIDELITY VOICE SEARCH ENGINE (GROQ WHISPER + DEEPGRAM NOVA-2)
 // =========================================================================
 
 sealed class VoiceSearchStatus {
@@ -391,7 +391,7 @@ object AudixVoiceSearchService {
             val key = keys[Math.floorMod(groqKeyIndex.getAndIncrement(), keys.size)]
             for (model in models) {
                 try {
-                    val boundary = "----AudixVoiceBoundary" + System.currentTimeMillis()
+                    val boundary = "----NightlyVoiceBoundary" + System.currentTimeMillis()
                     val requestBody = MultipartBody.Builder(boundary)
                         .setType(MultipartBody.FORM)
                         .addFormDataPart("model", model)
@@ -407,7 +407,7 @@ object AudixVoiceSearchService {
                     val request = Request.Builder()
                         .url("https://api.groq.com/openai/v1/audio/transcriptions")
                         .header("Authorization", "Bearer $key")
-                        .header("User-Agent", "Audix-Desktop/1.0.3 (Windows NT 10.0; Win64; x64)")
+                        .header("User-Agent", "Nightly-Desktop/1.0.3 (Windows NT 10.0; Win64; x64)")
                         .post(requestBody)
                         .build()
 
@@ -445,7 +445,7 @@ object AudixVoiceSearchService {
                 .url(url)
                 .header("Authorization", "Token $key")
                 .header("Content-Type", "audio/wav")
-                .header("User-Agent", "Audix-Desktop/1.0.3")
+                .header("User-Agent", "Nightly-Desktop/1.0.3")
                 .post(wavBytes.toRequestBody("audio/wav".toMediaType()))
                 .build()
 
@@ -552,7 +552,7 @@ object AudixVoiceSearchService {
 }
 
 // =========================================================================
-// AUDIX FROSTED GLASS VOICE SEARCH MODAL & TRIGGER BUTTON
+// NIGHTLY FROSTED GLASS VOICE SEARCH MODAL & TRIGGER BUTTON
 // =========================================================================
 
 @Composable
@@ -706,7 +706,7 @@ fun AudixVoiceSearchModal(
                         borderColor = Color(0xFFE11D48).copy(alpha = 0.60f)
                     ) {
                         Text(
-                            text = "AI VOICE SEARCH • GROQ WHISPER V3",
+                            text = "NIGHTLY VOICE SEARCH • GROQ WHISPER V3",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE11D48),
@@ -962,3 +962,6 @@ private fun VoiceVisualizerWaveform(amplitude: Float) {
         }
     }
 }
+
+
+typealias NightlyVoiceSearchService = AudixVoiceSearchService

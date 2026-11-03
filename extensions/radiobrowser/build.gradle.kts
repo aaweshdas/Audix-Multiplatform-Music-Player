@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "MUSIC",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Free live radio stations, music channels, genres, and top hits worldwide.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

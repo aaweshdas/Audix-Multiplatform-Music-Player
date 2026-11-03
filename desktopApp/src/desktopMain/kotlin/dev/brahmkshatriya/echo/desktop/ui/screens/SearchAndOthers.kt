@@ -160,7 +160,7 @@ private fun StoredTrack.toTrack(): Track {
     val finalArtists = when {
         cleanArtists.isNotEmpty() -> cleanArtists.map { Artist(id = it, name = it) }
         detectedArtist.isNotBlank() -> listOf(Artist(id = detectedArtist, name = detectedArtist))
-        else -> listOf(Artist(id = "Audix Hi-Res Audio", name = "Audix Hi-Res Audio"))
+        else -> listOf(Artist(id = "Nightly Hi-Res Audio", name = "Nightly Hi-Res Audio"))
     }
     val validAlbumTitle = albumTitle?.takeIf { !isGarbageAlbum(it) }
 
@@ -214,7 +214,7 @@ private fun Track.toStoredTrack(): StoredTrack {
     val finalArtists = when {
         cleanArtists.isNotEmpty() -> cleanArtists
         detectedArtist.isNotBlank() -> listOf(detectedArtist)
-        else -> listOf("Audix Hi-Res Audio")
+        else -> listOf("Nightly Hi-Res Audio")
     }
     val validAlbumTitle = album?.title?.takeIf { !isGarbageAlbum(it) }
 
@@ -235,7 +235,7 @@ private fun Track.toStoredTrack(): StoredTrack {
     )
 }
 
-private fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Audix Hi-Res Audio"): String {
+private fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Nightly Hi-Res Audio"): String {
     if (artists.isNullOrEmpty()) return fallback
     val filtered = artists.map { it.name.trim() }.filterNot { name ->
         name.isBlank() ||
@@ -248,7 +248,7 @@ private fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "
         name.equals("YouTube Music", true) ||
         name.equals("Spotify Artist", true) ||
         name.equals("Various Artists", true) ||
-        name.equals("Audix Artist", true) ||
+        name.equals("Nightly Artist", true) || name.equals("Nightly Artist", true) ||
         name.equals("Music Video", true) ||
         name.equals("T-Series", true) ||
         name.equals("SonyMusicIndiaVEVO", true) ||
@@ -564,7 +564,7 @@ fun RecommendedTrackTasteCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = formatArtistsForDisplay(track.artists, "Audix Artist"),
+                    text = formatArtistsForDisplay(track.artists, "Nightly Artist"),
                     fontSize = 11.sp,
                     color = Color.White,
                     maxLines = 1,
@@ -1886,7 +1886,7 @@ object UnifiedCatalogEngine {
         // 1. Fetch Tracks
         runCatching {
             val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=25&q=$encoded"
-            val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
             okHttpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     val body = resp.body?.string() ?: ""
@@ -1959,7 +1959,7 @@ object UnifiedCatalogEngine {
         // 2. Fetch Albums
         runCatching {
             val url = "https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&ctx=android&p=1&n=12&q=$encoded"
-            val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
             okHttpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     val body = resp.body?.string() ?: ""
@@ -2001,7 +2001,7 @@ object UnifiedCatalogEngine {
         // 3. Fetch Artists
         runCatching {
             val url = "https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&ctx=android&p=1&n=8&q=$encoded"
-            val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
             okHttpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     val body = resp.body?.string() ?: ""
@@ -2067,7 +2067,7 @@ object UnifiedCatalogEngine {
         if (!albumId.isNullOrBlank()) {
             val tracks = runCatching {
                 val url = "https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=$albumId"
-                val req = Request.Builder().url(url).header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)").build()
+                val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
                 okHttpClient.newCall(req).execute().use { resp ->
                     if (resp.isSuccessful) {
                         val body = resp.body?.string() ?: ""
@@ -4908,7 +4908,7 @@ fun LibraryScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = formatArtistsForDisplay(track.artists, "Audix Artist"),
+                                        text = formatArtistsForDisplay(track.artists, "Nightly Artist"),
                                         fontSize = 11.5.sp,
                                         color = TextSecondary,
                                         maxLines = 1,
@@ -5180,7 +5180,7 @@ fun LibraryScreen(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
-                                                text = formatArtistsForDisplay(track.artists, "Audix Artist"),
+                                                text = formatArtistsForDisplay(track.artists, "Nightly Artist"),
                                                 fontSize = 11.5.sp,
                                                 color = TextSecondary,
                                                 maxLines = 1,
@@ -5409,7 +5409,7 @@ fun LibraryScreen(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
-                                                text = formatArtistsForDisplay(track.artists, "Audix Artist"),
+                                                text = formatArtistsForDisplay(track.artists, "Nightly Artist"),
                                                 fontSize = 11.5.sp,
                                                 color = TextSecondary,
                                                 maxLines = 1,
@@ -5615,7 +5615,7 @@ fun DownloadsScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(task.track.title, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Color.White)
                                     Text(
-                                        formatArtistsForDisplay(task.track.artists, "Audix Artist"),
+                                        formatArtistsForDisplay(task.track.artists, "Nightly Artist"),
                                         fontSize = 11.5.sp,
                                         color = TextSecondary
                                     )
@@ -5803,7 +5803,7 @@ fun DownloadsScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = formatArtistsForDisplay(dl.track.artists, "Audix Artist"),
+                                    text = formatArtistsForDisplay(dl.track.artists, "Nightly Artist"),
                                     fontSize = 11.5.sp,
                                     color = TextSecondary,
                                     maxLines = 1,
@@ -5874,7 +5874,7 @@ enum class SettingsSection(
 ) {
     AUDIO("Audio & Playback", "Stream bitrate, volume normalization, buffer latency & LibVLC decoding", Icons.Default.GraphicEq),
     APPEARANCE("Appearance & Visuals", "3D music screensaver, interface styling & fluid animations", Icons.Default.Palette),
-    AI_INTELLIGENCE("Audix Intelligence", "Gemini AI API key, generative playlists & smart DJ", Icons.Default.AutoAwesome),
+    AI_INTELLIGENCE("Nightly Intelligence", "Gemini AI API key, generative playlists & smart DJ", Icons.Default.AutoAwesome),
     STORAGE("Storage & Downloads", "Download paths, directory picker & cache management", Icons.Default.Folder),
     LOCAL_LIBRARY("Local Music Folders", "Offline music scan directories & storage paths", Icons.Default.LibraryMusic),
     SYSTEM("System & Desktop", "Tray minimization, startup & notifications", Icons.Default.Computer),
@@ -6153,7 +6153,7 @@ fun SettingsScreen(
     var enableAnimations by remember { mutableStateOf(settings.getBoolean("enable_animations", true)) }
     var dynamicAccentGlow by remember { mutableStateOf(settings.getBoolean("dynamic_accent_glow", true)) }
 
-    // Audix Intelligence state
+    // Nightly Intelligence state
     var geminiApiKey by remember { mutableStateOf(settings.getString("gemini_api_key", "") ?: "") }
     var geminiModel by remember { mutableStateOf(settings.getString("gemini_selected_model", "gemini-2.5-flash") ?: "gemini-2.5-flash") }
     var isTestingAiConnection by remember { mutableStateOf(false) }
@@ -6845,7 +6845,7 @@ fun SettingsScreen(
                                         val maxMem = Runtime.getRuntime().maxMemory() / (1024 * 1024)
                                         val usedMem = totalMem - freeMem
                                         val diag = buildString {
-                                            appendLine("=== AUDIX DESKTOP DIAGNOSTICS ===")
+                                            appendLine("=== NIGHTLY DESKTOP DIAGNOSTICS ===")
                                             appendLine("Version: 1.0.3-UNIFIED")
                                             appendLine("OS: ${System.getProperty("os.name")} (${System.getProperty("os.arch")})")
                                             appendLine("Java: ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")}")
@@ -7186,7 +7186,7 @@ fun SettingsScreen(
                                     val maxMem = Runtime.getRuntime().maxMemory() / (1024 * 1024)
                                     val usedMem = totalMem - freeMem
                                     val diag = buildString {
-                                        appendLine("=== AUDIX DESKTOP DIAGNOSTICS ===")
+                                        appendLine("=== NIGHTLY DESKTOP DIAGNOSTICS ===")
                                         appendLine("Version: 1.0.3-UNIFIED")
                                         appendLine("OS: ${System.getProperty("os.name")} (${System.getProperty("os.arch")})")
                                         appendLine("Java: ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")}")
@@ -7237,7 +7237,7 @@ private fun RenderAiIntelligenceCard(
     var isKeyVisible by remember { mutableStateOf(false) }
 
     SettingsCategoryCard(
-        title = "Audix Intelligence & Gemini AI Engine",
+        title = "Nightly Intelligence & Gemini AI Engine",
         subtitle = "Connect Google Gemini generative intelligence to unlock natural-language playlist synthesis, real-time DJ track commentary, song lore & neural vibe radar.",
         icon = Icons.Default.AutoAwesome,
         badge = if (apiKey.isNotBlank()) "Gemini Active" else "Autonomous Studio"
@@ -7287,7 +7287,7 @@ private fun RenderAiIntelligenceCard(
                             text = if (apiKey.isNotBlank())
                                 "Connected to Google DeepMind Gemini API. Natural language reasoning, lyrical interpretation, and DJ commentary are streaming live."
                             else
-                                "Audix AI works 100% offline with built-in semantic curation and acoustic feature detection. Provide a Gemini API key below to unlock limitless deep-story reasoning.",
+                                "Nightly AI works 100% offline with built-in semantic curation and acoustic feature detection. Provide a Gemini API key below to unlock limitless deep-story reasoning.",
                             color = Color.White.copy(alpha = 0.70f),
                             fontSize = 11.sp,
                             lineHeight = 15.sp
@@ -8179,7 +8179,7 @@ private fun RenderScreensaverStudioCard(
 
         SettingRow(
             title = "Activate When Mouse Leaves App Window",
-            description = "Automatically launch screensaver 2.5 seconds after your cursor exits the Audix application window."
+            description = "Automatically launch screensaver 2.5 seconds after your cursor exits the Nightly application window."
         ) {
             MonochromeSwitch(
                 checked = screensaverMouseExit,
@@ -8666,7 +8666,7 @@ private fun RenderLocalLibraryFoldersCard(
 ) {
     SettingsCategoryCard(
         title = "Local Music Folders",
-        subtitle = "Audix scans these local directories on startup to populate your offline Library.",
+        subtitle = "Nightly scans these local directories on startup to populate your offline Library.",
         icon = Icons.Default.LibraryMusic
     ) {
         Text("Default Monitored Directories", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 13.sp)
@@ -8703,7 +8703,7 @@ private fun RenderLocalLibraryFoldersCard(
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(downloadDir.absolutePath, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                    Text("Audix Downloads Directory [Always Scanned]", fontSize = 10.5.sp, color = Color.White.copy(alpha = 0.45f))
+                    Text("Nightly Downloads Directory [Always Scanned]", fontSize = 10.5.sp, color = Color.White.copy(alpha = 0.45f))
                 }
                 LiquidGlassBox(
                     shape = RoundedCornerShape(4.dp),
@@ -8804,7 +8804,7 @@ private fun RenderSystemIntegrationCard(
     ) {
         SettingRow(
             title = "Minimize to System Tray on Close",
-            description = "When enabled, closing the Audix window keeps the application playing in the Windows taskbar tray instead of terminating."
+            description = "When enabled, closing the Nightly window keeps the application playing in the Windows taskbar tray instead of terminating."
         ) {
             MonochromeSwitch(
                 checked = minimizeToTray,
@@ -8849,7 +8849,7 @@ private fun RenderExtensionsSettingsCard(
 ) {
     SettingsCategoryCard(
         title = "Extensions & Providers Directory",
-        subtitle = "Audix loads external modular JAR plugins for music searching, streaming, and synchronized lyrics.",
+        subtitle = "Nightly loads external modular JAR plugins for music searching, streaming, and synchronized lyrics.",
         icon = Icons.Default.Extension
     ) {
         LiquidGlassCard(
@@ -8946,7 +8946,7 @@ private fun RenderAboutAndDiagnosticsCard(
     onRequestReset: () -> Unit
 ) {
     SettingsCategoryCard(
-        title = "Audix Desktop Workstation",
+        title = "Nightly Desktop Workstation",
         subtitle = "Next-generation multiplatform audio player for Windows.",
         icon = Icons.Default.Info
     ) {
@@ -8956,8 +8956,8 @@ private fun RenderAboutAndDiagnosticsCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Audix Native Edition", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
-                Text("Audix v1.0.4-UNIFIED (Windows x64 Build)", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 12.5.sp)
+                Text("Nightly Native Edition", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
+                Text("Nightly v1.0.4-UNIFIED (Windows x64 Build)", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 12.5.sp)
                 Spacer(Modifier.height(3.dp))
                 Text("Multiplatform Kotlin 2.2 • Jetpack Compose Desktop 1.8.2 • VLCJ / LibVLC 4.8.3", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.45f))
             }

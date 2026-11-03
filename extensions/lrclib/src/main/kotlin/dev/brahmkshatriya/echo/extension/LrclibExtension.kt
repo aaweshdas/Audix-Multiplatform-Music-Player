@@ -58,7 +58,7 @@ class LrclibExtension : LyricsClient {
         try {
             val req = Request.Builder()
                 .url("https://lrclib.net/api/get/$id")
-                .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)")
                 .build()
 
             val body = client.newCall(req).execute().use { it.body.string() }
@@ -84,7 +84,7 @@ class LrclibExtension : LyricsClient {
 
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)")
                 .build()
 
             client.newCall(req).execute().use { resp ->
@@ -113,7 +113,7 @@ class LrclibExtension : LyricsClient {
             val encoded = URLEncoder.encode(query, "UTF-8")
             val req = Request.Builder()
                 .url("https://lrclib.net/api/search?q=$encoded")
-                .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)")
                 .build()
 
             val body = client.newCall(req).execute().use { it.body.string() }

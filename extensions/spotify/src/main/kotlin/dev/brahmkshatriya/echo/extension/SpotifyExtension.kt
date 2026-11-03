@@ -633,7 +633,7 @@ class SpotifyExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, Trac
             val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=8&q=$encoded"
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Audix/1.0.0 (Windows; OpenJDK 21)")
+                .header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)")
                 .build()
 
             val body = client.newCall(req).execute().use { it.body.string() }

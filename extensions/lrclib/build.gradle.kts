@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "LYRICS",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Real-time synchronized and plain lyrics for Now Playing tracks.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

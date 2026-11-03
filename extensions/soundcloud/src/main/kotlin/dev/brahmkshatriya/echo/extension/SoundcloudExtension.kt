@@ -48,8 +48,8 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
         val low = name.lowercase().trim()
         return low in setOf(
             "song", "video", "episode", "podcast", "youtube music", "soundcloud artist",
-            "unknown artist", "t-series", "sony music india", "audix music",
-            "audix hi-res audio", "various artists"
+            "unknown artist", "t-series", "sony music india", "nightly music",
+            "nightly hi-res audio", "various artists"
         ) || low.startsWith("user-")
     }
 
@@ -127,7 +127,7 @@ class SoundcloudExtension : ExtensionClient, HomeFeedClient, SearchFeedClient, T
                         listOf(Artist(id = artistName, name = artistName))
                     } else emptyList()
 
-                    val finalArtists = if (artistList.isNotEmpty()) artistList else listOf(Artist(id = "Audix Hi-Res Audio", name = "Audix Hi-Res Audio"))
+                    val finalArtists = if (artistList.isNotEmpty()) artistList else listOf(Artist(id = "Nightly Hi-Res Audio", name = "Nightly Hi-Res Audio"))
 
                     val rawArtwork = obj["artwork_url"]?.jsonPrimitive?.content
                         ?: userObj?.get("avatar_url")?.jsonPrimitive?.content

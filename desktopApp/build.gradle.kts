@@ -83,14 +83,14 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
-            packageName = "Audix"
+            packageName = "Nightly"
             packageVersion = "1.0.4"
-            description = "Audix - High-Fidelity Music Player"
-            vendor = "Audix"
-            copyright = "© 2026 Audix"
+            description = "Nightly - High-Fidelity Music Player"
+            vendor = "Nightly"
+            copyright = "© 2026 Nightly"
 
             windows {
-                menuGroup = "Audix"
+                menuGroup = "Nightly"
                 shortcut = true
                 dirChooser = true
                 val ico = project.file("src/desktopMain/resources/icons/audix.ico")

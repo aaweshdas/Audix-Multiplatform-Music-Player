@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "MUSIC",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Browse Spotify Top Charts, Today's Top Hits, Viral 50, and stream high-fidelity tracks.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

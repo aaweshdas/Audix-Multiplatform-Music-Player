@@ -45,7 +45,7 @@ object DesktopBackgroundManager {
     val PRESET_WALLPAPERS = listOf(
         BackgroundWallpaper(
             id = "default_master",
-            title = "Audix 32K Master Atmosphere",
+            title = "Nightly 32K Master Atmosphere",
             subtitle = "Signature acoustic dark gradient with liquid glass grain",
             resourcePath = "images/audix_bg.jpg",
             thumbResourcePath = "images/backgrounds/default_master_thumb.jpg",
@@ -183,7 +183,7 @@ object DesktopBackgroundManager {
             if (!devDir.exists()) devDir.mkdirs()
             return devDir
         }
-        val userDir = File(System.getProperty("user.home"), ".audix/wallpapers")
+        val userDir = File(System.getProperty("user.home"), ".nightly/wallpapers")
         if (!userDir.exists()) userDir.mkdirs()
         return userDir
     }

@@ -27,7 +27,7 @@ tasks.jar {
             "Extension-Type" to "MUSIC",
             "Extension-Version-Name" to "1.0.0",
             "Extension-Description" to "Stream millions of songs and official tracks from YouTube Music with adaptive bitrates.",
-            "Extension-Author" to "Audix"
+            "Extension-Author" to "Nightly"
         )
     }
 }

@@ -28,7 +28,7 @@ private fun isGarbageArtist(name: String?): Boolean {
     if (clean in setOf(
         "song", "video", "episode", "podcast", "audio", "track",
         "unknown", "unknown artist", "youtube music", "spotify artist",
-        "various artists", "audix artist", "audix music", "audix hi-res audio",
+        "various artists", "nightly artist", "nightly music", "nightly hi-res audio",
         "music video", "official", "vevo", "lyric video", "lyrics", "full song",
         "t-series", "sonymusicindiavevo", "zee music company", "tips official",
         "speed records", "white hill music", "geet mp3", "sony music india",
@@ -129,7 +129,7 @@ fun StoredTrack.toTrack(): Track {
     val finalArtists = when {
         cleanArtists.isNotEmpty() -> cleanArtists.map { Artist(id = it, name = it) }
         detectedArtist.isNotBlank() -> listOf(Artist(id = detectedArtist, name = detectedArtist))
-        else -> listOf(Artist(id = "Audix Hi-Res Audio", name = "Audix Hi-Res Audio"))
+        else -> listOf(Artist(id = "Nightly Hi-Res Audio", name = "Nightly Hi-Res Audio"))
     }
 
     val validAlbumTitle = albumTitle?.takeIf { !isGarbageAlbum(it) }
@@ -189,7 +189,7 @@ fun Track.toStoredTrack(): StoredTrack {
     val finalArtists = when {
         cleanArtists.isNotEmpty() -> cleanArtists
         detectedArtist.isNotBlank() -> listOf(detectedArtist)
-        else -> listOf("Audix Hi-Res Audio")
+        else -> listOf("Nightly Hi-Res Audio")
     }
 
     val validAlbumTitle = album?.title?.takeIf { !isGarbageAlbum(it) }

@@ -145,7 +145,7 @@ fun AiStudioScreen(
             .padding(horizontal = 24.dp, vertical = 18.dp)
     ) {
         // -----------------------------------------------------------------------------------------
-        // HEADER: AUDIX INTELLIGENCE HERO MASTHEAD
+        // HEADER: NIGHTLY INTELLIGENCE HERO MASTHEAD
         // -----------------------------------------------------------------------------------------
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -173,7 +173,7 @@ fun AiStudioScreen(
                         )
                     }
                     Text(
-                        text = "Audix Intelligence Studio",
+                        text = "Nightly Intelligence Studio",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = (-0.5).sp
@@ -644,7 +644,7 @@ fun AiStudioScreen(
                                                         overflow = TextOverflow.Ellipsis
                                                     )
                                                     Text(
-                                                        text = track.artists.joinToString(", ") { it.name }.ifBlank { "Audix Artist" },
+                                                        text = track.artists.joinToString(", ") { it.name }.ifBlank { "Nightly Artist" },
                                                         fontSize = 11.5.sp,
                                                         color = Color.White.copy(alpha = 0.65f),
                                                         maxLines = 1,
@@ -771,7 +771,7 @@ fun AiStudioScreen(
                                                 color = Color.White
                                             )
                                             Text(
-                                                text = activeTrack.artists.joinToString(", ") { it.name }.ifBlank { "Audix Artist" },
+                                                text = activeTrack.artists.joinToString(", ") { it.name }.ifBlank { "Nightly Artist" },
                                                 fontSize = 13.sp,
                                                 color = Color.White.copy(alpha = 0.70f)
                                             )
@@ -843,7 +843,7 @@ fun AiStudioScreen(
                                             )
                                             Column {
                                                 Text(
-                                                    text = "AUDIX AI DJ COMMENTARY",
+                                                    text = "NIGHTLY AI DJ COMMENTARY",
                                                     fontSize = 10.5.sp,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     letterSpacing = 0.5.sp,

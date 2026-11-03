@@ -125,7 +125,7 @@ internal fun cleanDisplayAlbum(album: String?, fallback: String = ""): String {
     return if (isGarbageAlbum(a)) fallback else a
 }
 
-internal fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Audix Hi-Res Audio", extraArtist: String? = null): String {
+internal fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = "Nightly Hi-Res Audio", extraArtist: String? = null): String {
     val filtered = artists?.map { it.name.trim() }?.filterNot { name ->
         name.isBlank() ||
         name.equals("Song", true) ||
@@ -137,9 +137,9 @@ internal fun formatArtistsForDisplay(artists: List<Artist>?, fallback: String = 
         name.equals("YouTube Music", true) ||
         name.equals("Spotify Artist", true) ||
         name.equals("Various Artists", true) ||
-        name.equals("Audix Artist", true) ||
-        name.equals("Audix Music", true) ||
-        name.equals("Audix Hi-Res Audio", true) ||
+        name.equals("Nightly Artist", true) ||
+        name.equals("Nightly Music", true) ||
+        name.equals("Nightly Hi-Res Audio", true) ||
         name.equals("Music Video", true) ||
         name.equals("T-Series", true) ||
         name.equals("SonyMusicIndiaVEVO", true) ||
@@ -212,14 +212,14 @@ enum class PlayerModalTab(val title: String, val subtitle: String) {
 private object StudioStorage {
     val storageDir by lazy {
         val home = System.getProperty("user.home") ?: "."
-        File(home, ".echo_audix_data").apply { mkdirs() }
+        File(home, ".echo_nightly_data").apply { mkdirs() }
     }
     val streamCacheDir by lazy {
         File(storageDir, "stream_cache").apply { mkdirs() }
     }
     val downloadsDir by lazy {
         val home = System.getProperty("user.home") ?: "."
-        File(home, "Music/Audix").apply { mkdirs() }
+        File(home, "Music/Nightly").apply { mkdirs() }
     }
     val favoritesFile by lazy { File(storageDir, "favorites.txt") }
     val playlistsDir by lazy { File(storageDir, "playlists").apply { mkdirs() } }
@@ -826,7 +826,7 @@ private fun RedesignedMiniPlayerDock(
                         Spacer(Modifier.height(3.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val artists = formatArtistsForDisplay(currentTrack?.artists, "Audix Hi-Res Audio", currentTrack?.extras?.get("artist_name"))
+                            val artists = formatArtistsForDisplay(currentTrack?.artists, "Nightly Hi-Res Audio", currentTrack?.extras?.get("artist_name"))
                             Text(
                                 text = artists,
                                 style = MaterialTheme.typography.bodySmall,
@@ -2163,7 +2163,7 @@ fun MiniPlayer(
 
 
     // =========================================================================
-    // AUDIX PRO STUDIO & AUDIO MASTER HUB (80+ FEATURES & OPTIONS MODAL)
+    // NIGHTLY PRO STUDIO & AUDIO MASTER HUB (80+ FEATURES & OPTIONS MODAL)
     // =========================================================================
     if (showDetailsModal) {
         val originalCoverUrl = extractTrackCoverUrl(currentTrack)
@@ -2262,7 +2262,7 @@ fun MiniPlayer(
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(15.dp), tint = StudioTheme.TextSecondary)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Back to Audix", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = StudioTheme.TextPrimary)
+                                Text("Back to Nightly", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = StudioTheme.TextPrimary)
                             }
 
                             LiquidGlassBox(
@@ -2280,7 +2280,7 @@ fun MiniPlayer(
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        "Audix Studio & Audio Master",
+                                        "Nightly Studio & Audio Master",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 17.sp,
                                         color = StudioTheme.TextPrimary
@@ -2490,7 +2490,7 @@ fun MiniPlayer(
                                                         )
                                                         Spacer(Modifier.height(8.dp))
                                                         Text(
-                                                            "AUDIX HI-FI",
+                                                            "NIGHTLY HI-FI",
                                                             fontSize = 11.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = StudioTheme.TextMuted.copy(alpha = 0.7f),
@@ -2557,9 +2557,9 @@ fun MiniPlayer(
                                             val rawTitle = (currentTrack?.title ?: editTitle).ifBlank { "No track selected" }
                                             val displayTitle = cleanDisplayTitle(rawTitle)
                                             val trackArtists = formatArtistsForDisplay(currentTrack?.artists, "", currentTrack?.extras?.get("artist_name"))
-                                            val displayArtists = (trackArtists.ifBlank { editArtist }).ifBlank { "Audix Hi-Res Audio" }
+                                            val displayArtists = (trackArtists.ifBlank { editArtist }).ifBlank { "Nightly Hi-Res Audio" }
                                             val trackAlbum = currentTrack?.album?.title ?: ""
-                                            val displayAlbum = cleanDisplayAlbum(trackAlbum.ifBlank { editAlbum }, "Audix Studio Collection").ifBlank { "Audix Studio Collection" }
+                                            val displayAlbum = cleanDisplayAlbum(trackAlbum.ifBlank { editAlbum }, "Nightly Studio Collection").ifBlank { "Nightly Studio Collection" }
 
                                             Column(
                                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -2861,7 +2861,7 @@ fun MiniPlayer(
                                                         val displayBitrate = if (downloadQuality.contains("FLAC")) "1411 kbps (Lossless)" else "320 kbps (High Fidelity)"
                                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                             SpecCard("Bitrate & Fidelity", displayBitrate, Icons.Default.GraphicEq, if (displayBitrate.contains("Lossless")) "FLAC" else "HI-FI", Modifier.weight(1f))
-                                                            SpecCard("Streaming Source", activeExtensionName.ifBlank { "Audix Local Engine" }, Icons.Default.Radio, "ONLINE", Modifier.weight(1f))
+                                                            SpecCard("Streaming Source", activeExtensionName.ifBlank { "Nightly Local Engine" }, Icons.Default.Radio, "ONLINE", Modifier.weight(1f))
                                                         }
                                                         Spacer(Modifier.height(8.dp))
                                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -3000,7 +3000,7 @@ fun MiniPlayer(
                                                                 onClick = {
                                                                     val vibeTracks = when (smartFlowVibe) {
                                                                         "Chill Flow" -> listOf(
-                                                                            Track(id = "vibe_chill_1", title = "Weightless (Audix Ambient Edit)", artists = listOf(Artist("vibe_a1", "Marconi Union")), album = Album("v_alb_1", "Ambient Master")),
+                                                                            Track(id = "vibe_chill_1", title = "Weightless (Nightly Ambient Edit)", artists = listOf(Artist("vibe_a1", "Marconi Union")), album = Album("v_alb_1", "Ambient Master")),
                                                                             Track(id = "vibe_chill_2", title = "Sunset Lover (Chill Vibe)", artists = listOf(Artist("vibe_a2", "Petit Biscuit")), album = Album("v_alb_2", "Sunset Edition")),
                                                                             Track(id = "vibe_chill_3", title = "Intro (Chill Remaster)", artists = listOf(Artist("vibe_a3", "The xx")), album = Album("v_alb_3", "Coexist Master"))
                                                                         )
@@ -3010,7 +3010,7 @@ fun MiniPlayer(
                                                                             Track(id = "vibe_eng_3", title = "One More Time (Club Remaster)", artists = listOf(Artist("vibe_a6", "Daft Punk")), album = Album("v_alb_6", "Discovery"))
                                                                         )
                                                                         "Deep Focus" -> listOf(
-                                                                            Track(id = "vibe_foc_1", title = "Deep Focus Alpha Waves", artists = listOf(Artist("vibe_a7", "Audix Binaural")), album = Album("v_alb_7", "Cognitive Flow")),
+                                                                            Track(id = "vibe_foc_1", title = "Deep Focus Alpha Waves", artists = listOf(Artist("vibe_a7", "Nightly Binaural")), album = Album("v_alb_7", "Cognitive Flow")),
                                                                             Track(id = "vibe_foc_2", title = "Time (Acoustic Minimal)", artists = listOf(Artist("vibe_a8", "Hans Zimmer")), album = Album("v_alb_8", "Inception Score")),
                                                                             Track(id = "vibe_foc_3", title = "Day One (Piano Resonance)", artists = listOf(Artist("vibe_a9", "Hans Zimmer")), album = Album("v_alb_9", "Interstellar Flow"))
                                                                         )
@@ -3049,7 +3049,7 @@ fun MiniPlayer(
                                                                 val itemCover = extractTrackCoverUrl(item)
                                                                 val rawItemTitle = item.title.ifBlank { "Untitled Track" }
                                                                 val displayItemTitle = cleanDisplayTitle(rawItemTitle)
-                                                                val itemArtists = item.artists.joinToString(", ") { it.name }.ifBlank { "Audix Hi-Res" }
+                                                                val itemArtists = item.artists.joinToString(", ") { it.name }.ifBlank { "Nightly Hi-Res" }
                                                                 val itemAlbum = item.album?.title ?: ""
                                                                 val subtitle = if (itemAlbum.isNotBlank()) "$itemArtists • $itemAlbum" else itemArtists
 
@@ -4802,7 +4802,7 @@ fun MiniPlayer(
                                                     onClick = {
                                                         val vibeTracks = when (smartFlowVibe) {
                                                             "Chill Flow" -> listOf(
-                                                                Track(id = "vibe_chill_1", title = "Weightless (Audix Ambient Edit)", artists = listOf(Artist("vibe_a1", "Marconi Union")), album = Album("v_alb_1", "Ambient Master")),
+                                                                Track(id = "vibe_chill_1", title = "Weightless (Nightly Ambient Edit)", artists = listOf(Artist("vibe_a1", "Marconi Union")), album = Album("v_alb_1", "Ambient Master")),
                                                                 Track(id = "vibe_chill_2", title = "Sunset Lover (Chill Vibe)", artists = listOf(Artist("vibe_a2", "Petit Biscuit")), album = Album("v_alb_2", "Sunset Edition")),
                                                                 Track(id = "vibe_chill_3", title = "Intro (Chill Remaster)", artists = listOf(Artist("vibe_a3", "The xx")), album = Album("v_alb_3", "Coexist Master"))
                                                             )
@@ -4812,7 +4812,7 @@ fun MiniPlayer(
                                                                 Track(id = "vibe_eng_3", title = "One More Time (Club Remaster)", artists = listOf(Artist("vibe_a6", "Daft Punk")), album = Album("v_alb_6", "Discovery"))
                                                             )
                                                             "Deep Focus" -> listOf(
-                                                                Track(id = "vibe_foc_1", title = "Deep Focus Alpha Waves", artists = listOf(Artist("vibe_a7", "Audix Binaural")), album = Album("v_alb_7", "Cognitive Flow")),
+                                                                Track(id = "vibe_foc_1", title = "Deep Focus Alpha Waves", artists = listOf(Artist("vibe_a7", "Nightly Binaural")), album = Album("v_alb_7", "Cognitive Flow")),
                                                                 Track(id = "vibe_foc_2", title = "Time (Acoustic Minimal)", artists = listOf(Artist("vibe_a8", "Hans Zimmer")), album = Album("v_alb_8", "Inception Score")),
                                                                 Track(id = "vibe_foc_3", title = "Day One (Piano Resonance)", artists = listOf(Artist("vibe_a9", "Hans Zimmer")), album = Album("v_alb_9", "Interstellar Flow"))
                                                             )
@@ -4948,7 +4948,7 @@ fun MiniPlayer(
                                                             color = StudioTheme.TextPrimary
                                                         )
                                                         Text(
-                                                            if (isFavorite) "Synchronized in your personal Audix library" else "Instant library synchronization and smart queue weighting",
+                                                            if (isFavorite) "Synchronized in your personal Nightly library" else "Instant library synchronization and smart queue weighting",
                                                             fontSize = 11.sp,
                                                             color = StudioTheme.TextMuted
                                                         )
@@ -5102,7 +5102,7 @@ fun MiniPlayer(
                                                     )
                                                     Text(
                                                         if (isDownloading) "Downloading... ${(downloadProgress * 100).toInt()}%"
-                                                        else if (isDownloaded) "Saved locally in Music/Audix"
+                                                        else if (isDownloaded) "Saved locally in Music/Nightly"
                                                         else "Persist studio-quality audio master directly to local storage",
                                                         fontSize = 11.sp,
                                                         color = StudioTheme.TextMuted
@@ -5147,7 +5147,7 @@ fun MiniPlayer(
                                                                         if (file != null && file.exists()) {
                                                                             downloadedFile = file
                                                                             isDownloaded = true
-                                                                            playlistFeedbackMessage = "Track downloaded to Music/Audix"
+                                                                            playlistFeedbackMessage = "Track downloaded to Music/Nightly"
                                                                         }
                                                                     }
                                                                 }
@@ -5228,7 +5228,7 @@ fun MiniPlayer(
                                         OutlinedButton(
                                             onClick = {
                                                 currentTrack?.let { tr ->
-                                                    val shareText = "Now listening to \"${tr.title}\" by ${tr.artists.joinToString { it.name }} on Audix Studio"
+                                                    val shareText = "Now listening to \"${tr.title}\" by ${tr.artists.joinToString { it.name }} on Nightly Studio"
                                                     StudioStorage.copyToClipboard(shareText)
                                                     shareFeedback = true
                                                 }
@@ -5292,7 +5292,7 @@ fun MiniPlayer(
                                         OutlinedButton(
                                             onClick = {
                                                 val similarTracks = listOf(
-                                                    Track(id = "sim_mix_1", title = "Resonance (Audix Studio Mix)", artists = listOf(Artist("sim_a1", "Audix Curated")), album = currentTrack?.album),
+                                                    Track(id = "sim_mix_1", title = "Resonance (Nightly Studio Mix)", artists = listOf(Artist("sim_a1", "Nightly Curated")), album = currentTrack?.album),
                                                     Track(id = "sim_mix_2", title = "Hypnotic Waves (Vibe Master)", artists = listOf(Artist("sim_a2", "Flow Engine")), album = currentTrack?.album)
                                                 )
                                                 viewModel.addToQueue(similarTracks)
@@ -5431,7 +5431,7 @@ fun MiniPlayer(
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Switch(checked = closeAppOnSleep, onCheckedChange = { closeAppOnSleep = it })
                                                     Spacer(Modifier.width(8.dp))
-                                                    Text("Quit Audix on Complete", fontSize = 12.sp, color = StudioTheme.TextSecondary)
+                                                    Text("Quit Nightly on Complete", fontSize = 12.sp, color = StudioTheme.TextSecondary)
                                                 }
                                             }
                                         }
@@ -6329,7 +6329,7 @@ private object UniversalLyricsSyncEngine {
             val c = url.openConnection() as HttpURLConnection
             conn = c
             c.requestMethod = "GET"
-            c.setRequestProperty("User-Agent", "Audix/1.0 (Windows; Desktop)")
+            c.setRequestProperty("User-Agent", "Nightly/1.0 (Windows; Desktop)")
             c.connectTimeout = 4000
             c.readTimeout = 4000
             if (c.responseCode in 200..299) {
@@ -6522,7 +6522,7 @@ private object UniversalLyricsSyncEngine {
         val lines = listOf(
             "♪ [Instrumental Intro]",
             "Now playing: $title",
-            if (artist.isNotBlank()) "by $artist" else "Audix Studio Master Engine",
+            if (artist.isNotBlank()) "by $artist" else "Nightly Studio Master Engine",
             "♪ [Verse 1 — Acoustic & Melody]",
             "♪ [Rhythm Progression & Harmonics]",
             "♪ [Chorus & Vocal Crescendo]",

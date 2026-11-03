@@ -150,7 +150,7 @@ class MusixmatchExtension : LyricsClient {
 
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Audix/1.0.0")
+                .header("User-Agent", "Nightly/1.0.0")
                 .build()
 
             val body = client.newCall(req).execute().use { resp ->

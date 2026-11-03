@@ -83,10 +83,10 @@ private interface WindowsKernel32MemoryTrimmer : com.sun.jna.Library {
 
 
 fun main() {
-    val logFile = File(System.getProperty("user.home"), "audix_desktop.log")
+    val logFile = File(System.getProperty("user.home"), "nightly_desktop.log")
     runCatching {
         if (logFile.exists() && logFile.length() > 5 * 1024 * 1024) {
-            val backup = File(System.getProperty("user.home"), "audix_desktop.log.1")
+            val backup = File(System.getProperty("user.home"), "nightly_desktop.log.1")
             if (backup.exists()) backup.delete()
             logFile.renameTo(backup)
         }
@@ -138,11 +138,11 @@ fun main() {
         System.setErr(teeErr)
     }
 
-    log("Audix Desktop initializing...")
+    log("Nightly Desktop initializing...")
 
     val singleInstancePort = 49876
     var instanceHandedOver = false
-    val dataDir = File(System.getProperty("user.home"), ".echo_audix_data").apply { mkdirs() }
+    val dataDir = File(System.getProperty("user.home"), ".echo_nightly_data").apply { mkdirs() }
     val tokenFile = File(dataDir, "session.token")
 
     try {
@@ -157,7 +157,7 @@ fun main() {
                     out.println("SHOW $existingToken")
                     val resp = reader.readLine()
                     if (resp == "ACK") {
-                        log("Existing Audix instance authenticated with session token. Handing over and exiting duplicate launcher.")
+                        log("Existing Nightly instance authenticated with session token. Handing over and exiting duplicate launcher.")
                         instanceHandedOver = true
                     } else {
                         log("Existing socket rejected handshake or replied with '$resp'. Proceeding with primary launch.")
@@ -195,7 +195,7 @@ fun main() {
             javax.swing.JOptionPane.showMessageDialog(
                 null,
                 "Error: ${throwable.message}\n\nCheck log: ${logFile.absolutePath}",
-                "Audix Music Error",
+                "Nightly Music Error",
                 javax.swing.JOptionPane.ERROR_MESSAGE
             )
         }
@@ -316,7 +316,7 @@ fun main() {
             mediaKeys.start()
 
             val ipcExecutor = java.util.concurrent.Executors.newFixedThreadPool(2) { r ->
-                Thread(r, "Audix-IPC-Worker").apply { isDaemon = true }
+                Thread(r, "Nightly-IPC-Worker").apply { isDaemon = true }
             }
 
             val listenerThread = if (instanceServer != null) {
@@ -368,7 +368,7 @@ fun main() {
                     } catch (_: Exception) {}
                 }.apply {
                     isDaemon = true
-                    name = "Audix-SingleInstanceListener"
+                    name = "Nightly-SingleInstanceListener"
                     start()
                 }
             } else null
@@ -413,7 +413,7 @@ fun main() {
             log("Configuring Tray...")
             Tray(
                 icon = logoPainter,
-                tooltip = "Audix Music",
+                tooltip = "Nightly Music",
                 onAction = {
                     windowVisibleState.value = true
                     windowState.isMinimized = false
@@ -431,7 +431,7 @@ fun main() {
                     }
                 },
                 menu = {
-                    Item("Show Audix", onClick = {
+                    Item("Show Nightly", onClick = {
                         windowVisibleState.value = true
                         windowState.isMinimized = false
                         val win = activeWindow ?: java.awt.Window.getWindows().firstOrNull { it is java.awt.Frame }
@@ -476,7 +476,7 @@ fun main() {
                 if (minimizeToTray && traySupported) {
                     windowVisibleState.value = false
                 } else {
-                    log("Cleanly shutting down Audix on window close...")
+                    log("Cleanly shutting down Nightly on window close...")
                     runCatching { instanceServer?.close() }
                     runCatching { audioPlayer.stop() }
                     runCatching { audioPlayer.release() }
@@ -484,7 +484,7 @@ fun main() {
                     kotlin.system.exitProcess(0)
                 }
             },
-            title = "Audix v1.0.4-UNIFIED",
+            title = "Nightly v1.0.4-UNIFIED",
             icon = logoPainter,
             state = windowState,
             resizable = false,

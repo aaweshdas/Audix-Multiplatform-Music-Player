@@ -2,7 +2,7 @@
 
 <img src="tools/assets/audix_logo.jpg" alt="Audix Logo" width="140" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); margin-bottom: 16px;" />
 
-# Audix — Multiplatform Music Player
+# Nightly — Multiplatform Music Player
 
 ![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
 ![Compose Multiplatform](https://img.shields.io/badge/Compose-Multiplatform-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
@@ -11,7 +11,7 @@
 ![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
 
 <p align="center">
-  <b>A modern, high-performance, extension-based music player built for Android and Desktop (Audix).</b><br>
+  <b>A modern, high-performance, extension-based music player built for Android and Desktop (Nightly).</b><br>
   Powered by Kotlin Multiplatform, Compose Multiplatform, SQLDelight, and VLC audio playback.
 </p>
 
@@ -23,16 +23,16 @@
 
 | Platform | Format | File | Size | Download |
 | :--- | :--- | :--- | :--- | :--- |
-| 📱 **Android** (SDK 24+) | **APK** | `Audix-v1.0.1-Android.apk` | ~14.4 MB | [⬇️ **Download APK**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Audix-v1.0.1-Android.apk) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
-| 💻 **Windows** (x64) | **EXE Setup** | `Audix-v1.0.1-Windows-Installer.exe` | ~166 MB | [⬇️ **Download EXE**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Audix-v1.0.1-Windows-Installer.exe) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
-| 💻 **Windows** (x64) | **MSI Installer** | `Audix-v1.0.1-Windows-Installer.msi` | ~165 MB | [⬇️ **Download MSI**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Audix-v1.0.1-Windows-Installer.msi) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
-| 📦 **Windows** (x64) | **Portable ZIP** | `Audix-v1.0.1-Windows-Portable.zip` | ~234 MB | [⬇️ **Download ZIP**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Audix-v1.0.1-Windows-Portable.zip) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 📱 **Android** (SDK 24+) | **APK** | `Nightly-v1.0.4-Android.apk` | ~14.4 MB | [⬇️ **Download APK**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Android.apk) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 💻 **Windows** (x64) | **EXE Setup** | `Nightly-v1.0.4-Windows-Installer.exe` | ~166 MB | [⬇️ **Download EXE**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Installer.exe) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 💻 **Windows** (x64) | **MSI Installer** | `Nightly-v1.0.4-Windows-Installer.msi` | ~165 MB | [⬇️ **Download MSI**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Installer.msi) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 📦 **Windows** (x64) | **Portable ZIP** | `Nightly-v1.0.4-Windows-Portable.zip` | ~234 MB | [⬇️ **Download ZIP**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Portable.zip) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
 
 > [!TIP]
-> **New to Audix?** Follow the quick steps below to load your music and install extensions in seconds!
+> **New to Nightly?** Follow the quick steps below to load your music and install extensions in seconds!
 
-### 📥 How to Install & Add Extensions in Audix
-1. **Download & Install**: Install `Audix-v1.0.1-Android.apk` on your Android device (or run `Audix-v1.0.1-Windows-Installer.exe` on Windows).
+### 📥 How to Install & Add Extensions in Nightly
+1. **Download & Install**: Install `Nightly-v1.0.4-Android.apk` on your Android device (or run `Nightly-v1.0.4-Windows-Installer.exe` on Windows).
 2. **Open Extensions**: Tap the **Extensions** icon in the navigation bar.
 3. **Tap Add (`+`)**: Tap the **Add Extension** button.
 4. **Enter Shortcode or URL**:
@@ -60,12 +60,12 @@
 
 ## 📖 Overview
 
-**Audix** is an extensible, privacy-conscious audio player. Rather than hardcoding fixed streaming services, Audix features a decoupled **Extension SPI Architecture** that dynamically loads audio sources, metadata providers, synchronized lyrics engines, and social integrations at runtime.
+**Nightly** is an extensible, privacy-conscious audio player. Rather than hardcoding fixed streaming services, Nightly features a decoupled **Extension SPI Architecture** that dynamically loads audio sources, metadata providers, synchronized lyrics engines, and social integrations at runtime.
 
-The desktop client (**Audix**) provides an immersive, desktop-grade interface featuring smooth animations, hardware-accelerated playback, dynamic lyrics sync, visualizers, system tray minimization, and media key support.
+The desktop client (**Nightly**) provides an immersive, desktop-grade interface featuring smooth animations, hardware-accelerated playback, dynamic lyrics sync, visualizers, system tray minimization, and media key support.
 
 > [!NOTE]
-> Audix is designed as an offline player and extension host. The application itself hosts zero content and does not condone piracy. Users configure their own extensions and manage their own local libraries.
+> Nightly is designed as an offline player and extension host. The application itself hosts zero content and does not condone piracy. Users configure their own extensions and manage their own local libraries.
 
 ---
 
@@ -75,7 +75,7 @@ The workspace is organized into four modular Kotlin Multiplatform (KMP) modules:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                           Audix Workspace                       │
+│                           Nightly Workspace                       │
 ├─────────────────┬─────────────────┬──────────────┬──────────────┤
 │      :app       │   :desktopApp   │    :core     │   :common    │
 │  (Android App)  │(Compose Desktop)│(DB & Engine) │ (Domain SPI) │
@@ -84,8 +84,8 @@ The workspace is organized into four modular Kotlin Multiplatform (KMP) modules:
 
 | Module | Target | Description |
 | :--- | :--- | :--- |
-| [**:app**](file:///s:/All%20Code/Antigravity/echo-nightly/app) | Android (SDK 24–36) | Android application with Material 3 UI, background playback services, home widgets, and Media3 ExoPlayer. App name: **Audix**. |
-| [**:desktopApp**](file:///s:/All%20Code/Antigravity/echo-nightly/desktopApp) | JVM / Desktop | Modern Compose Multiplatform desktop client (**Audix**). Implements Decompose navigation, Koin DI, VLC audio playback, and Windows tray/media keys. |
+| [**:app**](file:///s:/All%20Code/Antigravity/echo-nightly/app) | Android (SDK 24–36) | Android application with Material 3 UI, background playback services, home widgets, and Media3 ExoPlayer. App name: **Nightly**. |
+| [**:desktopApp**](file:///s:/All%20Code/Antigravity/echo-nightly/desktopApp) | JVM / Desktop | Modern Compose Multiplatform desktop client (**Nightly**). Implements Decompose navigation, Koin DI, VLC audio playback, and Windows tray/media keys. |
 | [**:core**](file:///s:/All%20Code/Antigravity/echo-nightly/core) | Common & JVM | Shared business logic, SQLDelight database (`EchoDatabase`), VLCJ playback engine, and dynamic JAR extension loader. |
 | [**:common**](file:///s:/All%20Code/Antigravity/echo-nightly/common) | Kotlin Multiplatform | Core domain models (`Track`, `Album`, `Artist`, `Playlist`), client interfaces, and Extension SPI. |
 
@@ -102,7 +102,7 @@ echo-nightly/
 ├── AI_POLICY.md                     # Project AI and contribution policies
 ├── LICENSE.md                       # GNU General Public License v3.0
 ├── README.md                        # Master project documentation
-├── Run-Audix.bat                    # Primary Windows desktop launcher script
+├── Run-Nightly.bat                    # Primary Windows desktop launcher script
 ├── Run-Echo.bat                     # Fallback Windows desktop launcher script
 │
 ├── app/                             # [Module] Android Application (Audix)
@@ -179,7 +179,7 @@ Extensions are stored locally under:
 
 To quickly run the desktop application on Windows:
 ```cmd
-.\Run-Audix.bat
+.\Run-Nightly.bat
 ```
 
 Or via Gradle directly:
@@ -229,4 +229,4 @@ Join the official community for news, extension development guides, and nightly 
 
 ## ⚖️ License
 
-Audix is free software licensed under the **GNU General Public License v3.0** (GPL-3.0). See [LICENSE.md](file:///s:/All%20Code/Antigravity/echo-nightly/LICENSE.md) for full details.
+Nightly is free software licensed under the **GNU General Public License v3.0** (GPL-3.0). See [LICENSE.md](file:///s:/All%20Code/Antigravity/echo-nightly/LICENSE.md) for full details.

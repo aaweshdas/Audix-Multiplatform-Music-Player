@@ -15,7 +15,7 @@ foreach ($dp in $desktopPaths) {
     if (Test-Path $dp) {
         $lnk = Join-Path $dp 'Audix.lnk'
         $s = $wsh.CreateShortcut($lnk)
-        $s.TargetPath = 'S:\All Code\Antigravity\echo-nightly\Run-Audix.bat'
+        $s.TargetPath = 'S:\All Code\Antigravity\echo-nightly\Run-Nightly.bat'
         $s.WorkingDirectory = 'S:\All Code\Antigravity\echo-nightly'
         $ico = 'S:\All Code\Antigravity\echo-nightly\desktopApp\src\desktopMain\resources\icons\audix.ico'
         if (Test-Path $ico) {

@@ -88,7 +88,7 @@ s:\All Code\Antigravity\echo-nightly\
 ├── local.properties                      # Local SDK and environment path configurations
 ├── AI_POLICY.md                          # Engineering development standards and guidelines
 ├── README.md                             # User-facing project documentation and quickstart
-├── Run-Nightly-Desktop.bat                 # Primary standalone launcher script for portable JRE
+├── Run-Nightly.bat                         # Primary standalone launcher script for portable JRE
 ├── Run.bat                               # Quick launcher script
 │
 ├── common/                               # Domain Contracts & Extension Interfaces
@@ -641,9 +641,9 @@ Nightly utilizes a high-efficiency standalone build pipeline optimized for rapid
   - Method A (Direct Native Launcher):
     Navigate to release-artifacts\Nightly-Windows-Portable\ and double-click Nightly.exe.
   - Method B (Batch Launcher):
-    Run Run-Nightly-Desktop.bat from the repository root.
+    Run Run-Nightly.bat from the repository root.
   - Method C (Command Line):
-    Run-Nightly-Desktop.bat
+    Run-Nightly.bat
 
 ====================================================================================================
 14. KEYBOARD SHORTCUTS, ACCELERATORS & NAVIGATION MAPPINGS

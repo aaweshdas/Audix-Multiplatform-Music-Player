@@ -2312,12 +2312,12 @@ fun LiquidGlassCard(
                         val rootW = rootWindowSize!!.width.toFloat()
                         val rootH = rootWindowSize!!.height.toFloat()
                         val pos = cardWindowPos!!
-                        val rx = (pos.x / rootW).coerceIn(0f, 0.999f)
-                        val ry = (pos.y / rootH).coerceIn(0f, 0.999f)
-                        val maxRw = (1f - rx).coerceAtLeast(0.001f)
-                        val maxRh = (1f - ry).coerceAtLeast(0.001f)
-                        val rw = (size.width / rootW).coerceIn(0.001f, maxRw)
-                        val rh = (size.height / rootH).coerceIn(0.001f, maxRh)
+                        val rx = if (pos.x.isFinite() && rootW > 0f) (pos.x / rootW).coerceIn(0f, 0.999f) else 0f
+                        val ry = if (pos.y.isFinite() && rootH > 0f) (pos.y / rootH).coerceIn(0f, 0.999f) else 0f
+                        val maxRw = maxOf(0.001f, 1f - rx)
+                        val maxRh = maxOf(0.001f, 1f - ry)
+                        val rw = if (size.width.isFinite() && rootW > 0f) (size.width / rootW).coerceIn(0.001f, maxRw) else 0.001f
+                        val rh = if (size.height.isFinite() && rootH > 0f) (size.height / rootH).coerceIn(0.001f, maxRh) else 0.001f
 
                         val maxSrcX = (blurredBg.width - 1).coerceAtLeast(0)
                         val maxSrcY = (blurredBg.height - 1).coerceAtLeast(0)
@@ -2495,12 +2495,12 @@ fun LiquidGlassBox(
                         val rootW = boxRootWindowSize!!.width.toFloat()
                         val rootH = boxRootWindowSize!!.height.toFloat()
                         val pos = boxWindowPos!!
-                        val rx = (pos.x / rootW).coerceIn(0f, 0.999f)
-                        val ry = (pos.y / rootH).coerceIn(0f, 0.999f)
-                        val maxRw = (1f - rx).coerceAtLeast(0.001f)
-                        val maxRh = (1f - ry).coerceAtLeast(0.001f)
-                        val rw = (size.width / rootW).coerceIn(0.001f, maxRw)
-                        val rh = (size.height / rootH).coerceIn(0.001f, maxRh)
+                        val rx = if (pos.x.isFinite() && rootW > 0f) (pos.x / rootW).coerceIn(0f, 0.999f) else 0f
+                        val ry = if (pos.y.isFinite() && rootH > 0f) (pos.y / rootH).coerceIn(0f, 0.999f) else 0f
+                        val maxRw = maxOf(0.001f, 1f - rx)
+                        val maxRh = maxOf(0.001f, 1f - ry)
+                        val rw = if (size.width.isFinite() && rootW > 0f) (size.width / rootW).coerceIn(0.001f, maxRw) else 0.001f
+                        val rh = if (size.height.isFinite() && rootH > 0f) (size.height / rootH).coerceIn(0.001f, maxRh) else 0.001f
 
                         val maxSrcX = (blurredBg.width - 1).coerceAtLeast(0)
                         val maxSrcY = (blurredBg.height - 1).coerceAtLeast(0)

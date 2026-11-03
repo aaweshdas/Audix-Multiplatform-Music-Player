@@ -680,7 +680,8 @@ private fun RenderMosaicCardScreensaver(
                                     )
 
                                     // Active progress fill (solid white)
-                                    val activeEnd = (w * currentProgress).coerceIn(0f, w)
+                                    val safeW = maxOf(0f, w)
+                                    val activeEnd = (w * currentProgress).coerceIn(0f, safeW)
                                     if (activeEnd > 0f) {
                                         drawLine(
                                             color = Color.White,
@@ -912,7 +913,8 @@ private fun RenderMosaicCardScreensaver(
                                     )
 
                                     // Active volume fill (white)
-                                    val activeEnd = (w * currentVol).coerceIn(0f, w)
+                                    val safeW = maxOf(0f, w)
+                                    val activeEnd = (w * currentVol).coerceIn(0f, safeW)
                                     if (activeEnd > 0f) {
                                         drawLine(
                                             color = Color.White,

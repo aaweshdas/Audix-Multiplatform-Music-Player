@@ -58,4 +58,26 @@
             app:iconTint="@color/audix_text_secondary" />
     </LinearLayout>
 
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/collapsed_buffer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:alpha="0.25"
+        android:progress="0"
+        app:indicatorColor="@color/audix_cyan"
+        app:indicatorTrackGapSize="0dp"
+        app:trackColor="@android:color/transparent"
+        app:trackThickness="2dp" />
+
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/collapsed_seekbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:progress="0"
+        app:indicatorColor="@color/audix_cyan"
+        app:trackColor="@android:color/transparent"
+        app:trackThickness="2dp" />
+
 </FrameLayout>

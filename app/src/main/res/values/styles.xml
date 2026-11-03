@@ -78,6 +78,7 @@
         <item name="itemTextAppearanceActive">@style/TextAppearance.Material3.BodySmall</item>
         <item name="itemTextAppearanceInactive">@style/TextAppearance.Material3.BodySmall</item>
         <item name="itemIconTint">@color/nav_bar_icon</item>
+        <item name="itemTextColor">@color/nav_bar_icon</item>
         <item name="labelVisibilityMode">labeled</item>
         <item name="itemPaddingBottom">6dp</item>
         <item name="itemPaddingTop">8dp</item>

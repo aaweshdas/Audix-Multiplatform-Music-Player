@@ -1,5 +1,5 @@
 ====================================================================================================
- AUDIX (ECHO DESKTOP) — COMPLETE APPLICATION SPECIFICATION & ARCHITECTURAL REFERENCE MANUAL
+ NIGHTLY (ECHO DESKTOP) — COMPLETE APPLICATION SPECIFICATION & ARCHITECTURAL REFERENCE MANUAL
  Version: 1.0.0-RELEASE (Windows Portable)
  Platform: Windows x64 (OpenJDK 21, Compose Multiplatform, LibVLC 3.x)
  Build Type: Native Standalone Portable Runtime
@@ -26,7 +26,7 @@ TABLE OF CONTENTS
 ====================================================================================================
 1. EXECUTIVE OVERVIEW & PRODUCT IDENTITY
 ====================================================================================================
-Audix (developed under the internal project name Echo Desktop / echo-nightly) is an enterprise-grade,
+Nightly (developed under the internal project name Echo Desktop / echo-nightly) is an enterprise-grade,
 ultra-high-fidelity desktop audio player, music streamer, and media manager engineered with Kotlin
 Multiplatform and Jetpack Compose Desktop.
 
@@ -50,7 +50,7 @@ Multiplatform and Jetpack Compose Desktop.
 ====================================================================================================
 2. ARCHITECTURAL BLUEPRINT & TECHNOLOGY STACK
 ====================================================================================================
-Audix is architected as a layered reactive system following Unidirectional Data Flow (UDF) and
+Nightly is architected as a layered reactive system following Unidirectional Data Flow (UDF) and
 Clean Architecture principles.
 
 2.1 Technology Stack Matrix:
@@ -88,7 +88,7 @@ s:\All Code\Antigravity\echo-nightly\
 ├── local.properties                      # Local SDK and environment path configurations
 ├── AI_POLICY.md                          # Engineering development standards and guidelines
 ├── README.md                             # User-facing project documentation and quickstart
-├── Run-Audix-Desktop.bat                 # Primary standalone launcher script for portable JRE
+├── Run-Nightly-Desktop.bat                 # Primary standalone launcher script for portable JRE
 ├── Run.bat                               # Quick launcher script
 │
 ├── common/                               # Domain Contracts & Extension Interfaces
@@ -163,11 +163,11 @@ s:\All Code\Antigravity\echo-nightly\
 │   └── soundcloud/                       # SoundCloud API extension
 │
 ├── release-artifacts/                    # Production Portable Distribution Bundle
-│   ├── Audix-Windows-Portable/           # Unpacked runtime folder ready for direct execution
-│   │   ├── Audix.exe                     # Native launcher executable
+│   ├── Nightly-Windows-Portable/           # Unpacked runtime folder ready for direct execution
+│   │   ├── Nightly.exe                     # Native launcher executable
 │   │   ├── app/                          # Application JARs, classloader libraries & resources
 │   │   └── runtime/                      # Bundled Java 21 JRE and VideoLAN VLC 3.0 binaries
-│   └── Audix-v1.0.0-Windows-Portable.zip # Compressed standalone release distribution (65.9 MB)
+│   └── Nightly-v1.0.0-Windows-Portable.zip # Compressed standalone release distribution (65.9 MB)
 │
 ├── runtime/                              # Shared native libraries
 │   └── vlc/                              # libvlc.dll, libvlccore.dll, plugins/
@@ -186,7 +186,7 @@ s:\All Code\Antigravity\echo-nightly\
 ====================================================================================================
 4. CORE DATA MODELS & DOMAIN SCHEMAS
 ====================================================================================================
-All media entities in Audix are strongly typed immutable data classes with serialization support.
+All media entities in Nightly are strongly typed immutable data classes with serialization support.
 
 4.1 Track:
   - id: String                       (Unique alphanumeric ID or foreign URI)
@@ -295,7 +295,7 @@ The playback engine is implemented in VlcAudioPlayer.kt, providing a native brid
 ====================================================================================================
 6. SEARCH & CANDIDATE RESOLUTION MATRIX (THE SEARCH-TO-PLAYBACK SPEC)
 ====================================================================================================
-Audix implements a strict, multi-tiered resolution matrix to prevent audio desynchronization and
+Nightly implements a strict, multi-tiered resolution matrix to prevent audio desynchronization and
 track hijacking.
 
 6.1 Extension Attribution Pipeline:
@@ -349,7 +349,7 @@ track hijacking.
 ====================================================================================================
 7. ALL 14 USER INTERFACE SCREENS & COMPONENT ARCHITECTURE
 ====================================================================================================
-Audix provides 14 distinct, responsive, and beautifully crafted screens styled in a senior-developer
+Nightly provides 14 distinct, responsive, and beautifully crafted screens styled in a senior-developer
 minimalist monochrome liquid-glass design.
 
 7.1 Screen 1: Home Screen (HomeScreen.kt)
@@ -455,7 +455,7 @@ minimalist monochrome liquid-glass design.
 ====================================================================================================
 8. EXTENSION ECOSYSTEM & ISOLATED CLASSLOADER ARCHITECTURE
 ====================================================================================================
-Audix features a dynamic plugin architecture that isolates extensions in their own JVM ClassLoaders.
+Nightly features a dynamic plugin architecture that isolates extensions in their own JVM ClassLoaders.
 
 8.1 Dynamic Extension Discovery:
   - Extensions directory is resolved at runtime: %APPDATA%\Echo\extensions\
@@ -495,7 +495,7 @@ Audix features a dynamic plugin architecture that isolates extensions in their o
 ====================================================================================================
 9. DOWNLOAD ENGINE & OFFLINE METADATA SUBSYSTEM
 ====================================================================================================
-Audix includes a robust offline download manager implemented in DesktopDownloadManager.kt.
+Nightly includes a robust offline download manager implemented in DesktopDownloadManager.kt.
 
 9.1 Download Pipeline:
   1. Trigger: User clicks download icon on track, album, or playlist.
@@ -598,7 +598,7 @@ User settings are managed by EchoSettings and stored locally on the user's files
 ====================================================================================================
 12. BUILD, COMPILATION, PACKAGING & DEPLOYMENT PIPELINES
 ====================================================================================================
-Audix utilizes a high-efficiency standalone build pipeline optimized for rapid iteration.
+Nightly utilizes a high-efficiency standalone build pipeline optimized for rapid iteration.
 
 12.1 Standalone Compiler Pipeline (scratch/compile_screens.py):
   - Solves Gradle daemon memory exhaustion by executing the Kotlin 2.2.10 compiler directly via JRE.
@@ -608,12 +608,12 @@ Audix utilizes a high-efficiency standalone build pipeline optimized for rapid i
 
 12.2 Bytecode Injector (scratch/inject_classes.py):
   - Automatically injects newly compiled *.class files into:
-    * release-artifacts\Audix-Windows-Portable\app\recovered_classes-*.jar
-    * desktopApp\build\compose\binaries\main\app\Audix\app\recovered_classes-*.jar
+    * release-artifacts\Nightly-Windows-Portable\app\recovered_classes-*.jar
+    * desktopApp\build\compose\binaries\main\app\Nightly\app\recovered_classes-*.jar
     * tools\recovered-reference\recovered_classes.jar
   - Bundles background wallpapers, cosmic clock dial assets, and application logos into the JAR.
   - Packages and embeds all 10 extension JARs into the classpath and portable distribution.
-  - Updates the standalone release ZIP: release-artifacts\Audix-v1.0.0-Windows-Portable.zip.
+  - Updates the standalone release ZIP: release-artifacts\Nightly-v1.0.0-Windows-Portable.zip.
 
 12.3 Extension Compiler & Packager (scripts/compile_and_package_extensions.py):
   - Iterates through extensions (YouTube, Saavn, Spotify, SoundCloud, Radio Browser).
@@ -639,16 +639,16 @@ Audix utilizes a high-efficiency standalone build pipeline optimized for rapid i
 
 13.3 Launch Protocols:
   - Method A (Direct Native Launcher):
-    Navigate to release-artifacts\Audix-Windows-Portable\ and double-click Audix.exe.
+    Navigate to release-artifacts\Nightly-Windows-Portable\ and double-click Nightly.exe.
   - Method B (Batch Launcher):
-    Run Run-Audix-Desktop.bat from the repository root.
+    Run Run-Nightly-Desktop.bat from the repository root.
   - Method C (Command Line):
-    Run-Audix-Desktop.bat
+    Run-Nightly-Desktop.bat
 
 ====================================================================================================
 14. KEYBOARD SHORTCUTS, ACCELERATORS & NAVIGATION MAPPINGS
 ====================================================================================================
-Audix supports universal keyboard shortcuts for seamless control:
+Nightly supports universal keyboard shortcuts for seamless control:
 
   | Key Combination       | Function                                            |
   |-----------------------|-----------------------------------------------------|

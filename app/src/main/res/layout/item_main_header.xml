@@ -6,12 +6,12 @@
     android:layout_height="wrap_content"
     android:layout_marginStart="-20dp"
     android:layout_marginEnd="-20dp"
-    android:layout_marginBottom="12dp"
+    android:layout_marginBottom="16dp"
     android:clipToPadding="false"
     android:orientation="vertical"
     android:paddingHorizontal="20dp">
 
-    <!-- 1. TOP BRANDING & WORKSTATION BAR -->
+    <!-- 1. TOP BRANDING & IDENTITY WORKSTATION BAR -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,10 +19,10 @@
         android:orientation="horizontal"
         android:paddingVertical="8dp">
 
-        <!-- Audix Studio Icon & Identity -->
+        <!-- Nightly Studio Logo -->
         <com.google.android.material.card.MaterialCardView
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             app:cardBackgroundColor="#131B2E"
             app:cardCornerRadius="12dp"
             app:strokeColor="#22334F"
@@ -31,8 +31,8 @@
             <ImageView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="5dp"
-                android:src="@drawable/ic_audix_logo"
+                android:padding="6dp"
+                android:src="@drawable/ic_nightly_logo"
                 android:importantForAccessibility="no" />
         </com.google.android.material.card.MaterialCardView>
 
@@ -48,18 +48,18 @@
                 android:layout_height="wrap_content"
                 android:text="Nightly"
                 android:textColor="@color/audix_white"
-                android:textSize="18sp"
+                android:textSize="19sp"
                 android:textStyle="bold"
                 android:letterSpacing="-0.02" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="v1.0.4-UNIFIED • Hi-Res Studio"
+                android:text="v1.0.4-UNIFIED • Studio Soundstage"
                 android:textColor="@color/audix_cyan_bright"
                 android:textSize="10.5sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.04" />
+                android:letterSpacing="0.03" />
         </LinearLayout>
 
         <!-- Active Source / Extension Pill -->
@@ -81,11 +81,11 @@
 
                 <ImageView
                     android:id="@+id/extensions"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
                     android:contentDescription="@string/extensions"
                     android:src="@drawable/ic_extension_32dp"
-                    app:tint="@color/audix_cyan" />
+                    app:tint="@color/audix_cyan_bright" />
 
                 <TextView
                     android:id="@+id/title"
@@ -95,9 +95,9 @@
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:maxWidth="110dp"
-                    android:text="@string/app_name"
+                    android:text="Master Collection"
                     android:textColor="@color/audix_white"
-                    android:textSize="12sp"
+                    android:textSize="11.5sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -124,20 +124,25 @@
 
     </LinearLayout>
 
-    <!-- 2. FLAGSHIP DESKTOP-STYLE STUDIO HERO CARD -->
-    <FrameLayout
+    <!-- 2. STUDIO SOUNDSTAGE NOW PLAYING HERO CARD (DESKTOP PARITY) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardNowPlayingSoundstage"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:background="@drawable/bg_audix_header_card"
-        android:padding="16dp">
+        android:layout_marginTop="8dp"
+        app:cardBackgroundColor="#0D1324"
+        app:cardCornerRadius="20dp"
+        app:strokeColor="#243452"
+        app:strokeWidth="1.2dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:background="@drawable/bg_audix_header_card"
+            android:orientation="vertical"
+            android:padding="16dp">
 
-            <!-- Top Quality & Soundstage Badges -->
+            <!-- Top Header Row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -145,13 +150,14 @@
                 android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/tvSoundstageStatusBadge"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_audix_badge_lossless"
+                    android:background="@drawable/bg_audix_badge_soundstage"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="3dp"
-                    android:text="● 320 kbps Lossless"
-                    android:textColor="@color/audix_emerald"
+                    android:text="● STUDIO SOUNDSTAGE"
+                    android:textColor="@color/audix_cyan_bright"
                     android:textSize="9.5sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.04" />
@@ -160,11 +166,11 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:background="@drawable/bg_audix_badge_soundstage"
+                    android:background="@drawable/bg_audix_badge_lossless"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="3dp"
-                    android:text="STUDIO SOUNDSTAGE"
-                    android:textColor="@color/audix_cyan_bright"
+                    android:text="320 KBPS HI-RES"
+                    android:textColor="@color/audix_emerald"
                     android:textSize="9.5sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.04" />
@@ -175,41 +181,16 @@
                     android:layout_weight="1" />
 
                 <TextView
+                    android:id="@+id/headerGreeting"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_audix_badge_cinema"
-                    android:paddingHorizontal="8dp"
-                    android:paddingVertical="3dp"
-                    android:text="CINEMA 4K"
-                    android:textColor="@color/audix_crimson"
-                    android:textSize="9.5sp"
+                    android:textColor="@color/audix_text_secondary"
+                    android:textSize="11.5sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.04" />
+                    tools:text="Good afternoon" />
             </LinearLayout>
 
-            <!-- Dynamic Greeting (Morning / Afternoon / Evening) -->
-            <TextView
-                android:id="@+id/headerGreeting"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Good afternoon"
-                android:textColor="@color/audix_white"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:letterSpacing="-0.03" />
-
-            <!-- Subtitle -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Tuned to your affinity for High-Fidelity Lossless Sound • 320 kbps Studio Stream"
-                android:textColor="@color/audix_text_secondary"
-                android:textSize="12sp"
-                android:lineSpacingExtra="2dp" />
-
-            <!-- Quick Action Row -->
+            <!-- Main Soundstage Body: Song Info on Left, Rotating Vinyl on Right -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -217,72 +198,303 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/btnInstantMix"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    app:cardBackgroundColor="@color/audix_white"
-                    app:cardCornerRadius="16dp"
-                    app:strokeWidth="0dp">
+                <!-- Song Info & Mini Transport -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
+                    <TextView
+                        android:id="@+id/tvLiveTrackTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="Nightly Hi-Res Flow"
+                        android:textColor="@color/audix_white"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="-0.02" />
+
+                    <TextView
+                        android:id="@+id/tvLiveTrackArtist"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="Master Collection • Ready to stream"
+                        android:textColor="@color/audix_text_secondary"
+                        android:textSize="12sp" />
+
+                    <!-- Mini Transport Buttons -->
                     <LinearLayout
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
                         android:gravity="center_vertical"
-                        android:paddingHorizontal="12dp">
+                        android:orientation="horizontal">
+
+                        <!-- Play/Pause Neon Pill -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/btnLivePlayPause"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            app:cardBackgroundColor="@color/audix_cyan_bright"
+                            app:cardCornerRadius="16dp"
+                            app:strokeWidth="0dp">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="match_parent"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="12dp">
+
+                                <ImageView
+                                    android:id="@+id/ivLivePlayIcon"
+                                    android:layout_width="14dp"
+                                    android:layout_height="14dp"
+                                    android:src="@drawable/ic_play"
+                                    app:tint="#05070D"
+                                    android:importantForAccessibility="no" />
+
+                                <TextView
+                                    android:id="@+id/tvLivePlayText"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="Play Flow"
+                                    android:textColor="#05070D"
+                                    android:textSize="11.5sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Open Screensaver Quick Pill -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/btnLaunchScreensaver"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:layout_marginStart="8dp"
+                            app:cardBackgroundColor="#182338"
+                            app:cardCornerRadius="16dp"
+                            app:strokeColor="#2E3F5E"
+                            app:strokeWidth="1dp">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="match_parent"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="10dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="📺 Screensaver"
+                                    android:textColor="@color/audix_white"
+                                    android:textSize="11sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Rotating Vinyl Disc Stage -->
+                <FrameLayout
+                    android:id="@+id/flLiveVinylContainer"
+                    android:layout_width="78dp"
+                    android:layout_height="78dp"
+                    android:layout_marginStart="14dp">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/bg_nightly_vinyl_grooves"
+                        android:importantForAccessibility="no" />
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:layout_gravity="center"
+                        app:cardBackgroundColor="#0D1322"
+                        app:cardCornerRadius="17dp"
+                        app:strokeColor="@color/audix_cyan_bright"
+                        app:strokeWidth="1dp">
 
                         <ImageView
-                            android:layout_width="14dp"
-                            android:layout_height="14dp"
-                            android:src="@drawable/ic_shuffle"
-                            app:tint="@color/audix_bg"
+                            android:id="@+id/ivLiveCover"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/art_music"
                             android:importantForAccessibility="no" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:text="Instant Mix"
-                            android:textColor="@color/audix_bg"
-                            android:textSize="11.5sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/btnCinemaStudio"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginStart="8dp"
-                    app:cardBackgroundColor="#1A2438"
-                    app:cardCornerRadius="16dp"
-                    app:strokeColor="#2E3F5E"
-                    app:strokeWidth="1dp">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="12dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="🎬 Cinema Studio"
-                            android:textColor="@color/audix_white"
-                            android:textSize="11.5sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    </com.google.android.material.card.MaterialCardView>
+                </FrameLayout>
             </LinearLayout>
         </LinearLayout>
-    </FrameLayout>
+    </com.google.android.material.card.MaterialCardView>
 
-    <!-- 3. HORIZONTAL DISCOVERY VIBE RIBBON -->
+    <!-- 3. STUDIO 4-TILE QUICK ACTION LAUNCHPAD -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <!-- Tile 1: Screensaver -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/tileScreensaver"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            app:cardBackgroundColor="#0F1626"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="#1F2E47"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📺 Screensaver"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Vinyl &amp; FFT"
+                    android:textColor="@color/audix_cyan_bright"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Tile 2: Equalizer -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/tileEqualizer"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            app:cardBackgroundColor="#0F1626"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="#1F2E47"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎚️ Equalizer"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="3D DSP &amp; Bass"
+                    android:textColor="@color/audix_emerald"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Tile 3: AI Studio -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/tileAiStudio"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            app:cardBackgroundColor="#0F1626"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="#1F2E47"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✨ AI Studio"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Prompt Flow"
+                    android:textColor="@color/audix_purple"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Tile 4: Cinema Studio -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/tileCinemaStudio"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            app:cardBackgroundColor="#0F1626"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="#1F2E47"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎬 Cinema"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="331+ 4K Films"
+                    android:textColor="@color/audix_crimson"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+
+    <!-- 4. MASTER EXTENSION SOURCE RIBBON -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="14dp"
         android:clipToPadding="false"
         android:scrollbars="none">
 
@@ -293,80 +505,84 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/chipMasterCollection"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:background="@drawable/bg_audix_pill_filter"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_audix_badge_soundstage"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
+                android:paddingHorizontal="14dp"
                 android:text="● Master Collection"
-                android:textColor="@color/audix_white"
-                android:textSize="11.5sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/bg_audix_pill_filter"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="For You"
                 android:textColor="@color/audix_cyan_bright"
                 android:textSize="11.5sp"
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/chipSpotify"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:layout_marginStart="6dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
                 android:background="@drawable/bg_audix_pill_filter"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="Top Charts"
-                android:textColor="@color/audix_text_secondary"
+                android:paddingHorizontal="14dp"
+                android:text="Spotify"
+                android:textColor="@color/audix_white"
                 android:textSize="11.5sp" />
 
             <TextView
+                android:id="@+id/chipSaavn"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:layout_marginStart="6dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
                 android:background="@drawable/bg_audix_pill_filter"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="Focus Sanctuary"
-                android:textColor="@color/audix_text_secondary"
+                android:paddingHorizontal="14dp"
+                android:text="JioSaavn"
+                android:textColor="@color/audix_white"
                 android:textSize="11.5sp" />
 
             <TextView
+                android:id="@+id/chipYoutube"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:layout_marginStart="6dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
                 android:background="@drawable/bg_audix_pill_filter"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="Midnight Lo-Fi"
-                android:textColor="@color/audix_text_secondary"
+                android:paddingHorizontal="14dp"
+                android:text="YouTube Music"
+                android:textColor="@color/audix_white"
                 android:textSize="11.5sp" />
 
             <TextView
+                android:id="@+id/chipSoundCloud"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:layout_marginStart="6dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
                 android:background="@drawable/bg_audix_pill_filter"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="Hi-Res Masters"
-                android:textColor="@color/audix_emerald"
-                android:textSize="11.5sp"
-                android:textStyle="bold" />
+                android:paddingHorizontal="14dp"
+                android:text="SoundCloud"
+                android:textColor="@color/audix_white"
+                android:textSize="11.5sp" />
+
+            <TextView
+                android:id="@+id/chipRadio"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_audix_pill_filter"
+                android:gravity="center"
+                android:paddingHorizontal="14dp"
+                android:text="Radio Browser"
+                android:textColor="@color/audix_white"
+                android:textSize="11.5sp" />
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- 4. MOVIE PLAY & BLOCKBUSTER SOUNDTRACKS (DESKTOP PARITY) -->
+    <!-- 5. MOVIE PLAY & BLOCKBUSTER SOUNDTRACKS (DESKTOP PARITY) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="18dp"
         android:orientation="vertical">
 
         <LinearLayout

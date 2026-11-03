@@ -93,7 +93,7 @@ compose.desktop {
                 menuGroup = "Nightly"
                 shortcut = true
                 dirChooser = true
-                val ico = project.file("src/desktopMain/resources/icons/audix.ico")
+                val ico = project.file("src/desktopMain/resources/icons/nightly.ico")
                 val fallbackIco = project.file("src/desktopMain/resources/icons/spothub.ico")
                 if (ico.exists()) iconFile.set(ico)
                 else if (fallbackIco.exists()) iconFile.set(fallbackIco)

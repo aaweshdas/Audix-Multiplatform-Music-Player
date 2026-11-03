@@ -2619,7 +2619,9 @@ private fun SeniorExecutiveMasthead(
 
     val logoBitmap = remember {
         cachedHomeLogoBitmap ?: runCatching {
-            val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_logo_square.png")
+            val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/nightly_logo_square.png")
+                ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/nightly_logo.png")
+                ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_logo_square.png")
                 ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_logo.png")
                 ?: Thread.currentThread().contextClassLoader.getResourceAsStream("images/spothub_logo.png")
                 ?: java.nio.file.Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", "images", "audix_logo_square.png").toFile().takeIf { it.exists() }?.inputStream()

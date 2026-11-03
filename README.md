@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="tools/assets/audix_logo.jpg" alt="Audix Logo" width="140" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); margin-bottom: 16px;" />
+<img src="tools/assets/nightly_logo.jpg" alt="Nightly Logo" width="140" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); margin-bottom: 16px;" />
 
 # Nightly — Multiplatform Music Player
 

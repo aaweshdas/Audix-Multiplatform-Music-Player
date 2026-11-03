@@ -80,9 +80,32 @@ class MediaViewHolder(
     override fun onSwipe() = feed
 
     override fun onCurrentChanged(current: PlayerState.Current?) {
-        val isPlaying = current.isPlaying(feed?.item?.id)
-        binding.coverContainer.isPlaying.isVisible = isPlaying
-        (binding.coverContainer.isPlaying.icon as Animatable).start()
+        val itemId = feed?.item?.id
+        val currTrack = current?.track
+        val isThisTrack = itemId != null && (
+            itemId == currTrack?.id || 
+            itemId == current?.mediaItem?.mediaId ||
+            (feed?.item is Track && (feed?.item as Track).title.equals(currTrack?.title, ignoreCase = true))
+        )
+        val isActivelyPlaying = isThisTrack && current?.isPlaying == true
+
+        binding.coverContainer.isPlaying.isVisible = isThisTrack
+        runCatching {
+            val icon = binding.coverContainer.isPlaying.icon
+            if (icon is Animatable) {
+                if (isActivelyPlaying) icon.start() else icon.stop()
+            }
+        }
+
+        if (isThisTrack) {
+            runCatching {
+                binding.title.setTextColor(androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.audix_cyan_bright))
+            }
+        } else {
+            runCatching {
+                binding.title.setTextColor(androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.audix_white))
+            }
+        }
     }
 
     companion object {

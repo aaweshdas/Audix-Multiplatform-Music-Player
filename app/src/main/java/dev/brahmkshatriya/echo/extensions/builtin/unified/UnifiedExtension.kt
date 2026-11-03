@@ -58,6 +58,10 @@ import dev.brahmkshatriya.echo.playback.MediaItemUtils.toKey
 import dev.brahmkshatriya.echo.utils.CacheUtils.getFromCache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 @OptIn(UnstableApi::class)
@@ -340,24 +344,57 @@ class UnifiedExtension(
         } else data
     }
 
+    private suspend fun resolveExtension(extId: String?): Extension<*>? {
+        val list = extensions()
+        if (!extId.isNullOrBlank() && extId != UNIFIED_ID) {
+            val found = list.find { it.id == extId }
+            if (found != null) return found
+        }
+        return list.firstOrNull { it.instance.value is TrackClient } ?: list.firstOrNull()
+    }
+
     private suspend inline fun <reified T> feed(
         crossinline loadFeed: suspend T.() -> Feed<Shelf>,
     ): Feed<Shelf> {
         val list = extensions()
-        return if (list.isEmpty()) {
-            Feed(listOf()) {
+        if (list.isEmpty()) {
+            return Feed(listOf()) {
                 PagedData.Single { listOf<Shelf>() }.toFeedData()
             }
-        } else if (list.size == 1) {
-            val ext = list.first()
-            ext.client<T, Feed<Shelf>> { loadFeed() }.injectExtensionId(ext)
-        } else Feed(
-            list.map { Tab(it.id, it.name).injectId(it.id) }
-        ) { tab ->
-            val extensions = extensions()
-            val id = tab?.extras?.extensionId ?: extensions.firstOrNull()?.id
-            val targetExt = if (id != null) extensions.find { it.id == id } ?: extensions.firstOrNull() else extensions.firstOrNull()
-            targetExt?.getFeedData(loadFeed) ?: PagedData.Single { listOf<Shelf>() }.toFeedData()
+        }
+        val masterTab = Tab(UNIFIED_ID, "Master Collection").injectId(UNIFIED_ID)
+        val extTabs = list.map { Tab(it.id, it.name).injectId(it.id) }
+        val allTabs = listOf(masterTab) + extTabs
+
+        return Feed(allTabs) { tab ->
+            val exts = extensions()
+            val id = tab?.extras?.get(EXTENSION_ID) ?: tab?.id ?: UNIFIED_ID
+            if (id == UNIFIED_ID || tab == null) {
+                // Concurrently aggregate home/search shelves across all active music extensions
+                val allShelves = coroutineScope {
+                    exts.map { ext ->
+                        async {
+                            runCatching {
+                                withTimeoutOrNull(7000L) {
+                                    ext.clientOrNull<T, Feed<Shelf>> { loadFeed() }
+                                        ?.injectExtensionId(ext)
+                                        ?.run { getPagedData(tabs.firstOrNull()) }
+                                        ?.pagedData
+                                        ?.loadAll()
+                                }
+                            }.getOrNull().orEmpty()
+                        }
+                    }.awaitAll().flatten()
+                }
+                Feed.Data(
+                    PagedData.Single { allShelves },
+                    null,
+                    null
+                )
+            } else {
+                val targetExt = exts.find { it.id == id } ?: exts.firstOrNull()
+                targetExt?.getFeedData(loadFeed) ?: PagedData.Single { listOf<Shelf>() }.toFeedData()
+            }
         }
     }
 
@@ -422,89 +459,92 @@ class UnifiedExtension(
     }
 
     override suspend fun loadRadio(radio: Radio): Radio {
-        val id = radio.extras.extensionId
-        val extension = extensions().get(id)
-        return extension.client<RadioClient, Radio> {
-            loadRadio(radio).withExtensionId(id, this)
+        val ext = resolveExtension(radio.extras[EXTENSION_ID]) ?: throw Exception("No radio extension available")
+        val targetId = ext.id
+        return ext.client<RadioClient, Radio> {
+            loadRadio(radio).withExtensionId(targetId, this)
         }
     }
 
     override suspend fun loadTracks(radio: Radio): Feed<Track> {
-        val id = radio.extras.extensionId
-        val extension = extensions().get(id)
-        return extension.client<RadioClient, Feed<Track>> {
-            this.loadTracks(radio).injectExtension(extension)
+        val ext = resolveExtension(radio.extras[EXTENSION_ID]) ?: throw Exception("No radio extension available")
+        return ext.client<RadioClient, Feed<Track>> {
+            this.loadTracks(radio).injectExtension(ext)
         }
     }
 
     override suspend fun radio(item: EchoMediaItem, context: EchoMediaItem?): Radio {
-        val id = item.extras.extensionId
-        return extensions().get(id).client<RadioClient, Radio> {
-            radio(item, context).withExtensionId(id, this)
+        val ext = resolveExtension(item.extras[EXTENSION_ID]) ?: throw Exception("No radio extension available")
+        val targetId = ext.id
+        return ext.client<RadioClient, Radio> {
+            radio(item, context).withExtensionId(targetId, this)
         }
     }
 
     override suspend fun loadTrack(track: Track, isDownload: Boolean): Track {
         val cached = track.extras["cached"]?.toBoolean() ?: false
         if (cached) return track
-        val id = track.extras.extensionId
-        return extensions().get(id).client<TrackClient, Track> {
-            loadTrack(track, isDownload).withExtensionId(id, this)
+        val rawId = track.extras[EXTENSION_ID]
+            ?: track.streamables.firstOrNull()?.extras?.get(EXTENSION_ID)
+        val ext = resolveExtension(rawId) ?: throw Exception("No music extension available for track: ${track.title}")
+        val targetId = ext.id
+        return ext.client<TrackClient, Track> {
+            loadTrack(track, isDownload).withExtensionId(targetId, this)
         }
     }
 
     override suspend fun loadStreamableMedia(
         streamable: Streamable, isDownload: Boolean,
     ): Streamable.Media {
-        val id = streamable.extras.extensionId
-        return extensions().get(id).client<TrackClient, Streamable.Media> {
+        val rawId = streamable.extras[EXTENSION_ID]
+        val ext = resolveExtension(rawId) ?: throw Exception("No music extension available for streamable")
+        return ext.client<TrackClient, Streamable.Media> {
             loadStreamableMedia(streamable, isDownload)
         }
     }
 
     override suspend fun loadFeed(track: Track): Feed<Shelf>? {
-        val id = track.extras.extensionId
-        val extension = extensions().get(id)
-        return extension.client<TrackClient, Feed<Shelf>?> {
-            loadFeed(track)?.injectExtensionId(extension)
+        val rawId = track.extras[EXTENSION_ID]
+        val ext = resolveExtension(rawId) ?: return null
+        return ext.clientOrNull<TrackClient, Feed<Shelf>?> {
+            loadFeed(track)?.injectExtensionId(ext)
         }
     }
 
     override suspend fun loadAlbum(album: Album): Album {
-        val id = album.extras.extensionId
-        return extensions().get(id).client<AlbumClient, Album> {
+        val ext = resolveExtension(album.extras[EXTENSION_ID]) ?: throw Exception("No album extension available")
+        val id = ext.id
+        return ext.client<AlbumClient, Album> {
             loadAlbum(album).withExtensionId(id, this)
         }
     }
 
     override suspend fun loadTracks(album: Album): Feed<Track>? {
-        val id = album.extras.extensionId
-        val extension = extensions().get(id)
-        return extension.client<AlbumClient, Feed<Track>?> {
-            loadTracks(album)?.injectExtension(extension)
+        val ext = resolveExtension(album.extras[EXTENSION_ID]) ?: return null
+        return ext.clientOrNull<AlbumClient, Feed<Track>?> {
+            loadTracks(album)?.injectExtension(ext)
         }
     }
 
     override suspend fun loadFeed(album: Album): Feed<Shelf>? {
-        val id = album.extras.extensionId
-        val extension = extensions().get(id)
-        return extension.client<AlbumClient, Feed<Shelf>?> {
-            loadFeed(album)?.injectExtensionId(extension)
+        val ext = resolveExtension(album.extras[EXTENSION_ID]) ?: return null
+        return ext.clientOrNull<AlbumClient, Feed<Shelf>?> {
+            loadFeed(album)?.injectExtensionId(ext)
         }
     }
 
     override suspend fun loadArtist(artist: Artist): Artist {
-        val id = artist.extras.extensionId
-        return extensions().get(id).client<ArtistClient, Artist> {
+        val ext = resolveExtension(artist.extras[EXTENSION_ID]) ?: throw Exception("No artist extension available")
+        val id = ext.id
+        return ext.client<ArtistClient, Artist> {
             loadArtist(artist).withExtensionId(id, this)
         }
     }
 
     override suspend fun loadFeed(artist: Artist): Feed<Shelf> {
-        val id = artist.extras.extensionId
-        val extension = extensions().get(id)
-        return extension.client<ArtistClient, Feed<Shelf>> {
-            loadFeed(artist).injectExtensionId(extension)
+        val ext = resolveExtension(artist.extras[EXTENSION_ID]) ?: throw Exception("No artist extension available")
+        return ext.client<ArtistClient, Feed<Shelf>> {
+            loadFeed(artist).injectExtensionId(ext)
         }
     }
 
@@ -610,8 +650,9 @@ class UnifiedExtension(
     }
 
     override suspend fun loadLyrics(lyrics: Lyrics): Lyrics {
-        val extId = lyrics.extras.extensionId
-        return extensions().get(extId).client<LyricsClient, Lyrics> {
+        val ext = resolveExtension(lyrics.extras[EXTENSION_ID]) ?: throw Exception("No lyrics extension available")
+        val extId = ext.id
+        return ext.client<LyricsClient, Lyrics> {
             loadLyrics(lyrics).withExtensionId(extId)
         }
     }
@@ -619,38 +660,33 @@ class UnifiedExtension(
     private var current: Track? = null
     override suspend fun onTrackChanged(details: TrackDetails?) {
         current = details?.track
-        val id = details?.track?.extras?.extensionId ?: return
-        val extension = extensions().get(id)
-        extension.clientOrNull<TrackerClient, Unit> { onTrackChanged(details) }
+        val ext = resolveExtension(details?.track?.extras?.get(EXTENSION_ID)) ?: return
+        ext.clientOrNull<TrackerClient, Unit> { onTrackChanged(details) }
     }
 
     override suspend fun onMarkAsPlayed(details: TrackDetails) {
-        val id = details.track.extras.extensionId
-        val extension = extensions().get(id)
-        extension.clientOrNull<TrackerMarkClient, Unit> { onMarkAsPlayed(details) }
+        val ext = resolveExtension(details.track.extras[EXTENSION_ID]) ?: return
+        ext.clientOrNull<TrackerMarkClient, Unit> { onMarkAsPlayed(details) }
     }
 
     override suspend fun onPlayingStateChanged(details: TrackDetails?, isPlaying: Boolean) {
-        val id = details?.track?.extras?.extensionId ?: return
-        val extension = extensions().get(id)
-        extension.clientOrNull<TrackerClient, Unit> { onPlayingStateChanged(details, isPlaying) }
+        val ext = resolveExtension(details?.track?.extras?.get(EXTENSION_ID)) ?: return
+        ext.clientOrNull<TrackerClient, Unit> { onPlayingStateChanged(details, isPlaying) }
     }
 
     override suspend fun getMarkAsPlayedDuration(details: TrackDetails): Long? {
-        val extension = extensions().get(details.track.extras.extensionId)
-        return extension.clientOrNull<TrackerMarkClient, Long?> { getMarkAsPlayedDuration(details) }
+        val ext = resolveExtension(details.track.extras[EXTENSION_ID]) ?: return null
+        return ext.clientOrNull<TrackerMarkClient, Long?> { getMarkAsPlayedDuration(details) }
     }
 
     override suspend fun onShare(item: EchoMediaItem): String {
-        val id = item.extras.extensionId
-        val extension = extensions().get(id)
-        return extension.client<ShareClient, String> { onShare(item) }
+        val ext = resolveExtension(item.extras[EXTENSION_ID]) ?: return ""
+        return ext.clientOrNull<ShareClient, String> { onShare(item) } ?: ""
     }
 
     override suspend fun isFollowing(item: EchoMediaItem): Boolean {
-        val id = item.extras.extensionId
-        val extension = extensions().get(id)
-        return extension.client<FollowClient, Boolean> { isFollowing(item) }
+        val ext = resolveExtension(item.extras[EXTENSION_ID]) ?: return false
+        return ext.clientOrNull<FollowClient, Boolean> { isFollowing(item) } ?: false
     }
 
     override suspend fun getFollowersCount(item: EchoMediaItem): Long? {

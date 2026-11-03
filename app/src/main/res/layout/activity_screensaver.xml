@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/screensaverRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:fitsSystemWindows="false"
+    android:keepScreenOn="true">
+
+    <!-- 1. FULLSCREEN 3D MOSAIC GRID WALLPAPER -->
+    <ImageView
+        android:id="@+id/ivScreensaverBackdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/screensaver_bg"
+        android:importantForAccessibility="no" />
+
+    <!-- Dark Ambient Vignette -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#33000000" />
+
+    <!-- Top Floating Exit Button -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/btnCloseScreensaver"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="42dp"
+        android:layout_marginEnd="20dp"
+        app:cardBackgroundColor="#80101420"
+        app:cardCornerRadius="19dp"
+        app:strokeColor="#33FFFFFF"
+        app:strokeWidth="1dp">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_close"
+            app:tint="@color/audix_white"
+            android:importantForAccessibility="no" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- 2. PIXEL-PERFECT FLOATING APPLE/MOSAIC CARD CONSOLE -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardScreensaverConsole"
+        android:layout_width="356dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        app:cardBackgroundColor="#FA10131B"
+        app:cardCornerRadius="34dp"
+        app:cardElevation="36dp"
+        app:strokeColor="#50FFFFFF"
+        app:strokeWidth="1.5dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="22dp"
+            android:paddingTop="22dp"
+            android:paddingBottom="24dp">
+
+            <!-- Square Album Artwork (Rounded corners) -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                app:cardBackgroundColor="#0A0C12"
+                app:cardCornerRadius="26dp"
+                app:cardElevation="8dp"
+                app:strokeColor="#25FFFFFF"
+                app:strokeWidth="1dp">
+
+                <ImageView
+                    android:id="@+id/ivScreensaverCover"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/art_music"
+                    android:importantForAccessibility="no" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Song Info & Device / Cast Row -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/btnScreensaverAirplay"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvDeviceSpec"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Nightly • Studio Hi-Res"
+                        android:textColor="@color/audix_text_secondary"
+                        android:textSize="11.5sp"
+                        android:textStyle="normal" />
+
+                    <TextView
+                        android:id="@+id/tvScreensaverTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/audix_white"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="-0.02"
+                        tools:text="Tum Hi Ho" />
+
+                    <TextView
+                        android:id="@+id/tvScreensaverArtist"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/audix_text_secondary"
+                        android:textSize="13sp"
+                        tools:text="Arijit Singh, Mithoon • Aashiqui 2" />
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/btnScreensaverAirplay"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_airplay"
+                    app:tint="@color/audix_white"
+                    android:importantForAccessibility="no" />
+            </RelativeLayout>
+
+            <!-- Progress Scrubber with Timestamps -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical">
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderProgress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="-12dp"
+                    android:value="0.0"
+                    android:valueFrom="0.0"
+                    android:valueTo="1.0"
+                    app:thumbColor="@color/audix_white"
+                    app:thumbRadius="5dp"
+                    app:trackColorActive="@color/audix_white"
+                    app:trackColorInactive="#55FFFFFF"
+                    app:trackHeight="3.5dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="-4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvCurrentTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0:00"
+                        android:textColor="@color/audix_text_secondary"
+                        android:textSize="11sp" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/tvTotalDuration"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="-0:00"
+                        android:textColor="@color/audix_text_secondary"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Playback Controls (Prev <<, Play/Pause ||, Next >>) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <!-- Fast Rewind / Prev -->
+                <ImageView
+                    android:id="@+id/btnPrevious"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:layout_marginEnd="24dp"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_skip_previous_40dp"
+                    app:tint="@color/audix_white"
+                    android:importantForAccessibility="no" />
+
+                <!-- Big Play / Pause Button -->
+                <ImageView
+                    android:id="@+id/btnPlayPause"
+                    android:layout_width="58dp"
+                    android:layout_height="58dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_pause_to_play_48dp_anim"
+                    app:tint="@color/audix_white"
+                    android:importantForAccessibility="no" />
+
+                <!-- Fast Forward / Next -->
+                <ImageView
+                    android:id="@+id/btnNext"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="24dp"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_skip_next_40dp"
+                    app:tint="@color/audix_white"
+                    android:importantForAccessibility="no" />
+            </LinearLayout>
+
+            <!-- Volume Slider Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_volume_down"
+                    app:tint="@color/audix_text_secondary"
+                    android:importantForAccessibility="no" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderVolume"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="-6dp"
+                    android:layout_weight="1"
+                    android:value="0.8"
+                    android:valueFrom="0.0"
+                    android:valueTo="1.0"
+                    app:thumbColor="@color/audix_white"
+                    app:thumbRadius="5dp"
+                    app:trackColorActive="@color/audix_white"
+                    app:trackColorInactive="#55FFFFFF"
+                    app:trackHeight="3.5dp" />
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_volume_up"
+                    app:tint="@color/audix_text_secondary"
+                    android:importantForAccessibility="no" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

@@ -77,7 +77,7 @@ class MainApplication : Application(), KoinStartup, SingletonImageLoader.Factory
                     .maxSizeBytes(262_144_000L) // 250MB
                     .build()
             }
-            .allowHardware(false)
+            .allowHardware(true)
             .crossfade(true)
             .build()
     }

@@ -61,15 +61,28 @@ if os.path.exists(clock_img_path):
     classes_to_update['images/cosmic_clock_dial.png'] = clock_bytes
     print(f'[2/5] Loaded cosmic clock dial asset ({len(clock_bytes)} bytes)')
 
-logo_img_path = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\audix_logo.png')
-if os.path.exists(logo_img_path):
-    with open(logo_img_path, 'rb') as f_logo:
+nightly_logo_path = os.path.join(PROJECT_ROOT, r"desktopApp\src\desktopMain\resources\images\nightly_logo.png")
+nightly_square_path = os.path.join(PROJECT_ROOT, r"desktopApp\src\desktopMain\resources\images\nightly_logo_square.png")
+logo_img_path = os.path.join(PROJECT_ROOT, r"desktopApp\src\desktopMain\resources\images\audix_logo.png")
+if os.path.exists(nightly_logo_path):
+    with open(nightly_logo_path, "rb") as f_nl:
+        nl_bytes = f_nl.read()
+    classes_to_update["images/nightly_logo.png"] = nl_bytes
+    classes_to_update["images/audix_logo.png"] = nl_bytes
+    classes_to_update["images/spothub_logo.png"] = nl_bytes
+if os.path.exists(nightly_square_path):
+    with open(nightly_square_path, "rb") as f_nsq:
+        nsq_bytes = f_nsq.read()
+    classes_to_update["images/nightly_logo_square.png"] = nsq_bytes
+    classes_to_update["images/audix_logo_square.png"] = nsq_bytes
+    print(f"[2/5] Loaded Nightly brand logo assets ({len(nsq_bytes)} bytes)")
+elif os.path.exists(logo_img_path):
+    with open(logo_img_path, "rb") as f_logo:
         logo_bytes = f_logo.read()
-    classes_to_update['images/audix_logo.png'] = logo_bytes
-    classes_to_update['images/audix_logo_square.png'] = logo_bytes
-    classes_to_update['images/spothub_logo.png'] = logo_bytes
-    print(f'[2/5] Loaded logo image assets ({len(logo_bytes)} bytes)')
-
+    classes_to_update["images/audix_logo.png"] = logo_bytes
+    classes_to_update["images/audix_logo_square.png"] = logo_bytes
+    classes_to_update["images/spothub_logo.png"] = logo_bytes
+    print(f"[2/5] Loaded logo image assets ({len(logo_bytes)} bytes)")
 # Read all background theme images and thumbnails
 bg_dir = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\backgrounds')
 if os.path.exists(bg_dir):
@@ -188,10 +201,13 @@ for rd in res_dirs:
     if os.path.exists(bg_img_path):
         shutil.copy2(bg_img_path, os.path.join(rd, 'audix_bg.jpg'))
         shutil.copy2(bg_img_path, os.path.join(rd, 'music_notes_bg.jpg'))
-    if os.path.exists(logo_img_path):
-        shutil.copy2(logo_img_path, os.path.join(rd, 'audix_logo.png'))
-        shutil.copy2(logo_img_path, os.path.join(rd, 'audix_logo_square.png'))
-        shutil.copy2(logo_img_path, os.path.join(rd, 'spothub_logo.png'))
+    if os.path.exists(nightly_logo_path):
+        shutil.copy2(nightly_logo_path, os.path.join(rd, 'nightly_logo.png'))
+        shutil.copy2(nightly_logo_path, os.path.join(rd, 'audix_logo.png'))
+        shutil.copy2(nightly_logo_path, os.path.join(rd, 'spothub_logo.png'))
+    if os.path.exists(nightly_square_path):
+        shutil.copy2(nightly_square_path, os.path.join(rd, 'nightly_logo_square.png'))
+        shutil.copy2(nightly_square_path, os.path.join(rd, 'audix_logo_square.png'))
     if os.path.exists(clock_img_path):
         shutil.copy2(clock_img_path, os.path.join(rd, 'cosmic_clock_dial.png'))
     bg_src_dir = os.path.join(PROJECT_ROOT, r'desktopApp\src\desktopMain\resources\images\backgrounds')
@@ -248,21 +264,16 @@ for dj in desktopapp_jars:
             pass
         print(f'   Updated {dj} with all extension bundles.')
 
-# Update the current portable zip (Audix-v1.0.3-Windows-Portable.zip)
-zip_v104 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.4-Windows-Portable.zip')
-zip_v103 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.3-Windows-Portable.zip')
-zip_v102 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.2-Windows-Portable.zip')
-zip_v101 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.1-Windows-Portable.zip')
-if not os.path.exists(zip_v104):
-    if os.path.exists(zip_v103):
-        shutil.copy2(zip_v103, zip_v104)
-if not os.path.exists(zip_v103):
-    if os.path.exists(zip_v102):
-        shutil.copy2(zip_v102, zip_v103)
-    elif os.path.exists(zip_v101):
-        shutil.copy2(zip_v101, zip_v103)
+# Update the canonical Nightly portable distribution zip
+nightly_zip = os.path.join(PROJECT_ROOT, r'release-artifacts\Nightly-v1.0.4-Windows-Portable.zip')
+audix_zip = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-v1.0.4-Windows-Portable.zip')
+if os.path.exists(audix_zip):
+    try:
+        os.remove(audix_zip)
+    except Exception:
+        pass
 
-portable_zips = [zip_v104, zip_v103]
+portable_zips = [nightly_zip]
 for portable_zip in portable_zips:
     if os.path.exists(portable_zip):
         print(f'[5/5] Updating portable distribution zip: {portable_zip}...')
@@ -284,8 +295,8 @@ for portable_zip in portable_zips:
         if os.path.exists(cfg_path):
             with open(cfg_path, 'rb') as f_cfg:
                 cfg_bytes = f_cfg.read()
-        bat1 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Audix.bat')
-        bat2 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Audix-Debug.bat')
+        bat1 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Nightly.bat')
+        bat2 = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\Run-Nightly-Debug.bat')
         with open(bat1, 'rb') as f1: bat1_bytes = f1.read()
         with open(bat2, 'rb') as f2: bat2_bytes = f2.read()
         with zipfile.ZipFile(portable_zip, 'r') as zin, zipfile.ZipFile(zip_temp, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
@@ -293,13 +304,24 @@ for portable_zip in portable_zips:
                 rel_in_zip,
                 rel_desktopapp,
                 'Audix-Windows-Portable/app/Audix.cfg',
+                'Audix-Windows-Portable/app/Nightly.cfg',
                 'Audix-Windows-Portable/app/resources/images/audix_bg.jpg',
                 'Audix-Windows-Portable/app/resources/images/music_notes_bg.jpg',
                 'Audix-Windows-Portable/app/resources/images/audix_bg_32k_master.jpg',
                 'Audix-Windows-Portable/app/resources/images/cosmic_clock_dial.png',
+                'Audix-Windows-Portable/app/resources/images/nightly_logo.png',
+                'Audix-Windows-Portable/app/resources/images/nightly_logo_square.png',
+                'Audix-Windows-Portable/app/resources/images/audix_logo.png',
+                'Audix-Windows-Portable/app/resources/images/audix_logo_square.png',
+                'Audix-Windows-Portable/app/resources/images/spothub_logo.png',
                 'Audix-Windows-Portable/Run-Audix.bat',
-                'Audix-Windows-Portable/Run-Audix-Debug.bat'
+                'Audix-Windows-Portable/Run-Audix-Debug.bat',
+                'Audix-Windows-Portable/Run-Nightly.bat',
+                'Audix-Windows-Portable/Run-Nightly-Debug.bat'
             }
+            if os.path.exists(mb_dir):
+                for f in os.listdir(mb_dir):
+                    skip_items.add(f'Audix-Windows-Portable/app/resources/moviebox/{f}')
             for name in extension_jars.keys():
                 skip_items.add(f'Audix-Windows-Portable/app/resources/extensions/{name}')
 
@@ -322,8 +344,19 @@ for portable_zip in portable_zips:
             if os.path.exists(clock_img_path):
                 with open(clock_img_path, 'rb') as f_c:
                     zout.writestr('Audix-Windows-Portable/app/resources/images/cosmic_clock_dial.png', f_c.read())
-            zout.writestr('Audix-Windows-Portable/Run-Audix.bat', bat1_bytes)
-            zout.writestr('Audix-Windows-Portable/Run-Audix-Debug.bat', bat2_bytes)
+            if os.path.exists(nightly_logo_path):
+                with open(nightly_logo_path, 'rb') as f_nl:
+                    nl_data = f_nl.read()
+                    zout.writestr('Audix-Windows-Portable/app/resources/images/nightly_logo.png', nl_data)
+                    zout.writestr('Audix-Windows-Portable/app/resources/images/audix_logo.png', nl_data)
+                    zout.writestr('Audix-Windows-Portable/app/resources/images/spothub_logo.png', nl_data)
+            if os.path.exists(nightly_square_path):
+                with open(nightly_square_path, 'rb') as f_nsq:
+                    nsq_data = f_nsq.read()
+                    zout.writestr('Audix-Windows-Portable/app/resources/images/nightly_logo_square.png', nsq_data)
+                    zout.writestr('Audix-Windows-Portable/app/resources/images/audix_logo_square.png', nsq_data)
+            zout.writestr('Audix-Windows-Portable/Run-Nightly.bat', bat1_bytes)
+            zout.writestr('Audix-Windows-Portable/Run-Nightly-Debug.bat', bat2_bytes)
             for name, data in extension_jars.items():
                 zout.writestr(f'Audix-Windows-Portable/app/resources/extensions/{name}', data)
 
@@ -358,7 +391,7 @@ for portable_zip in portable_zips:
             shutil.copy2(audix_cfg, nightly_cfg)
 
         nightly_zip = os.path.join(PROJECT_ROOT, r'release-artifacts\Nightly-v1.0.4-Windows-Portable.zip')
-        if os.path.exists(portable_zip):
+        if os.path.exists(portable_zip) and portable_zip != nightly_zip:
             shutil.copy2(portable_zip, nightly_zip)
             print(f'   Synchronized {nightly_zip} successfully.')
 

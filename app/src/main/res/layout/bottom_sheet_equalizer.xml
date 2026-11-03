@@ -1,0 +1,520 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/audix_bg_surface"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="36dp">
+
+        <!-- Top Drag Pill -->
+        <View
+            android:layout_width="38dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:alpha="0.4"
+            android:background="@drawable/rounded_rectangle_24dp"
+            android:backgroundTint="@color/audix_white" />
+
+        <!-- Title & Spec Badge -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🎚️ Studio Equalizer"
+                android:textColor="@color/audix_white"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:letterSpacing="-0.02" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_audix_badge_soundstage"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:text="32-BIT DSP"
+                android:textColor="@color/audix_cyan_bright"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="Pro-grade studio frequency sculpting and spatial enhancement engine."
+            android:textColor="@color/audix_text_secondary"
+            android:textSize="12sp" />
+
+        <!-- Presets Horizontal Ribbon -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:clipToPadding="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/llPresets"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/presetFlat"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_audix_pill_filter"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="Studio Flat"
+                    android:textColor="@color/audix_cyan_bright"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/presetBass"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_audix_pill_filter"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="Bass Supreme"
+                    android:textColor="@color/audix_white"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/presetVocal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_audix_pill_filter"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="Vocal Clarity"
+                    android:textColor="@color/audix_white"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/presetElectronic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_audix_pill_filter"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="Electronic Pulse"
+                    android:textColor="@color/audix_white"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/presetRock"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_audix_pill_filter"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="Rock / Metal"
+                    android:textColor="@color/audix_white"
+                    android:textSize="11.5sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- 5-Band Equalizer Sliders Container -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_audix_card_glass"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Band 1: 60 Hz (Sub Bass) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="70dp"
+                    android:layout_height="wrap_content"
+                    android:text="60 Hz"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderBand0"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:value="0.0"
+                    android:valueFrom="-12.0"
+                    android:valueTo="12.0"
+                    android:stepSize="1.0"
+                    app:thumbColor="@color/audix_cyan_bright"
+                    app:trackColorActive="@color/audix_cyan_bright" />
+
+                <TextView
+                    android:id="@+id/tvBand0"
+                    android:layout_width="45dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="0 dB"
+                    android:textColor="@color/audix_cyan_bright"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Band 2: 230 Hz (Mid Bass) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="70dp"
+                    android:layout_height="wrap_content"
+                    android:text="230 Hz"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderBand1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:value="0.0"
+                    android:valueFrom="-12.0"
+                    android:valueTo="12.0"
+                    android:stepSize="1.0"
+                    app:thumbColor="@color/audix_cyan"
+                    app:trackColorActive="@color/audix_cyan" />
+
+                <TextView
+                    android:id="@+id/tvBand1"
+                    android:layout_width="45dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="0 dB"
+                    android:textColor="@color/audix_cyan"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Band 3: 910 Hz (Mids) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="70dp"
+                    android:layout_height="wrap_content"
+                    android:text="910 Hz"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderBand2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:value="0.0"
+                    android:valueFrom="-12.0"
+                    android:valueTo="12.0"
+                    android:stepSize="1.0"
+                    app:thumbColor="@color/audix_emerald"
+                    app:trackColorActive="@color/audix_emerald" />
+
+                <TextView
+                    android:id="@+id/tvBand2"
+                    android:layout_width="45dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="0 dB"
+                    android:textColor="@color/audix_emerald"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Band 4: 3.6 kHz (High Mids) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="70dp"
+                    android:layout_height="wrap_content"
+                    android:text="3.6 kHz"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderBand3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:value="0.0"
+                    android:valueFrom="-12.0"
+                    android:valueTo="12.0"
+                    android:stepSize="1.0"
+                    app:thumbColor="@color/audix_gold"
+                    app:trackColorActive="@color/audix_gold" />
+
+                <TextView
+                    android:id="@+id/tvBand3"
+                    android:layout_width="45dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="0 dB"
+                    android:textColor="@color/audix_gold"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Band 5: 14 kHz (Treble) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="70dp"
+                    android:layout_height="wrap_content"
+                    android:text="14 kHz"
+                    android:textColor="@color/audix_white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderBand4"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:value="0.0"
+                    android:valueFrom="-12.0"
+                    android:valueTo="12.0"
+                    android:stepSize="1.0"
+                    app:thumbColor="@color/audix_crimson"
+                    app:trackColorActive="@color/audix_crimson" />
+
+                <TextView
+                    android:id="@+id/tvBand4"
+                    android:layout_width="45dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="0 dB"
+                    android:textColor="@color/audix_crimson"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Bass Boost & Virtualizer 3D Effects -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_audix_card_glass"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Sub-Bass Boost"
+                    android:textColor="@color/audix_white"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvBassBoostVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="20%"
+                    android:textColor="@color/audix_cyan_bright"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderBassBoost"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:value="20.0"
+                android:valueFrom="0.0"
+                android:valueTo="100.0"
+                app:thumbColor="@color/audix_cyan_bright"
+                app:trackColorActive="@color/audix_cyan_bright" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="3D Spatial Virtualizer"
+                    android:textColor="@color/audix_white"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvVirtualizerVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="15%"
+                    android:textColor="@color/audix_purple"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderVirtualizer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:value="15.0"
+                android:valueFrom="0.0"
+                android:valueTo="100.0"
+                app:thumbColor="@color/audix_purple"
+                app:trackColorActive="@color/audix_purple" />
+        </LinearLayout>
+
+        <!-- Audio Engine Latency & Normalization Options -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_audix_card_glass"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/switchNormalization"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Audio Normalization"
+                        android:textColor="@color/audix_white"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Equalize volume across different tracks &amp; extensions"
+                        android:textColor="@color/audix_text_secondary"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchNormalization"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:checked="true" />
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/switchLowLatency"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Studio Low-Latency Buffer"
+                        android:textColor="@color/audix_white"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ultra-fast seek and responsiveness (150ms buffer)"
+                        android:textColor="@color/audix_text_secondary"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchLowLatency"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:checked="true" />
+            </RelativeLayout>
+        </LinearLayout>
+
+        <!-- Reset Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnResetEqualizer"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="#162238"
+            android:text="Reset to Flat Response"
+            android:textColor="@color/audix_white"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:cornerRadius="12dp"
+            app:strokeColor="#24344E"
+            app:strokeWidth="1dp" />
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

@@ -28,7 +28,7 @@ object AudixBuiltInExtensions {
         description = "Browse Spotify Top Charts, Today's Top Hits, Viral 50, and stream high-fidelity tracks.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     val saavnMetadata = Metadata(
@@ -41,7 +41,7 @@ object AudixBuiltInExtensions {
         description = "High-Fidelity 320kbps Bollywood, Punjabi, Regional & International catalog with original covers.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     val youtubeMetadata = Metadata(
@@ -54,7 +54,7 @@ object AudixBuiltInExtensions {
         description = "Comprehensive music streaming, live performances, official tracks, and remixes.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     val soundcloudMetadata = Metadata(
@@ -67,7 +67,7 @@ object AudixBuiltInExtensions {
         description = "Independent music, electronic beats, remixes, underground playlists, and original creator tracks.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     val radioBrowserMetadata = Metadata(
@@ -80,7 +80,7 @@ object AudixBuiltInExtensions {
         description = "Global community radio stations, live news, and ambient broadcasts from around the world.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     val geniusMetadata = Metadata(
@@ -93,7 +93,7 @@ object AudixBuiltInExtensions {
         description = "Synchronized lyrics, artist commentary, and comprehensive song annotations.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     val lrclibMetadata = Metadata(
@@ -106,7 +106,7 @@ object AudixBuiltInExtensions {
         description = "Time-synced and plain text lyrics database for audio tracks.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     val musixmatchMetadata = Metadata(
@@ -119,7 +119,7 @@ object AudixBuiltInExtensions {
         description = "Real-time synced lyrics with rich metadata translations.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     val lastfmMetadata = Metadata(
@@ -132,7 +132,7 @@ object AudixBuiltInExtensions {
         description = "Automatic track scrobbling and playback statistics tracking.",
         version = "1.0.0",
         author = "Audix",
-        icon = R.drawable.ic_audix_logo.toResourceImageHolder()
+        icon = R.drawable.ic_nightly_logo.toResourceImageHolder()
     )
 
     fun getBuiltIns(): List<Pair<Metadata, Lazy<ExtensionClient>>> = listOf(

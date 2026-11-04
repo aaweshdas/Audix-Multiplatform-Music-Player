@@ -74,8 +74,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         getTouchHelper(listener).attachToRecyclerView(binding.recyclerView)
         binding.recyclerView.apply {
             setItemViewCacheSize(25)
-            isDrawingCacheEnabled = true
-            drawingCacheQuality = View.DRAWING_CACHE_QUALITY_HIGH
         }
         configureGridLayout(
             binding.recyclerView,

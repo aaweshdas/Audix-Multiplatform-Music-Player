@@ -223,13 +223,16 @@ class UiViewModel(
     companion object {
         const val BACKGROUND_GRADIENT = "bg_gradient"
         fun Fragment.applyGradient(view: View, drawable: Drawable?) {
-            val settings = requireContext().getSettings()
-            val isGradient = settings.getBoolean(BACKGROUND_GRADIENT, true)
-            val drawable = if (isGradient) {
-                drawable ?: MaterialColors.getColor(view, androidx.appcompat.R.attr.colorPrimary)
-                    .toDrawable()
-            } else null
-            view.background = GradientDrawable.createBlurred(view, drawable)
+            runCatching {
+                val ctx = context ?: return@runCatching
+                val settings = ctx.getSettings()
+                val isGradient = settings.getBoolean(BACKGROUND_GRADIENT, true)
+                val target = if (isGradient) {
+                    drawable ?: MaterialColors.getColor(view, androidx.appcompat.R.attr.colorPrimary)
+                        .toDrawable()
+                } else null
+                view.background = GradientDrawable.createBlurred(view, target)
+            }
         }
 
         fun Fragment.applyInsets(vararg flows: Flow<*>, block: UiViewModel.(Insets) -> Unit) {

@@ -70,13 +70,20 @@ class LockScreenScreensaverManager(
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_USER_PRESENT)
         }
-        ContextCompat.registerReceiver(
-            context,
-            screenReceiver,
-            filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        isReceiverRegistered = true
+        runCatching {
+            ContextCompat.registerReceiver(
+                context,
+                screenReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            isReceiverRegistered = true
+        }.onFailure {
+            runCatching {
+                context.registerReceiver(screenReceiver, filter)
+                isReceiverRegistered = true
+            }
+        }
     }
 
     fun stop() {
@@ -150,7 +157,7 @@ class LockScreenScreensaverManager(
             .setContentTitle("Nightly Screensaver")
             .setContentText("Ambient Soundstage Active")
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setFullScreenIntent(pendingIntent, true)
             .setAutoCancel(true)

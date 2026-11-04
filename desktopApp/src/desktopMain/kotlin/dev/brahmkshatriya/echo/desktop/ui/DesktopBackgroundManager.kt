@@ -188,31 +188,48 @@ object DesktopBackgroundManager {
         return userDir
     }
 
+    private val ALLOWED_IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp", "bmp")
+
     fun addCustomWallpaper(file: File, customTitle: String? = null): BackgroundWallpaper? {
         if (!file.exists() || !file.isFile) return null
         return runCatching {
-            val dir = getCustomWallpapersDir()
+            val ext = file.extension.lowercase().ifBlank { "png" }
+            if (!ALLOWED_IMAGE_EXTENSIONS.contains(ext)) {
+                System.err.println("[DesktopBackgroundManager] Security violation: Rejected non-image extension: $ext")
+                return null
+            }
+
+            // Verify file is a readable genuine image
+            val origImg = runCatching { ImageIO.read(file) }.getOrNull()
+            if (origImg == null) {
+                System.err.println("[DesktopBackgroundManager] Security violation: Failed to decode image format: ${file.name}")
+                return null
+            }
+
+            val dir = getCustomWallpapersDir().canonicalFile
             val timestamp = System.currentTimeMillis()
             val safeName = file.nameWithoutExtension.replace("[^a-zA-Z0-9_-]".toRegex(), "_").take(30)
-            val ext = file.extension.lowercase().ifBlank { "png" }
-            val targetFile = File(dir, "custom_${timestamp}_${safeName}.$ext")
-            val thumbFile = File(dir, "custom_${timestamp}_${safeName}_thumb.jpg")
+            val targetFile = File(dir, "custom_${timestamp}_${safeName}.$ext").canonicalFile
+            val thumbFile = File(dir, "custom_${timestamp}_${safeName}_thumb.jpg").canonicalFile
+
+            // Path traversal assertion
+            if (!targetFile.toPath().startsWith(dir.toPath()) || !thumbFile.toPath().startsWith(dir.toPath())) {
+                System.err.println("[DesktopBackgroundManager] Security violation: Path traversal detected in target wallpaper path")
+                return null
+            }
 
             file.copyTo(targetFile, overwrite = true)
 
             // Generate high quality thumbnail
             runCatching {
-                val origImg = ImageIO.read(targetFile)
-                if (origImg != null) {
-                    val thumbWidth = 400
-                    val thumbHeight = ((thumbWidth.toDouble() * origImg.height) / origImg.width).toInt().coerceAtLeast(100)
-                    val thumbImg = BufferedImage(thumbWidth, thumbHeight, BufferedImage.TYPE_INT_RGB)
-                    val g = thumbImg.createGraphics()
-                    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-                    g.drawImage(origImg, 0, 0, thumbWidth, thumbHeight, null)
-                    g.dispose()
-                    ImageIO.write(thumbImg, "jpg", thumbFile)
-                }
+                val thumbWidth = 400
+                val thumbHeight = ((thumbWidth.toDouble() * origImg.height) / origImg.width).toInt().coerceAtLeast(100)
+                val thumbImg = BufferedImage(thumbWidth, thumbHeight, BufferedImage.TYPE_INT_RGB)
+                val g = thumbImg.createGraphics()
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                g.drawImage(origImg, 0, 0, thumbWidth, thumbHeight, null)
+                g.dispose()
+                ImageIO.write(thumbImg, "jpg", thumbFile)
             }
 
             val nameDisplay = customTitle ?: file.nameWithoutExtension.replace('_', ' ').replace('-', ' ').trim()
@@ -244,9 +261,24 @@ object DesktopBackgroundManager {
         _wallpapers.value = updated
         persistCustomManifest(updated.filter { it.isCustom })
 
+        val dir = getCustomWallpapersDir().canonicalFile
         runCatching {
-            target.filePath?.let { File(it).takeIf { f -> f.exists() }?.delete() }
-            target.thumbFilePath?.let { File(it).takeIf { f -> f.exists() }?.delete() }
+            target.filePath?.let { pathStr ->
+                val f = File(pathStr).canonicalFile
+                if (f.exists() && f.toPath().startsWith(dir.toPath())) {
+                    f.delete()
+                } else if (f.exists()) {
+                    System.err.println("[DesktopBackgroundManager] Security violation: Refused deleting file outside wallpapers dir: $f")
+                }
+            }
+            target.thumbFilePath?.let { pathStr ->
+                val f = File(pathStr).canonicalFile
+                if (f.exists() && f.toPath().startsWith(dir.toPath())) {
+                    f.delete()
+                } else if (f.exists()) {
+                    System.err.println("[DesktopBackgroundManager] Security violation: Refused deleting thumb outside wallpapers dir: $f")
+                }
+            }
             bitmapCache.remove(id)
             blurredBitmapCache.remove(id)
             thumbCache.remove(id)
@@ -258,16 +290,23 @@ object DesktopBackgroundManager {
     }
 
     private fun loadCustomWallpapers(): List<BackgroundWallpaper> {
-        val dir = getCustomWallpapersDir()
+        val dir = getCustomWallpapersDir().canonicalFile
         val savedManifest = echoSettings?.getString("custom_wallpaper_manifest", "") ?: ""
         val fromManifest = mutableListOf<BackgroundWallpaper>()
 
         if (savedManifest.isNotBlank()) {
+            val dirPath = dir.toPath()
             savedManifest.lines().forEach { line ->
                 val parts = line.split("|")
                 if (parts.size >= 4) {
-                    val f = File(parts[2])
-                    if (f.exists() && f.isFile) {
+                    val f = File(parts[2]).canonicalFile
+                    if (f.exists() && f.isFile && f.toPath().startsWith(dirPath)) {
+                        val thumbFile = parts.getOrNull(3)?.let { File(it).canonicalFile }
+                        val safeThumb = if (thumbFile != null && thumbFile.exists() && thumbFile.toPath().startsWith(dirPath)) {
+                            thumbFile.absolutePath
+                        } else {
+                            f.absolutePath
+                        }
                         fromManifest.add(
                             BackgroundWallpaper(
                                 id = parts[0],
@@ -276,7 +315,7 @@ object DesktopBackgroundManager {
                                 resourcePath = null,
                                 thumbResourcePath = null,
                                 filePath = f.absolutePath,
-                                thumbFilePath = parts.getOrNull(3)?.takeIf { File(it).exists() } ?: f.absolutePath,
+                                thumbFilePath = safeThumb,
                                 isCustom = true,
                                 dateAdded = parts.getOrNull(4)?.toLongOrNull() ?: 0L
                             )

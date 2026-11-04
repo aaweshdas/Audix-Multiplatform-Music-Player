@@ -50,12 +50,19 @@ object AppShortcuts {
         val max = maxOf(width, height)
         val padding = (max * percentage).roundToInt().toFloat()
         val diameter = (max + padding * 2).toInt()
-        val newBitmap = createBitmap(diameter, diameter, config ?: Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(newBitmap)
-        newBitmap.applyCanvas {
-//            canvas.drawColor(getCommonColor())
-            canvas.drawBitmap(this@addPadding, padding, padding, null)
+        val safeSource = if (config == Bitmap.Config.HARDWARE) {
+            runCatching { copy(Bitmap.Config.ARGB_8888, false) }.getOrNull() ?: this
+        } else {
+            this
         }
+        val safeConfig = when (safeSource.config) {
+            Bitmap.Config.RGB_565 -> Bitmap.Config.RGB_565
+            Bitmap.Config.ALPHA_8 -> Bitmap.Config.ALPHA_8
+            else -> Bitmap.Config.ARGB_8888
+        }
+        val newBitmap = Bitmap.createBitmap(diameter, diameter, safeConfig)
+        val canvas = Canvas(newBitmap)
+        canvas.drawBitmap(safeSource, padding, padding, null)
         return newBitmap
     }
 

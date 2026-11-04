@@ -201,8 +201,10 @@ class EqualizerBottomSheet : BottomSheetDialogFragment() {
         runCatching {
             val eq = equalizer ?: return@runCatching
             if (index < eq.numberOfBands) {
-                // dB * 100 = millibels
-                val mb = (db * 100).toInt().coerceIn(eq.bandLevelRange[0].toInt(), eq.bandLevelRange[1].toInt()).toShort()
+                val range = eq.bandLevelRange
+                val minR = minOf(range.getOrNull(0)?.toInt() ?: -1500, range.getOrNull(1)?.toInt() ?: 1500)
+                val maxR = maxOf(range.getOrNull(0)?.toInt() ?: -1500, range.getOrNull(1)?.toInt() ?: 1500)
+                val mb = (db * 100).toInt().coerceIn(minR, maxR).toShort()
                 eq.setBandLevel(index.toShort(), mb)
             }
         }

@@ -219,7 +219,7 @@ class JarExtensionRepository @JvmOverloads constructor(
                     className = fullClassName,
                     path = jarPath,
                     importType = ImportType.File,
-                    type = ExtensionType.valueOf(dto.type.uppercase()),
+                    type = ExtensionType.entries.firstOrNull { it.name.equals(dto.type.trim(), ignoreCase = true) } ?: ExtensionType.MISC,
                     id = dto.id,
                     name = dto.name,
                     version = dto.version,

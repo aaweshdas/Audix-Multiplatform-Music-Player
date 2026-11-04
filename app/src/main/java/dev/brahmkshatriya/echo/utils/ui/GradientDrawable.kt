@@ -1,6 +1,7 @@
 package dev.brahmkshatriya.echo.utils.ui
 
 import android.R.attr.colorPrimary
+import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Color
 import android.graphics.ComposeShader
@@ -56,81 +57,87 @@ object GradientDrawable {
 
     private const val RATIO = 0.33f
     private val maxColor = Color.argb(128, 0, 0, 0)
+
     fun createBlurred(view: View, toBlur: Drawable?): Drawable {
         val background = MaterialColors.getColor(view, R.attr.echoBackground)
         val primary = MaterialColors.getColor(view, colorPrimary)
         if (toBlur == null) return background.toDrawable()
-        val noise = ResourcesCompat.getDrawable(
-            view.resources, R.drawable.grain_noise, view.context.theme
-        )!!.toBitmap()
-        val bitmap = toBlur.run {
-            toBitmap(
-                intrinsicWidth.coerceAtLeast(1),
-                intrinsicHeight.coerceAtLeast(1),
-            )
-        }.blurred(view.context)
-        return PaintDrawable().apply {
-            setShape(RectShape())
-            paint.shader = null
-            shaderFactory = object : ShapeDrawable.ShaderFactory() {
-                override fun resize(width: Int, height: Int): Shader {
-                    val bitmapShader =
-                        BitmapShader(bitmap, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR)
-                    val cropHeight = (height * RATIO).toInt().coerceAtLeast(1)
-                    val scale = maxOf(
-                        width.toFloat() / bitmap.width,
-                        cropHeight.toFloat() / bitmap.height
-                    )
-                    val matrix = Matrix().apply {
-                        setScale(scale, scale)
-                    }
-                    bitmapShader.setLocalMatrix(matrix)
 
-                    val primaryOverlay = LinearGradient(
-                        0f, 0f, 0f, height.toFloat(),
-                        intArrayOf(ColorUtils.setAlphaComponent(primary, 84), Color.TRANSPARENT),
-                        floatArrayOf(0f, 1f),
-                        Shader.TileMode.CLAMP
-                    )
-                    val blurredWithPrimary = ComposeShader(
-                        bitmapShader,
-                        primaryOverlay,
-                        PorterDuff.Mode.SRC_OVER
-                    )
-                    val composed = ComposeShader(
-                        blurredWithPrimary,
-                        LinearGradient(
+        return runCatching {
+            val noise = ResourcesCompat.getDrawable(
+                view.resources, R.drawable.grain_noise, view.context.theme
+            )?.toBitmap(config = Bitmap.Config.ARGB_8888) ?: return background.toDrawable()
+
+            val w = toBlur.intrinsicWidth.coerceAtLeast(1)
+            val h = toBlur.intrinsicHeight.coerceAtLeast(1)
+            val rawBitmap = toBlur.toBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val bitmap = rawBitmap.blurred(view.context)
+
+            PaintDrawable().apply {
+                setShape(RectShape())
+                paint.shader = null
+                shaderFactory = object : ShapeDrawable.ShaderFactory() {
+                    override fun resize(width: Int, height: Int): Shader {
+                        val bitmapShader =
+                            BitmapShader(bitmap, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR)
+                        val cropHeight = (height * RATIO).toInt().coerceAtLeast(1)
+                        val scale = maxOf(
+                            width.toFloat() / bitmap.width.coerceAtLeast(1),
+                            cropHeight.toFloat() / bitmap.height.coerceAtLeast(1)
+                        )
+                        val matrix = Matrix().apply {
+                            setScale(scale, scale)
+                        }
+                        bitmapShader.setLocalMatrix(matrix)
+
+                        val primaryOverlay = LinearGradient(
+                            0f, 0f, 0f, height.toFloat(),
+                            intArrayOf(ColorUtils.setAlphaComponent(primary, 84), Color.TRANSPARENT),
+                            floatArrayOf(0f, 1f),
+                            Shader.TileMode.CLAMP
+                        )
+                        val blurredWithPrimary = ComposeShader(
+                            bitmapShader,
+                            primaryOverlay,
+                            PorterDuff.Mode.SRC_OVER
+                        )
+                        val composed = ComposeShader(
+                            blurredWithPrimary,
+                            LinearGradient(
+                                0f,
+                                0f,
+                                0f,
+                                height.toFloat(),
+                                intArrayOf(maxColor, Color.TRANSPARENT, Color.TRANSPARENT),
+                                floatArrayOf(0f, RATIO, 1f),
+                                Shader.TileMode.CLAMP
+                            ),
+                            PorterDuff.Mode.DST_IN
+                        )
+                        val withNoise = ComposeShader(
+                            composed,
+                            BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT),
+                            PorterDuff.Mode.DST_IN
+                        )
+                        val backgroundShader = LinearGradient(
                             0f,
                             0f,
                             0f,
                             height.toFloat(),
-                            intArrayOf(maxColor, Color.TRANSPARENT, Color.TRANSPARENT),
-                            floatArrayOf(0f, RATIO, 1f),
+                            intArrayOf(background, background),
+                            null,
                             Shader.TileMode.CLAMP
-                        ),
-                        PorterDuff.Mode.DST_IN
-                    )
-                    val withNoise = ComposeShader(
-                        composed,
-                        BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT),
-                        PorterDuff.Mode.DST_IN
-                    )
-                    val backgroundShader = LinearGradient(
-                        0f,
-                        0f,
-                        0f,
-                        height.toFloat(),
-                        intArrayOf(background, background),
-                        null,
-                        Shader.TileMode.CLAMP
-                    )
-                    return ComposeShader(
-                        backgroundShader,
-                        withNoise,
-                        PorterDuff.Mode.SRC_OVER
-                    )
+                        )
+                        return ComposeShader(
+                            backgroundShader,
+                            withNoise,
+                            PorterDuff.Mode.SRC_OVER
+                        )
+                    }
                 }
             }
+        }.getOrElse {
+            background.toDrawable()
         }
     }
 }

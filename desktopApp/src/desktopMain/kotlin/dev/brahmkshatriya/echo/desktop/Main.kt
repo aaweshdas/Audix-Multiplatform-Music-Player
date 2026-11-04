@@ -95,11 +95,22 @@ fun main() {
         java.io.PrintWriter(java.io.BufferedWriter(java.io.FileWriter(logFile, true)), true)
     }.getOrNull()
 
-    val sensitiveRegex = Regex("""(?i)(token|client_secret|client_id|auth|key|password|credential)=([^\s&"'>]+)""")
+    val sensitiveBearerRegex = Regex("""(?i)\b(bearer\s+)([a-zA-Z0-9_\-\.]+)""")
+    val sensitiveGoogleKeyRegex = Regex("""AIza[0-9A-Za-z\-_]{35}""")
+    val sensitiveGroqKeyRegex = Regex("""gsk_[a-zA-Z0-9]{40,}""")
+    val sensitiveJsonRegex = Regex("""(?i)("(?:apiKey|api_key|access_token|client_secret|password|token|secret)"\s*:\s*")([^"]+)(")""")
+    val sensitiveUrlParamRegex = Regex("""(?i)([?&](?:key|api_key|token|access_token|sig|lsig|auth)=)([^&\s]+)""")
+    val sensitiveKeyValueRegex = Regex("""(?i)\b(token|client_secret|client_id|auth|key|password|credential|secret)\s*[:=]\s*([^\s&"'>]+)""")
+
     fun sanitizeLog(message: String): String {
-        return message.replace(sensitiveRegex) { mr ->
-            "${mr.groupValues[1]}=***REDACTED***"
-        }
+        var clean = message
+        clean = clean.replace(sensitiveGoogleKeyRegex, "***REDACTED_API_KEY***")
+        clean = clean.replace(sensitiveGroqKeyRegex, "***REDACTED_GROQ_KEY***")
+        clean = clean.replace(sensitiveBearerRegex) { mr -> "${mr.groupValues[1]}***REDACTED***" }
+        clean = clean.replace(sensitiveJsonRegex) { mr -> "${mr.groupValues[1]}***REDACTED***${mr.groupValues[3]}" }
+        clean = clean.replace(sensitiveUrlParamRegex) { mr -> "${mr.groupValues[1]}***REDACTED***" }
+        clean = clean.replace(sensitiveKeyValueRegex) { mr -> "${mr.groupValues[1]}=***REDACTED***" }
+        return clean
     }
 
     fun log(message: String) {

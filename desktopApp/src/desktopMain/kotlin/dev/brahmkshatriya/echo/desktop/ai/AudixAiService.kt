@@ -85,7 +85,7 @@ object AudixAiService {
         }
 
         try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$cleanKey"
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
             val payload = """
                 {
                     "contents": [{
@@ -101,6 +101,7 @@ object AudixAiService {
             val req = Request.Builder()
                 .url(url)
                 .header("Content-Type", "application/json")
+                .header("x-goog-api-key", cleanKey)
                 .post(payload.toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -303,8 +304,22 @@ object AudixAiService {
         )
     }
 
+    private fun extractJsonBlock(text: String): String {
+        val startIndex = text.indexOf('{')
+        val endIndex = text.lastIndexOf('}')
+        return if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+            text.substring(startIndex, endIndex + 1).trim()
+        } else {
+            text.trim()
+                .removePrefix("""```json""")
+                .removePrefix("""```""")
+                .removeSuffix("""```""")
+                .trim()
+        }
+    }
+
     private fun queryGeminiForCuration(prompt: String, apiKey: String, model: String): ParsedCuration {
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
         val systemPrompt = """
             You are Nightly AI DJ, an elite music curator.
             Analyze the user's music vibe prompt: "$prompt"
@@ -346,6 +361,7 @@ object AudixAiService {
         val req = Request.Builder()
             .url(url)
             .header("Content-Type", "application/json")
+            .header("x-goog-api-key", apiKey)
             .post(payload.toRequestBody("application/json".toMediaType()))
             .build()
 
@@ -360,11 +376,7 @@ object AudixAiService {
                 ?.firstOrNull()?.jsonObject
                 ?.get("text")?.jsonPrimitive?.content ?: throw Exception("No text in candidate")
 
-            val cleanJson = rawText.trim()
-                .removePrefix("```json")
-                .removePrefix("```")
-                .removeSuffix("```")
-                .trim()
+            val cleanJson = extractJsonBlock(rawText)
 
             val parsedObj = jsonParser.parseToJsonElement(cleanJson).jsonObject
             val title = parsedObj["title"]?.jsonPrimitive?.content ?: "Curated Vibe"
@@ -384,7 +396,7 @@ object AudixAiService {
         apiKey: String,
         model: String
     ): TrackAiInsight {
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
         val prompt = """
             Provide an insightful audio analysis for the track "$title" by "$artist".
             Respond ONLY with a valid raw JSON object (no markdown, no code block) matching this schema:
@@ -414,6 +426,7 @@ object AudixAiService {
         val req = Request.Builder()
             .url(url)
             .header("Content-Type", "application/json")
+            .header("x-goog-api-key", apiKey)
             .post(payload.toRequestBody("application/json".toMediaType()))
             .build()
 
@@ -426,11 +439,7 @@ object AudixAiService {
                 ?.get("parts")?.jsonArray?.firstOrNull()?.jsonObject
                 ?.get("text")?.jsonPrimitive?.content ?: throw Exception("No text")
 
-            val cleanJson = rawText.trim()
-                .removePrefix("```json")
-                .removePrefix("```")
-                .removeSuffix("```")
-                .trim()
+            val cleanJson = extractJsonBlock(rawText)
 
             val obj = jsonParser.parseToJsonElement(cleanJson).jsonObject
             return TrackAiInsight(

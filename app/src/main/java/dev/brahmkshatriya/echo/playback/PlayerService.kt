@@ -125,9 +125,11 @@ class PlayerService : MediaLibraryService() {
         notificationProvider.setSmallIcon(R.drawable.ic_mono)
         setMediaNotificationProvider(notificationProvider)
 
-        val lockScreenScreensaver = LockScreenScreensaverManager(this, scope, player)
-        lockScreenScreensaver.start()
-        lockScreenScreensaverManager = lockScreenScreensaver
+        runCatching {
+            val lockScreenScreensaver = LockScreenScreensaverManager(this, scope, player)
+            lockScreenScreensaver.start()
+            lockScreenScreensaverManager = lockScreenScreensaver
+        }
 
         mediaSession = session
     }

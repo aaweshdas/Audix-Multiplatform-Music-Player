@@ -33,6 +33,7 @@ class MediaViewHolder(
     ),
 ) : FeedViewHolder<FeedType.Media>(binding.root) {
     var feed: FeedType.Media? = null
+    private var lastCurrent: PlayerState.Current? = null
 
     init {
         binding.coverContainer.cover.clipToOutline = true
@@ -74,12 +75,16 @@ class MediaViewHolder(
     override fun bind(feed: FeedType.Media) {
         this.feed = feed
         binding.bind(feed.item, feed.number?.toInt())
+        binding.coverContainer.isPlaying.isVisible = false
+        binding.title.setTextColor(androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.audix_white))
+        lastCurrent?.let { onCurrentChanged(it) }
     }
 
     override fun canBeSwiped() = feed?.item is Track
     override fun onSwipe() = feed
 
     override fun onCurrentChanged(current: PlayerState.Current?) {
+        lastCurrent = current
         val itemId = feed?.item?.id
         val currTrack = current?.track
         val isThisTrack = itemId != null && (

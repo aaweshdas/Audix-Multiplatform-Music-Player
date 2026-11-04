@@ -321,8 +321,15 @@ object MoviePlayRepository {
                 val req = Request.Builder().url("$MOVIEBOX_SERVER_URL/api/status").build()
                 val ok = runCatching { httpClient.newCall(req).execute().use { it.isSuccessful } }.getOrDefault(false)
                 if (!ok) {
-                    val serverDir = File("S:/All Code/Movie Box Reverse engineer")
-                    if (serverDir.exists()) {
+                    val envDir = System.getenv("MOVIEBOX_SERVER_DIR")
+                    val candidateDirs = listOfNotNull(
+                        envDir?.let { File(it) },
+                        File("S:/All Code/Movie Box Reverse engineer"),
+                        File("moviebox_server"),
+                        File(System.getProperty("user.home"), ".nightly/moviebox_server")
+                    )
+                    val serverDir = candidateDirs.firstOrNull { it.exists() && File(it, "server/index.js").exists() }
+                    if (serverDir != null) {
                         val pb = ProcessBuilder("node", "server/index.js")
                         pb.directory(serverDir)
                         pb.redirectErrorStream(true)
@@ -611,8 +618,8 @@ object MoviePlayRepository {
                 )
 
                 val mirrorsJsonArray = mirrorOptions.joinToString(",", "[", "]") { m ->
-                    val safeTitle = m.title.replace("\"", "\\\"")
-                    val safeUrl = m.url.replace("\"", "\\\"")
+                    val safeTitle = m.title.replace("\\", "\\\\").replace("\"", "\\\"").replace("<", "&lt;").replace(">", "&gt;")
+                    val safeUrl = m.url.replace("\\", "\\\\").replace("\"", "\\\"").replace("<", "&lt;").replace(">", "&gt;")
                     """{"id":"${m.id}","title":"$safeTitle","url":"$safeUrl","res":"${m.resolution}"}"""
                 }
 
@@ -852,24 +859,47 @@ $mirrorButtonsHtml
     }
 
     fun openInBrowser(url: String) {
+        val trimmed = url.trim()
+        if (trimmed.isBlank()) return
+
+        val uri = runCatching { URI(trimmed) }.getOrNull()
+        if (uri == null) {
+            System.err.println("[MoviePlayModels] Security violation: Malformed URL rejected: $trimmed")
+            return
+        }
+
+        val scheme = uri.scheme?.lowercase()
+        val isValidHttp = scheme == "http" || scheme == "https"
+        val isAllowedLocalHtml = scheme == "file" && (trimmed.endsWith("audix_cinema_theater.html", ignoreCase = true) || trimmed.contains("audix_cinema_theater.html"))
+
+        if (!isValidHttp && !isAllowedLocalHtml) {
+            System.err.println("[MoviePlayModels] Security violation: Blocked unauthorized URI scheme: $scheme")
+            return
+        }
+
+        if (trimmed.any { it < ' ' || it == '\n' || it == '\r' || it == '\t' || it == '"' || it == '\'' }) {
+            System.err.println("[MoviePlayModels] Security violation: Blocked control/quote characters in URL: $trimmed")
+            return
+        }
+
         Thread {
             try {
                 if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                     try {
-                        Desktop.getDesktop().browse(URI.create(url))
+                        Desktop.getDesktop().browse(uri)
                         return@Thread
                     } catch (_: Exception) {}
                 }
                 val os = System.getProperty("os.name").lowercase()
                 if (os.contains("win")) {
-                    ProcessBuilder("explorer.exe", url).start()
+                    ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", trimmed).start()
+                } else if (os.contains("mac")) {
+                    ProcessBuilder("open", trimmed).start()
                 } else {
-                    ProcessBuilder("xdg-open", url).start()
+                    ProcessBuilder("xdg-open", trimmed).start()
                 }
             } catch (e: Exception) {
-                runCatching {
-                    ProcessBuilder("cmd.exe", "/c", "start", "\"\"", "\"$url\"").start()
-                }
+                System.err.println("[MoviePlayModels] Failed to open browser: ${e.message}")
             }
         }.start()
     }

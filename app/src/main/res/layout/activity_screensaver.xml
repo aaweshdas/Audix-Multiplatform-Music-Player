@@ -22,7 +22,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#26000000" />
+        android:background="#1F000000" />
 
     <!-- Top Floating Exit Button -->
     <com.google.android.material.card.MaterialCardView
@@ -32,7 +32,7 @@
         android:layout_gravity="top|end"
         android:layout_marginTop="42dp"
         android:layout_marginEnd="20dp"
-        app:cardBackgroundColor="#99101422"
+        app:cardBackgroundColor="#801C1E24"
         app:cardCornerRadius="19dp"
         app:strokeColor="#33FFFFFF"
         app:strokeWidth="1dp">
@@ -46,17 +46,17 @@
             android:importantForAccessibility="no" />
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 2. UNIFIED FROSTED NOW PLAYING CARD -->
+    <!-- 2. AUTHENTIC APPLE MUSIC FROSTED NOW PLAYING CARD -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardScreensaverMain"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:layout_marginHorizontal="24dp"
-        app:cardBackgroundColor="#F2111422"
-        app:cardCornerRadius="30dp"
-        app:cardElevation="22dp"
-        app:strokeColor="#38FFFFFF"
+        app:cardBackgroundColor="#E6202024"
+        app:cardCornerRadius="36dp"
+        app:cardElevation="24dp"
+        app:strokeColor="#30FFFFFF"
         app:strokeWidth="1.2dp">
 
         <LinearLayout
@@ -65,7 +65,7 @@
             android:orientation="vertical"
             android:paddingHorizontal="18dp"
             android:paddingTop="18dp"
-            android:paddingBottom="16dp">
+            android:paddingBottom="18dp">
 
             <!-- Square Album Artwork Card -->
             <androidx.constraintlayout.widget.ConstraintLayout
@@ -76,9 +76,9 @@
                     android:id="@+id/cardLiveArtwork"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
-                    app:cardBackgroundColor="#0A0C12"
-                    app:cardCornerRadius="24dp"
-                    app:cardElevation="8dp"
+                    app:cardBackgroundColor="#000000"
+                    app:cardCornerRadius="22dp"
+                    app:cardElevation="10dp"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintDimensionRatio="1:1"
                     app:layout_constraintEnd_toEndOf="parent"
@@ -107,54 +107,45 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
                     android:layout_toStartOf="@+id/btnScreensaverAirplay"
+                    android:paddingEnd="12dp"
                     android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tvDeviceSpec"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="NIGHTLY • STUDIO SOUNDSTAGE"
-                        android:textColor="@color/audix_cyan_bright"
-                        android:textSize="10.5sp"
-                        android:textStyle="bold"
-                        android:letterSpacing="0.04" />
 
                     <TextView
                         android:id="@+id/tvScreensaverTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
                         android:ellipsize="marquee"
                         android:marqueeRepeatLimit="marquee_forever"
                         android:singleLine="true"
                         android:textColor="@color/audix_white"
-                        android:textSize="18sp"
+                        android:textSize="17.5sp"
                         android:textStyle="bold"
-                        android:letterSpacing="-0.02"
+                        android:letterSpacing="-0.01"
                         tools:text="Tum Hi Ho" />
 
                     <TextView
                         android:id="@+id/tvScreensaverArtist"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
+                        android:layout_marginTop="2dp"
                         android:ellipsize="end"
                         android:singleLine="true"
-                        android:textColor="@color/audix_text_secondary"
-                        android:textSize="12.5sp"
-                        tools:text="Arijit Singh, Mithoon • Aashiqui 2" />
+                        android:textColor="#A6A6AA"
+                        android:textSize="13sp"
+                        tools:text="Arijit Singh, Mithoon • Nightly Soundstage" />
                 </LinearLayout>
 
                 <ImageView
                     android:id="@+id/btnScreensaverAirplay"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:padding="6dp"
-                    android:src="@drawable/ic_airplay"
+                    android:background="@drawable/bg_screensaver_airplay_circle"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_airplay_audio"
                     app:tint="@color/audix_white"
                     android:importantForAccessibility="no" />
             </RelativeLayout>
@@ -163,7 +154,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="12dp"
                 android:orientation="vertical">
 
                 <com.google.android.material.slider.Slider
@@ -192,8 +183,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0:00"
-                        android:textColor="@color/audix_text_secondary"
-                        android:textSize="11sp" />
+                        android:textColor="#8E8E93"
+                        android:textSize="11.5sp" />
 
                     <View
                         android:layout_width="0dp"
@@ -205,16 +196,16 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="-0:00"
-                        android:textColor="@color/audix_text_secondary"
-                        android:textSize="11sp" />
+                        android:textColor="#8E8E93"
+                        android:textSize="11.5sp" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Playback Transport Buttons -->
+            <!-- Playback Transport Buttons (Prev <<, Play/Pause || / ▶, Next >>) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="8dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
@@ -223,10 +214,10 @@
                     android:id="@+id/btnPrevious"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:layout_marginEnd="22dp"
+                    android:layout_marginEnd="24dp"
                     android:background="?selectableItemBackgroundBorderless"
                     android:padding="10dp"
-                    android:src="@drawable/ic_skip_previous_40dp"
+                    android:src="@drawable/ic_screensaver_prev"
                     app:tint="@color/audix_white"
                     android:importantForAccessibility="no" />
 
@@ -236,8 +227,8 @@
                     android:layout_width="56dp"
                     android:layout_height="56dp"
                     android:background="?selectableItemBackgroundBorderless"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_pause_to_play_48dp_anim"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_screensaver_pause"
                     app:tint="@color/audix_white"
                     android:importantForAccessibility="no" />
 
@@ -246,19 +237,19 @@
                     android:id="@+id/btnNext"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:layout_marginStart="22dp"
+                    android:layout_marginStart="24dp"
                     android:background="?selectableItemBackgroundBorderless"
                     android:padding="10dp"
-                    android:src="@drawable/ic_skip_next_40dp"
+                    android:src="@drawable/ic_screensaver_next"
                     app:tint="@color/audix_white"
                     android:importantForAccessibility="no" />
             </LinearLayout>
 
-            <!-- Volume Slider -->
+            <!-- Volume Slider Row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="8dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -266,7 +257,7 @@
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_volume_down"
-                    app:tint="@color/audix_text_secondary"
+                    app:tint="#8E8E93"
                     android:importantForAccessibility="no" />
 
                 <com.google.android.material.slider.Slider
@@ -288,7 +279,7 @@
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_volume_up"
-                    app:tint="@color/audix_text_secondary"
+                    app:tint="#8E8E93"
                     android:importantForAccessibility="no" />
             </LinearLayout>
 

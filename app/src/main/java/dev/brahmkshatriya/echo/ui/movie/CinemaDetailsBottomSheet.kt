@@ -56,17 +56,20 @@ class CinemaDetailsBottomSheet : BottomSheetDialogFragment() {
         }
 
         binding.btnWatchStream.setOnClickListener {
-            val streamUrl = when {
-                movieId.startsWith("tt") -> "https://vidsrc.to/embed/movie/$movieId"
-                movieId.isNotBlank() -> "https://vidsrc.to/embed/movie/$movieId"
-                else -> "https://vidsrc.to/embed/movie/${URLEncoder.encode(title, "UTF-8")}"
-            }
-            runCatching {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(streamUrl)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(intent)
-            }
+            val movie = MovieBoxItem(
+                id = movieId,
+                title = title,
+                year = year,
+                genre = genre,
+                duration = duration,
+                rating = rating,
+                qualityBadge = badge,
+                coverUrl = coverUrl,
+                bannerUrl = bannerUrl,
+                description = desc
+            )
+            CinemaPlayerActivity.launch(requireContext(), movie)
+            dismiss()
         }
 
         binding.btnSoundtracks.setOnClickListener {

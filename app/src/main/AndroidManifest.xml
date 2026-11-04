@@ -148,6 +148,15 @@
             android:theme="@style/Theme.Material3.Dark.NoActionBar" />
 
         <activity
+            android:name=".ui.movie.CinemaPlayerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:exported="true"
+            android:hardwareAccelerated="true"
+            android:launchMode="singleTop"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/Theme.Material3.Dark.NoActionBar" />
+
+        <activity
             android:name=".ui.extensions.ExtensionOpenerActivity"
             android:exported="true">
             <intent-filter>

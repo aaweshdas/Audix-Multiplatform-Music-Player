@@ -1,0 +1,32 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Solid upward pointing triangle at base -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,14.5 L17,21 L7,21 Z" />
+
+    <!-- Inner radiating arc -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M8.2,13.2 A5.2,5.2 0 0,1 15.8,13.2" />
+
+    <!-- Outer radiating arc -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M5.5,10.2 A8.8,8.8 0 0,1 18.5,10.2" />
+
+    <!-- Widest radiating arc -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M3.2,7.2 A12,12 0 0,1 20.8,7.2" />
+</vector>

@@ -188,14 +188,17 @@ class ScreensaverActivity : AppCompatActivity() {
 
             binding.tvScreensaverTitle.text = displayTitle
             val artistStr = track.artists.joinToString(", ") { it.name.trim() }.ifBlank { "Nightly Artist" }
-            binding.tvScreensaverArtist.text = artistStr
-            binding.tvDeviceSpec.text = "NIGHTLY • STUDIO SOUNDSTAGE"
+            val albumStr = track.album?.title?.trim()
+            binding.tvScreensaverArtist.text = if (!albumStr.isNullOrBlank()) {
+                "$artistStr • $albumStr"
+            } else {
+                "$artistStr • Nightly Soundstage"
+            }
 
             track.cover.loadInto(binding.ivScreensaverCover, R.drawable.art_music)
         } else {
             binding.tvScreensaverTitle.text = "Nightly Hi-Res Flow"
-            binding.tvScreensaverArtist.text = "Studio Soundstage • Ready"
-            binding.tvDeviceSpec.text = "NIGHTLY • IDLE"
+            binding.tvScreensaverArtist.text = "Studio Soundstage • Ready to Stream"
             binding.ivScreensaverCover.setImageResource(R.drawable.art_music)
         }
 
@@ -203,9 +206,9 @@ class ScreensaverActivity : AppCompatActivity() {
         isPlaying = playing
 
         if (playing) {
-            binding.btnPlayPause.setImageResource(R.drawable.ic_pause_to_play_48dp_anim)
+            binding.btnPlayPause.setImageResource(R.drawable.ic_screensaver_pause)
         } else {
-            binding.btnPlayPause.setImageResource(R.drawable.ic_play)
+            binding.btnPlayPause.setImageResource(R.drawable.ic_screensaver_play)
         }
 
         updateProgress()

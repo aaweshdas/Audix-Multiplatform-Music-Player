@@ -96,7 +96,7 @@ fun main() {
     }.getOrNull()
 
     val sensitiveBearerRegex = Regex("""(?i)\b(bearer\s+)([a-zA-Z0-9_\-\.]+)""")
-    val sensitiveGoogleKeyRegex = Regex("""AIza[0-9A-Za-z\-_]{35}""")
+    val sensitiveGoogleKeyRegex = Regex("""AIza[0-9A-Za-z\-_]{32,40}""")
     val sensitiveGroqKeyRegex = Regex("""gsk_[a-zA-Z0-9]{40,}""")
     val sensitiveJsonRegex = Regex("""(?i)("(?:apiKey|api_key|access_token|client_secret|password|token|secret)"\s*:\s*")([^"]+)(")""")
     val sensitiveUrlParamRegex = Regex("""(?i)([?&](?:key|api_key|token|access_token|sig|lsig|auth)=)([^&\s]+)""")

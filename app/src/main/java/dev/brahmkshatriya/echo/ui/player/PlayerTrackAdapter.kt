@@ -133,9 +133,12 @@ class PlayerTrackAdapter(
 
         fun updateColors() {
             binding.playerCollapsed.run {
-                val colors = uiViewModel.playerColors.value ?: context.defaultPlayerColors()
-                collapsedTrackTitle.setTextColor(colors.onBackground)
-                collapsedTrackArtist.setTextColor(colors.onBackground)
+                collapsedTrackTitle.setTextColor(
+                    androidx.core.content.ContextCompat.getColor(context, R.color.audix_white)
+                )
+                collapsedTrackArtist.setTextColor(
+                    androidx.core.content.ContextCompat.getColor(context, R.color.audix_text_secondary)
+                )
             }
         }
 
@@ -153,6 +156,12 @@ class PlayerTrackAdapter(
             binding.playerCollapsed.run {
                 collapsedTrackTitle.text = item?.track?.title
                 collapsedTrackArtist.text = item?.track?.artists?.joinToString(", ") { it.name }
+                collapsedTrackTitle.setTextColor(
+                    androidx.core.content.ContextCompat.getColor(context, R.color.audix_white)
+                )
+                collapsedTrackArtist.setTextColor(
+                    androidx.core.content.ContextCompat.getColor(context, R.color.audix_text_secondary)
+                )
             }
             val old = item?.unloadedCover?.getCachedDrawable(binding.root.context)
             item?.track?.cover.loadWithThumb(binding.playerTrackCover, old) {

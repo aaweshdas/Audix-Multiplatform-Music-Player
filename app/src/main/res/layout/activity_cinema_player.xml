@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/cinemaPlayerRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:fitsSystemWindows="false"
+    android:keepScreenOn="true">
+
+    <!-- 1. FULLSCREEN IN-APP WEBVIEW VIDEO PLAYER -->
+    <WebView
+        android:id="@+id/wvCinemaPlayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:overScrollMode="never" />
+
+    <!-- 2. FULLSCREEN CUSTOM VIEW CONTAINER (FOR HTML5 FULLSCREEN VIDEO) -->
+    <FrameLayout
+        android:id="@+id/flCustomVideoContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:visibility="gone" />
+
+    <!-- 3. SLEEK CINEMA BUFFERING / LOADING OVERLAY -->
+    <LinearLayout
+        android:id="@+id/llCinemaLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <ProgressBar
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/audix_cyan_bright" />
+
+        <TextView
+            android:id="@+id/tvLoadingTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textColor="@color/audix_white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            tools:text="12 Angry Men (1957)" />
+
+        <TextView
+            android:id="@+id/tvLoadingStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Connecting to High-Speed In-App Cinema Server..."
+            android:textColor="@color/audix_cyan_bright"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Protected by In-App Popup &amp; Ad Blocker"
+            android:textColor="@color/audix_text_secondary"
+            android:textSize="10.5sp" />
+    </LinearLayout>
+
+    <!-- 4. FLOATING TOP CINEMA CONTROLS BAR (AUTO-HIDING) -->
+    <RelativeLayout
+        android:id="@+id/rlTopCinemaBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_audix_header_glow"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="36dp"
+        android:paddingBottom="16dp">
+
+        <!-- Back Button -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/btnBackCinema"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            app:cardBackgroundColor="#80101626"
+            app:cardCornerRadius="20dp"
+            app:strokeColor="#33FFFFFF"
+            app:strokeWidth="1dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_back"
+                app:tint="@color/audix_white"
+                android:importantForAccessibility="no" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Movie Title & Meta -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="10dp"
+            android:layout_toStartOf="@+id/llTopActions"
+            android:layout_toEndOf="@+id/btnBackCinema"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvCinemaTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/audix_white"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="12 Angry Men" />
+
+            <TextView
+                android:id="@+id/tvCinemaMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/audix_cyan_bright"
+                android:textSize="11sp"
+                tools:text="1957 • 4K Ultra HD • In-App Theater" />
+        </LinearLayout>
+
+        <!-- Right Action Buttons -->
+        <LinearLayout
+            android:id="@+id/llTopActions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Server Selector Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnServerSelector"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:backgroundTint="#99162238"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="12dp"
+                android:text="Server 1 ▾"
+                android:textColor="@color/audix_cyan_bright"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                app:cornerRadius="18dp"
+                app:strokeColor="@color/audix_cyan_bright"
+                app:strokeWidth="1dp" />
+
+            <!-- Reload Stream Button -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btnReloadStream"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                app:cardBackgroundColor="#80101626"
+                app:cardCornerRadius="18dp"
+                app:strokeColor="#33FFFFFF"
+                app:strokeWidth="1dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_refresh"
+                    app:tint="@color/audix_white"
+                    android:importantForAccessibility="no" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Picture in Picture (PiP) Button -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btnPipCinema"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                app:cardBackgroundColor="#80101626"
+                app:cardCornerRadius="18dp"
+                app:strokeColor="#33FFFFFF"
+                app:strokeWidth="1dp">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_airplay"
+                    app:tint="@color/audix_white"
+                    android:importantForAccessibility="no" />
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- 5. BOTTOM CINEMA STATUS PILL -->
+    <LinearLayout
+        android:id="@+id/llBottomCinemaStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="22dp"
+        android:background="@drawable/bg_audix_badge_soundstage"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="6dp">
+
+        <View
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_audix_cyan_dot" />
+
+        <TextView
+            android:id="@+id/tvBottomStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="IN-APP CINEMA • STRICT POPUP SHIELD ACTIVE"
+            android:textColor="@color/audix_cyan_bright"
+            android:textSize="9.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04" />
+    </LinearLayout>
+
+</FrameLayout>

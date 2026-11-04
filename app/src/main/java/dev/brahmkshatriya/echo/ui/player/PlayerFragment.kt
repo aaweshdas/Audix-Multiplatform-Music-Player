@@ -208,7 +208,7 @@ class PlayerFragment : Fragment() {
             }
             binding.bgCollapsed.run {
                 translationY = collapsedY - collapseHeight * collapsedInv * 2
-                alpha = min(1f, collapsedOffset * 2) - 0.5f
+                alpha = min(1f, collapsedOffset * 2)
             }
             val alphaInv = 1 - min(1f, offset * 3)
             binding.expandedToolbar.run {
@@ -530,7 +530,7 @@ class PlayerFragment : Fragment() {
                 root.setBackgroundColor(color)
                 val backgroundState = ColorStateList.valueOf(colors.background)
                 bgGradient.imageTintList = backgroundState
-                bgCollapsed.backgroundTintList = backgroundState
+                bgCollapsed.backgroundTintList = null
                 bufferView?.indeterminateDrawable?.setTint(colors.accent)
                 expandedToolbar.run {
                     setTitleTextColor(colors.onBackground)

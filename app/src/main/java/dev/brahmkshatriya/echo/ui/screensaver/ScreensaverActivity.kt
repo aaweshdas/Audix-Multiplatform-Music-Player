@@ -6,7 +6,6 @@ import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -36,7 +35,7 @@ class ScreensaverActivity : AppCompatActivity() {
     private val progressRunnable = object : Runnable {
         override fun run() {
             updateProgress()
-            handler.postDelayed(this, 800L)
+            handler.postDelayed(this, 600L)
         }
     }
 
@@ -47,23 +46,48 @@ class ScreensaverActivity : AppCompatActivity() {
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-        // Fullscreen immersive mode
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        // Fullscreen immersive mode (hide system status and nav bars)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val insetsController = WindowInsetsControllerCompat(window, window.decorView)
         insetsController.hide(WindowInsetsCompat.Type.systemBars())
         insetsController.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
+        // Activate marquee on title
+        binding.tvScreensaverTitle.isSelected = true
+
         setupListeners()
         observePlayback()
         setupVolume()
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
     private fun setupListeners() {
-        // Dismiss on close button or background tap
+        // Dismiss on close button or background wallpaper tap
         binding.btnCloseScreensaver.setOnClickListener { finish() }
         binding.screensaverRoot.setOnClickListener { finish() }
-        binding.cardScreensaverConsole.setOnClickListener {
+        binding.cardScreensaverMain.setOnClickListener {
             // Absorb click so interacting with the card doesn't exit screensaver
         }
 
@@ -165,13 +189,13 @@ class ScreensaverActivity : AppCompatActivity() {
             binding.tvScreensaverTitle.text = displayTitle
             val artistStr = track.artists.joinToString(", ") { it.name.trim() }.ifBlank { "Nightly Artist" }
             binding.tvScreensaverArtist.text = artistStr
-            binding.tvDeviceSpec.text = "Nightly • Studio Hi-Res Stream"
+            binding.tvDeviceSpec.text = "NIGHTLY • STUDIO SOUNDSTAGE"
 
             track.cover.loadInto(binding.ivScreensaverCover, R.drawable.art_music)
         } else {
             binding.tvScreensaverTitle.text = "Nightly Hi-Res Flow"
             binding.tvScreensaverArtist.text = "Studio Soundstage • Ready"
-            binding.tvDeviceSpec.text = "Nightly • Idle"
+            binding.tvDeviceSpec.text = "NIGHTLY • IDLE"
             binding.ivScreensaverCover.setImageResource(R.drawable.art_music)
         }
 

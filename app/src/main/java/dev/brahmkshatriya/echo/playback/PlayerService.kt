@@ -62,6 +62,8 @@ class PlayerService : MediaLibraryService() {
     private var mediaSession: MediaLibrarySession? = null
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
+    private var lockScreenScreensaverManager: LockScreenScreensaverManager? = null
+
     private val app by inject<App>()
     private val state by inject<PlayerState>()
     private val serviceJob = SupervisorJob()
@@ -123,10 +125,16 @@ class PlayerService : MediaLibraryService() {
         notificationProvider.setSmallIcon(R.drawable.ic_mono)
         setMediaNotificationProvider(notificationProvider)
 
+        val lockScreenScreensaver = LockScreenScreensaverManager(this, scope, player)
+        lockScreenScreensaver.start()
+        lockScreenScreensaverManager = lockScreenScreensaver
+
         mediaSession = session
     }
 
     override fun onDestroy() {
+        lockScreenScreensaverManager?.stop()
+        lockScreenScreensaverManager = null
         app.settings.unregisterOnSharedPreferenceChangeListener(listener)
         serviceJob.cancel()
         mediaSession?.run {

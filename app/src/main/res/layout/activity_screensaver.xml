@@ -5,11 +5,11 @@
     android:id="@+id/screensaverRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000"
+    android:background="#05070D"
     android:fitsSystemWindows="false"
     android:keepScreenOn="true">
 
-    <!-- 1. FULLSCREEN 3D MOSAIC GRID WALLPAPER -->
+    <!-- 1. FULLSCREEN 3D ALBUM MOSAIC WALLPAPER -->
     <ImageView
         android:id="@+id/ivScreensaverBackdrop"
         android:layout_width="match_parent"
@@ -18,11 +18,11 @@
         android:src="@drawable/screensaver_bg"
         android:importantForAccessibility="no" />
 
-    <!-- Dark Ambient Vignette -->
+    <!-- Ambient Dark Vignette Overlay -->
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#33000000" />
+        android:background="#26000000" />
 
     <!-- Top Floating Exit Button -->
     <com.google.android.material.card.MaterialCardView
@@ -32,7 +32,7 @@
         android:layout_gravity="top|end"
         android:layout_marginTop="42dp"
         android:layout_marginEnd="20dp"
-        app:cardBackgroundColor="#80101420"
+        app:cardBackgroundColor="#99101422"
         app:cardCornerRadius="19dp"
         app:strokeColor="#33FFFFFF"
         app:strokeWidth="1dp">
@@ -46,50 +46,62 @@
             android:importantForAccessibility="no" />
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 2. PIXEL-PERFECT FLOATING APPLE/MOSAIC CARD CONSOLE -->
+    <!-- 2. UNIFIED FROSTED NOW PLAYING CARD -->
     <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardScreensaverConsole"
-        android:layout_width="356dp"
+        android:id="@+id/cardScreensaverMain"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        app:cardBackgroundColor="#FA10131B"
-        app:cardCornerRadius="34dp"
-        app:cardElevation="36dp"
-        app:strokeColor="#50FFFFFF"
-        app:strokeWidth="1.5dp">
+        android:layout_marginHorizontal="24dp"
+        app:cardBackgroundColor="#F2111422"
+        app:cardCornerRadius="30dp"
+        app:cardElevation="22dp"
+        app:strokeColor="#38FFFFFF"
+        app:strokeWidth="1.2dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="22dp"
-            android:paddingTop="22dp"
-            android:paddingBottom="24dp">
+            android:paddingHorizontal="18dp"
+            android:paddingTop="18dp"
+            android:paddingBottom="16dp">
 
-            <!-- Square Album Artwork (Rounded corners) -->
-            <com.google.android.material.card.MaterialCardView
+            <!-- Square Album Artwork Card -->
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
-                android:layout_height="300dp"
-                app:cardBackgroundColor="#0A0C12"
-                app:cardCornerRadius="26dp"
-                app:cardElevation="8dp"
-                app:strokeColor="#25FFFFFF"
-                app:strokeWidth="1dp">
+                android:layout_height="wrap_content">
 
-                <ImageView
-                    android:id="@+id/ivScreensaverCover"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/art_music"
-                    android:importantForAccessibility="no" />
-            </com.google.android.material.card.MaterialCardView>
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardLiveArtwork"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    app:cardBackgroundColor="#0A0C12"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="8dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintDimensionRatio="1:1"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:strokeColor="#25FFFFFF"
+                    app:strokeWidth="1dp">
 
-            <!-- Song Info & Device / Cast Row -->
+                    <ImageView
+                        android:id="@+id/ivScreensaverCover"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/art_music"
+                        android:importantForAccessibility="no" />
+                </com.google.android.material.card.MaterialCardView>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- Song Info & Studio Equalizer Shortcut -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp">
+                android:layout_marginTop="14dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -102,18 +114,20 @@
                         android:id="@+id/tvDeviceSpec"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Nightly • Studio Hi-Res"
-                        android:textColor="@color/audix_text_secondary"
-                        android:textSize="11.5sp"
-                        android:textStyle="normal" />
+                        android:text="NIGHTLY • STUDIO SOUNDSTAGE"
+                        android:textColor="@color/audix_cyan_bright"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.04" />
 
                     <TextView
                         android:id="@+id/tvScreensaverTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:ellipsize="end"
-                        android:maxLines="1"
+                        android:layout_marginTop="3dp"
+                        android:ellipsize="marquee"
+                        android:marqueeRepeatLimit="marquee_forever"
+                        android:singleLine="true"
                         android:textColor="@color/audix_white"
                         android:textSize="18sp"
                         android:textStyle="bold"
@@ -126,29 +140,30 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="1dp"
                         android:ellipsize="end"
-                        android:maxLines="1"
+                        android:singleLine="true"
                         android:textColor="@color/audix_text_secondary"
-                        android:textSize="13sp"
+                        android:textSize="12.5sp"
                         tools:text="Arijit Singh, Mithoon • Aashiqui 2" />
                 </LinearLayout>
 
                 <ImageView
                     android:id="@+id/btnScreensaverAirplay"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:padding="4dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:padding="6dp"
                     android:src="@drawable/ic_airplay"
                     app:tint="@color/audix_white"
                     android:importantForAccessibility="no" />
             </RelativeLayout>
 
-            <!-- Progress Scrubber with Timestamps -->
+            <!-- Scrubber Seekbar with Live Timestamps -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="10dp"
                 android:orientation="vertical">
 
                 <com.google.android.material.slider.Slider
@@ -162,7 +177,7 @@
                     app:thumbColor="@color/audix_white"
                     app:thumbRadius="5dp"
                     app:trackColorActive="@color/audix_white"
-                    app:trackColorInactive="#55FFFFFF"
+                    app:trackColorInactive="#40FFFFFF"
                     app:trackHeight="3.5dp" />
 
                 <LinearLayout
@@ -195,58 +210,61 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Playback Controls (Prev <<, Play/Pause ||, Next >>) -->
+            <!-- Playback Transport Buttons -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="6dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
-                <!-- Fast Rewind / Prev -->
+                <!-- Previous -->
                 <ImageView
                     android:id="@+id/btnPrevious"
-                    android:layout_width="52dp"
-                    android:layout_height="52dp"
-                    android:layout_marginEnd="24dp"
-                    android:padding="12dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="22dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:padding="10dp"
                     android:src="@drawable/ic_skip_previous_40dp"
                     app:tint="@color/audix_white"
                     android:importantForAccessibility="no" />
 
-                <!-- Big Play / Pause Button -->
+                <!-- Play / Pause -->
                 <ImageView
                     android:id="@+id/btnPlayPause"
-                    android:layout_width="58dp"
-                    android:layout_height="58dp"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="?selectableItemBackgroundBorderless"
                     android:padding="8dp"
                     android:src="@drawable/ic_pause_to_play_48dp_anim"
                     app:tint="@color/audix_white"
                     android:importantForAccessibility="no" />
 
-                <!-- Fast Forward / Next -->
+                <!-- Next -->
                 <ImageView
                     android:id="@+id/btnNext"
-                    android:layout_width="52dp"
-                    android:layout_height="52dp"
-                    android:layout_marginStart="24dp"
-                    android:padding="12dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="22dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:padding="10dp"
                     android:src="@drawable/ic_skip_next_40dp"
                     app:tint="@color/audix_white"
                     android:importantForAccessibility="no" />
             </LinearLayout>
 
-            <!-- Volume Slider Row -->
+            <!-- Volume Slider -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="6dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
                     android:src="@drawable/ic_volume_down"
                     app:tint="@color/audix_text_secondary"
                     android:importantForAccessibility="no" />
@@ -263,12 +281,12 @@
                     app:thumbColor="@color/audix_white"
                     app:thumbRadius="5dp"
                     app:trackColorActive="@color/audix_white"
-                    app:trackColorInactive="#55FFFFFF"
+                    app:trackColorInactive="#40FFFFFF"
                     app:trackHeight="3.5dp" />
 
                 <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
                     android:src="@drawable/ic_volume_up"
                     app:tint="@color/audix_text_secondary"
                     android:importantForAccessibility="no" />

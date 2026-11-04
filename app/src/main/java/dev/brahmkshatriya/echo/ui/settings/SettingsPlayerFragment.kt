@@ -10,6 +10,7 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import dev.brahmkshatriya.echo.R
 import dev.brahmkshatriya.echo.common.models.ImageHolder.Companion.toResourceImageHolder
+import dev.brahmkshatriya.echo.playback.LockScreenScreensaverManager
 import dev.brahmkshatriya.echo.playback.PlayerService.Companion.CACHE_SIZE
 import dev.brahmkshatriya.echo.playback.PlayerService.Companion.CLOSE_PLAYER
 import dev.brahmkshatriya.echo.playback.PlayerService.Companion.MORE_BRAIN_CAPACITY
@@ -93,6 +94,16 @@ class SettingsPlayerFragment : BaseSettingsFragment() {
                 isIconSpaceReserved = false
                 layoutResource = R.layout.preference_category
                 screen.addPreference(this)
+
+                SwitchPreferenceCompat(context).apply {
+                    key = LockScreenScreensaverManager.KEY_LOCKSCREEN_SCREENSAVER
+                    title = "Ambient Lockscreen Screensaver"
+                    summary = "Automatically display 3D album screensaver 7s after phone is locked during playback"
+                    layoutResource = R.layout.preference_switch
+                    isIconSpaceReserved = false
+                    setDefaultValue(true)
+                    addPreference(this)
+                }
 
                 SwitchPreferenceCompat(context).apply {
                     key = KEEP_QUEUE

@@ -143,6 +143,8 @@ class CinemaStudioBottomSheet : BottomSheetDialogFragment() {
 
             if (item.coverUrl.isNotBlank()) {
                 item.coverUrl.toImageHolder().loadInto(holder.binding.moviePoster)
+            } else {
+                holder.binding.moviePoster.setImageResource(R.drawable.art_music)
             }
             holder.itemView.setOnClickListener {
                 onMovieClick(item)

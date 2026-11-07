@@ -124,7 +124,9 @@ class CinemaPlayerActivity : AppCompatActivity() {
         val type = intent.getStringExtra(EXTRA_TYPE) ?: ""
         isSeries = type.equals("series", ignoreCase = true) ||
                 type.equals("tv", ignoreCase = true) ||
-                movieGenre.contains("eps", ignoreCase = true)
+                movieGenre.contains("eps", ignoreCase = true) ||
+                movieGenre.contains("tv", ignoreCase = true) ||
+                movieQuality.contains("tv", ignoreCase = true)
     }
 
     private fun setupViews() {

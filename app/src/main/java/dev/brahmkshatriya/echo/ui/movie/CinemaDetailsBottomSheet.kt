@@ -41,6 +41,7 @@ class CinemaDetailsBottomSheet : BottomSheetDialogFragment() {
         val bannerUrl = arguments?.getString(ARG_BANNER) ?: coverUrl
         val desc = arguments?.getString(ARG_DESC) ?: ""
         val movieId = arguments?.getString(ARG_ID) ?: ""
+        val type = arguments?.getString(ARG_TYPE) ?: "movie"
 
         binding.movieTitle.text = title
         binding.movieBadge.text = badge
@@ -59,6 +60,7 @@ class CinemaDetailsBottomSheet : BottomSheetDialogFragment() {
             val movie = MovieBoxItem(
                 id = movieId,
                 title = title,
+                type = type,
                 year = year,
                 genre = genre,
                 duration = duration,
@@ -93,12 +95,14 @@ class CinemaDetailsBottomSheet : BottomSheetDialogFragment() {
         private const val ARG_COVER = "cover"
         private const val ARG_BANNER = "banner"
         private const val ARG_DESC = "desc"
+        private const val ARG_TYPE = "type"
 
         fun newInstance(movie: MovieBoxItem): CinemaDetailsBottomSheet {
             return CinemaDetailsBottomSheet().apply {
                 arguments = Bundle().apply {
                     putString(ARG_ID, movie.id)
                     putString(ARG_TITLE, movie.title)
+                    putString(ARG_TYPE, movie.type)
                     putString(ARG_YEAR, movie.year)
                     putString(ARG_GENRE, movie.genre)
                     putString(ARG_DURATION, movie.duration)

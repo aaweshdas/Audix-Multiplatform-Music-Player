@@ -954,7 +954,13 @@ $mirrorButtonsHtml
                 }
                 val os = System.getProperty("os.name").lowercase()
                 val targetPath = if (scheme == "file") {
-                    try { File(uri).absolutePath } catch (_: Exception) { trimmed }
+                    val fromFile = runCatching { File(uri).absolutePath }.getOrNull()
+                    if (!fromFile.isNullOrBlank()) {
+                        fromFile
+                    } else {
+                        val p = uri.path.orEmpty()
+                        if (p.startsWith("/") && p.length > 2 && p[2] == ':') p.substring(1) else p
+                    }
                 } else {
                     trimmed
                 }

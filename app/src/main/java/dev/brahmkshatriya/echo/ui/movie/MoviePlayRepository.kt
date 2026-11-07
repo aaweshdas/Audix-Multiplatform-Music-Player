@@ -4,6 +4,12 @@ import android.content.Context
 import dev.brahmkshatriya.echo.common.models.Track
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
 
 @Serializable
 data class MovieBoxItem(
@@ -32,6 +38,83 @@ object MoviePlayRepository {
     }
 
     private var cachedMovies: List<MovieBoxItem>? = null
+
+    fun resolveImdbId(title: String, isSeries: Boolean = false): String? {
+        return runCatching {
+            val cleanTitle = title.replace(Regex("""\[.*?\]|\(.*?\)|4k|uhd|1080p|season \d+""", RegexOption.IGNORE_CASE), "").trim()
+            val enc = URLEncoder.encode(cleanTitle, "UTF-8")
+            val cinemetaType = if (isSeries) "series" else "movie"
+            val urlString = "https://v3-cinemeta.strem.io/catalog/$cinemetaType/top/search=$enc.json"
+            val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
+            }
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            if (body.isNotBlank()) {
+                val root = json.parseToJsonElement(body).jsonObject
+                val metas = root["metas"]?.jsonArray
+                if (metas != null && metas.isNotEmpty()) {
+                    return@runCatching metas[0].jsonObject["id"]?.jsonPrimitive?.content
+                }
+            }
+            null
+        }.getOrNull()
+    }
+
+    fun searchOnline(query: String): List<MovieBoxItem> {
+        val trimmed = query.trim()
+        if (trimmed.length < 2) return emptyList()
+
+        return runCatching {
+            val enc = URLEncoder.encode(trimmed, "UTF-8")
+            val results = mutableListOf<MovieBoxItem>()
+
+            for (type in listOf("movie", "series")) {
+                try {
+                    val urlString = "https://v3-cinemeta.strem.io/catalog/$type/top/search=$enc.json"
+                    val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 4000
+                        readTimeout = 4000
+                        setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
+                    }
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    if (body.isNotBlank()) {
+                        val root = json.parseToJsonElement(body).jsonObject
+                        val metas = root["metas"]?.jsonArray
+                        if (metas != null) {
+                            for (meta in metas) {
+                                val obj = meta.jsonObject
+                                val id = obj["id"]?.jsonPrimitive?.content ?: continue
+                                val name = obj["name"]?.jsonPrimitive?.content ?: continue
+                                val year = obj["releaseInfo"]?.jsonPrimitive?.content ?: "2024"
+                                val poster = obj["poster"]?.jsonPrimitive?.content ?: ""
+                                val background = obj["background"]?.jsonPrimitive?.content ?: poster
+                                val desc = obj["description"]?.jsonPrimitive?.content ?: "Stream $name in HD with multi-audio and subtitles."
+                                val isSeries = type == "series"
+                                results.add(
+                                    MovieBoxItem(
+                                        id = id,
+                                        title = name,
+                                        type = type,
+                                        year = year,
+                                        duration = if (isSeries) "TV Series" else "120 min",
+                                        genre = if (isSeries) "TV Series" else "Cinema",
+                                        rating = "8.5",
+                                        qualityBadge = if (isSeries) "HD TV" else "1080p HD",
+                                        coverUrl = poster,
+                                        bannerUrl = background,
+                                        description = desc
+                                    )
+                                )
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+            results
+        }.getOrDefault(emptyList())
+    }
 
     fun getMovies(context: Context): List<MovieBoxItem> {
         cachedMovies?.let { return it }

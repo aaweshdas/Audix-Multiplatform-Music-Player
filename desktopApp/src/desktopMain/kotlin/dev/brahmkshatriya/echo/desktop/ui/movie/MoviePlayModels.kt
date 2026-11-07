@@ -344,6 +344,56 @@ object MoviePlayRepository {
     // Stream Resolution
     // ---------------------------------------------------------------------
 
+    suspend fun searchOnlineMovies(query: String): List<MovieBoxItem> = withContext(Dispatchers.IO) {
+        val trimmed = query.trim()
+        if (trimmed.length < 2) return@withContext emptyList()
+
+        runCatching {
+            val enc = URLEncoder.encode(trimmed, "UTF-8")
+            val results = mutableListOf<MovieBoxItem>()
+
+            for (type in listOf("movie", "series")) {
+                try {
+                    val url = "https://v3-cinemeta.strem.io/catalog/$type/top/search=$enc.json"
+                    val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()
+                    val body = httpClient.newCall(req).execute().use { it.body?.string().orEmpty() }
+                    if (body.isNotBlank()) {
+                        val root = json.parseToJsonElement(body).jsonObject
+                        val metas = root["metas"]?.jsonArray
+                        if (metas != null) {
+                            for (meta in metas) {
+                                val obj = meta.jsonObject
+                                val id = obj["id"]?.jsonPrimitive?.content ?: continue
+                                val name = obj["name"]?.jsonPrimitive?.content ?: continue
+                                val year = obj["releaseInfo"]?.jsonPrimitive?.content ?: "2024"
+                                val poster = obj["poster"]?.jsonPrimitive?.content ?: ""
+                                val background = obj["background"]?.jsonPrimitive?.content ?: poster
+                                val desc = obj["description"]?.jsonPrimitive?.content ?: "Stream $name in HD with multi-audio and subtitles."
+                                val isSeries = type == "series"
+                                results.add(
+                                    MovieBoxItem(
+                                        id = id,
+                                        title = name,
+                                        type = type,
+                                        year = year,
+                                        duration = if (isSeries) "TV Series" else "120 min",
+                                        genre = if (isSeries) "TV Series" else "Cinema",
+                                        rating = "8.5",
+                                        qualityBadge = if (isSeries) "HD TV" else "1080p HD",
+                                        coverUrl = poster,
+                                        bannerUrl = background,
+                                        description = desc
+                                    )
+                                )
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+            results
+        }.getOrDefault(emptyList())
+    }
+
     suspend fun resolveImdbId(cleanTitle: String, type: String): String? = withContext(Dispatchers.IO) {
         runCatching {
             val cinemetaType = if (type == "series") "series" else "movie"
@@ -513,14 +563,14 @@ object MoviePlayRepository {
         // 3. If still no mirror streams present, resolve verified Cinemeta IMDb ID for working mirrors
         val hasMirrors = streams.any { it.isEmbed && (it.url.contains("vidsrc") || it.url.contains("2embed") || it.url.contains("smashy")) }
         if (!hasMirrors) {
-            val imdbId = resolveImdbId(cleanTitle, item.type)
+            val imdbId = if (item.id.startsWith("tt", ignoreCase = true)) item.id else resolveImdbId(cleanTitle, item.type)
             if (!imdbId.isNullOrBlank()) {
                 val isSeries = item.type == "series"
                 streams.add(
                     MovieStreamOption(
                         id = "mirror_vidsrc_$imdbId",
-                        title = "Mirror 1 • 1080p Full HD (VidSrc Direct)",
-                        url = if (isSeries) "https://vidsrc.me/embed/tv?imdb=$imdbId&season=1&episode=1" else "https://vidsrc.me/embed/movie?imdb=$imdbId",
+                        title = "Mirror 1 • 1080p Ultra HD (VidSrc Cloud)",
+                        url = if (isSeries) "https://vidsrc.to/embed/tv/$imdbId/1/1" else "https://vidsrc.to/embed/movie/$imdbId",
                         resolution = "1080",
                         format = "STREAM",
                         isEmbed = true,
@@ -530,9 +580,21 @@ object MoviePlayRepository {
                 )
                 streams.add(
                     MovieStreamOption(
-                        id = "mirror_vidto_$imdbId",
-                        title = "Mirror 2 • 1080p Ultra HD (VidTo Server)",
-                        url = if (isSeries) "https://vidsrc.to/embed/tv/$imdbId/1/1" else "https://vidsrc.to/embed/movie/$imdbId",
+                        id = "mirror_vidsrcpm_$imdbId",
+                        title = "Mirror 2 • 1080p Full HD (VidSrc PM)",
+                        url = if (isSeries) "https://vidsrc.pm/embed/tv/$imdbId/1-1" else "https://vidsrc.pm/embed/movie/$imdbId",
+                        resolution = "1080",
+                        format = "STREAM",
+                        isEmbed = true,
+                        size = "1080p HD",
+                        audio = "Original Audio + CC"
+                    )
+                )
+                streams.add(
+                    MovieStreamOption(
+                        id = "mirror_vidsrcxyz_$imdbId",
+                        title = "Mirror 3 • 1080p VIP (VidSrc VIP)",
+                        url = if (isSeries) "https://vidsrc.xyz/embed/tv/$imdbId/1-1" else "https://vidsrc.xyz/embed/movie/$imdbId",
                         resolution = "1080",
                         format = "STREAM",
                         isEmbed = true,
@@ -543,8 +605,8 @@ object MoviePlayRepository {
                 streams.add(
                     MovieStreamOption(
                         id = "mirror_2embed_$imdbId",
-                        title = "Mirror 3 • 720p High Speed (2Embed)",
-                        url = if (isSeries) "https://2embed.cc/embedtv/$imdbId&s=1&e=1" else "https://2embed.cc/embed/$imdbId",
+                        title = "Mirror 4 • 720p High Speed (2Embed)",
+                        url = if (isSeries) "https://www.2embed.cc/embedtv/$imdbId&s=1&e=1" else "https://www.2embed.cc/embed/$imdbId",
                         resolution = "720",
                         format = "STREAM",
                         isEmbed = true,
@@ -555,7 +617,7 @@ object MoviePlayRepository {
                 streams.add(
                     MovieStreamOption(
                         id = "mirror_smashy_$imdbId",
-                        title = "Mirror 4 • Fast Stream (SmashyStream)",
+                        title = "Mirror 5 • Fast Stream (SmashyStream)",
                         url = if (isSeries) "https://embed.smashystream.com/playere.php?imdb=$imdbId&season=1&episode=1" else "https://embed.smashystream.com/playere.php?imdb=$imdbId",
                         resolution = "1080",
                         format = "STREAM",
@@ -611,7 +673,7 @@ object MoviePlayRepository {
         Thread {
             try {
                 val tempDir = System.getProperty("java.io.tmpdir")
-                val theaterFile = File(tempDir, "audix_cinema_theater.html")
+                val theaterFile = File(tempDir, "nightly_cinema_theater.html")
 
                 val mirrorOptions = if (mirrors.isNotEmpty()) mirrors else listOf(
                     MovieStreamOption("current", "Default Server", activeUrl, "1080", "STREAM", true)
@@ -648,7 +710,7 @@ object MoviePlayRepository {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>$cleanTitle • Audix Cinema Theater</title>
+<title>$cleanTitle • Nightly Cinema Theater</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -767,7 +829,7 @@ object MoviePlayRepository {
 <body>
   <header>
     <div class="brand">
-      <span class="brand-badge">AUDIX CINEMA</span>
+      <span class="brand-badge">NIGHTLY CINEMA</span>
       <span class="movie-title">$cleanTitle</span>
     </div>
     <div class="mirror-bar">
@@ -870,7 +932,7 @@ $mirrorButtonsHtml
 
         val scheme = uri.scheme?.lowercase()
         val isValidHttp = scheme == "http" || scheme == "https"
-        val isAllowedLocalHtml = scheme == "file" && (trimmed.endsWith("audix_cinema_theater.html", ignoreCase = true) || trimmed.contains("audix_cinema_theater.html"))
+        val isAllowedLocalHtml = scheme == "file" && (trimmed.endsWith(".html", ignoreCase = true) || trimmed.contains("cinema_theater.html"))
 
         if (!isValidHttp && !isAllowedLocalHtml) {
             System.err.println("[MoviePlayModels] Security violation: Blocked unauthorized URI scheme: $scheme")
@@ -891,12 +953,21 @@ $mirrorButtonsHtml
                     } catch (_: Exception) {}
                 }
                 val os = System.getProperty("os.name").lowercase()
-                if (os.contains("win")) {
-                    ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", trimmed).start()
-                } else if (os.contains("mac")) {
-                    ProcessBuilder("open", trimmed).start()
+                val targetPath = if (scheme == "file") {
+                    try { File(uri).absolutePath } catch (_: Exception) { trimmed }
                 } else {
-                    ProcessBuilder("xdg-open", trimmed).start()
+                    trimmed
+                }
+                if (os.contains("win")) {
+                    try {
+                        ProcessBuilder("explorer.exe", targetPath).start()
+                    } catch (_: Exception) {
+                        ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", targetPath).start()
+                    }
+                } else if (os.contains("mac")) {
+                    ProcessBuilder("open", targetPath).start()
+                } else {
+                    ProcessBuilder("xdg-open", targetPath).start()
                 }
             } catch (e: Exception) {
                 System.err.println("[MoviePlayModels] Failed to open browser: ${e.message}")

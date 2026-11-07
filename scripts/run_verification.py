@@ -65,8 +65,8 @@ run_cmd = [
     'scripts.Verify_consecutive_playback_and_featuresKt'
 ]
 
-r_res = subprocess.run(run_cmd, env=env, capture_output=True, text=True)
-print(r_res.stdout)
-if r_res.stderr:
-    print("STDERR:\n", r_res.stderr)
-sys.exit(r_res.returncode)
+proc = subprocess.Popen(run_cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+for line in proc.stdout:
+    print(line, end='', flush=True)
+proc.wait()
+sys.exit(proc.returncode)

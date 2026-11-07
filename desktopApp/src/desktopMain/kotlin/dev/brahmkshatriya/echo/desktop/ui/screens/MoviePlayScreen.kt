@@ -212,9 +212,10 @@ import dev.brahmkshatriya.echo.desktop.voice.AudixVoiceSearchModal
 
 import dev.brahmkshatriya.echo.desktop.viewmodel.PlayerViewModel
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 import org.koin.compose.koinInject
 
@@ -338,11 +339,27 @@ fun MoviePlayScreen(
     LaunchedEffect(Unit) {
 
         MoviePlayRepository.ensureServerRunning()
-
         delay(1000)
-
         isServerOnline = MoviePlayRepository.isMovieBoxServerOnline()
+    }
 
+    var onlineSearchResults by remember { mutableStateOf<List<MovieBoxItem>>(emptyList()) }
+    var isSearchingOnline by remember { mutableStateOf(false) }
+
+    LaunchedEffect(searchQuery) {
+        val q = searchQuery.trim()
+        if (q.length >= 2) {
+            delay(350)
+            isSearchingOnline = true
+            val results = withContext(Dispatchers.IO) {
+                MoviePlayRepository.searchOnlineMovies(q)
+            }
+            onlineSearchResults = results
+            isSearchingOnline = false
+        } else {
+            onlineSearchResults = emptyList()
+            isSearchingOnline = false
+        }
     }
 
     val tabs = listOf("All", "Movies", "TV Shows", "4K Ultra HD", "Franchises", "Live TV")
@@ -350,25 +367,27 @@ fun MoviePlayScreen(
     val vibes = listOf("All", "🔥 Adrenaline", "🧠 Sci-Fi", "❤️ Romance", "🌑 Dark Thrillers", "😂 Comedy", "🌸 Anime", "👻 Horror")
 
     // Base filtering based on search, tab, vibe, franchise
-
-    val baseFilteredMovies = remember(selectedTab, selectedVibe, selectedFranchise, searchQuery, allMovies) {
-
+    val baseFilteredMovies = remember(selectedTab, selectedVibe, selectedFranchise, searchQuery, allMovies, onlineSearchResults) {
         val q = searchQuery.trim()
-
         var list = if (q.isNotBlank()) {
-
-            allMovies.filter { m ->
-
+            val local = allMovies.filter { m ->
                 m.title.contains(q, ignoreCase = true) ||
-
                 m.genre.contains(q, ignoreCase = true) ||
-
                 m.year.contains(q, ignoreCase = true) ||
-
                 m.description.contains(q, ignoreCase = true)
-
             }
-
+            if (onlineSearchResults.isEmpty()) {
+                local
+            } else {
+                val seen = local.map { it.title.lowercase().trim() }.toMutableSet()
+                val merged = local.toMutableList()
+                for (item in onlineSearchResults) {
+                    if (seen.add(item.title.lowercase().trim())) {
+                        merged.add(item)
+                    }
+                }
+                merged
+            }
         } else {
 
             when (selectedTab) {
@@ -1090,9 +1109,16 @@ fun MoviePlayScreen(
                         trailingIcon = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 modifier = Modifier.padding(end = 6.dp)
                             ) {
+                                if (isSearchingOnline) {
+                                    CircularProgressIndicator(
+                                        color = Color(0xFFE11D48),
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                                 if (searchQuery.isNotBlank()) {
                                     IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(28.dp)) {
                                         Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.70f), modifier = Modifier.size(17.dp))

@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
@@ -7324,7 +7325,7 @@ private fun RenderAiIntelligenceCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.OpenInNew,
+                            Icons.AutoMirrored.Filled.OpenInNew,
                             contentDescription = null,
                             tint = Color(0xFF4E95FF),
                             modifier = Modifier.size(12.dp)

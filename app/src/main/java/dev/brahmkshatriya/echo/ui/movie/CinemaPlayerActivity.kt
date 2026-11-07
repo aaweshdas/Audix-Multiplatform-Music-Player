@@ -27,9 +27,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.brahmkshatriya.echo.R
 import dev.brahmkshatriya.echo.databinding.ActivityCinemaPlayerBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import java.net.URLEncoder
 
@@ -56,47 +60,29 @@ class CinemaPlayerActivity : AppCompatActivity() {
     private data class StreamServer(val name: String, val badge: String, val urlBuilder: (imdb: String, title: String, isTv: Boolean) -> String)
 
     private val streamServers = listOf(
-        StreamServer("Server 1 (AutoEmbed 4K)", "Ultra HD") { id, title, isTv ->
-            if (id.isNotBlank()) {
-                if (isTv) "https://autoembed.to/tv/imdb/$id/1/1" else "https://autoembed.to/movie/imdb/$id"
-            } else {
-                "https://autoembed.to/movie/search?q=${URLEncoder.encode(title, "UTF-8")}"
-            }
+        StreamServer("Server 1 (VidSrc Cloud)", "Fast HD") { id, title, isTv ->
+            val cleanId = id.ifBlank { "tt0816692" }
+            if (isTv) "https://vidsrc.to/embed/tv/$cleanId/1/1" else "https://vidsrc.to/embed/movie/$cleanId"
         },
-        StreamServer("Server 2 (VidSrc VIP)", "Multi-Audio") { id, title, isTv ->
-            if (id.isNotBlank()) {
-                if (isTv) "https://vidsrc.to/embed/tv/$id/1/1" else "https://vidsrc.to/embed/movie/$id"
-            } else {
-                "https://vidsrc.to/embed/movie/${URLEncoder.encode(title, "UTF-8")}"
-            }
+        StreamServer("Server 2 (VidSrc PM)", "Ultra HD") { id, title, isTv ->
+            val cleanId = id.ifBlank { "tt0816692" }
+            if (isTv) "https://vidsrc.pm/embed/tv/$cleanId/1-1" else "https://vidsrc.pm/embed/movie/$cleanId"
         },
-        StreamServer("Server 3 (VidLink Cloud)", "Instant Fast") { id, title, isTv ->
-            if (id.isNotBlank()) {
-                if (isTv) "https://vidlink.pro/tv/$id/1/1" else "https://vidlink.pro/movie/$id"
-            } else {
-                "https://vidlink.pro/movie/${URLEncoder.encode(title, "UTF-8")}"
-            }
+        StreamServer("Server 3 (VidSrc VIP)", "Multi-Audio") { id, title, isTv ->
+            val cleanId = id.ifBlank { "tt0816692" }
+            if (isTv) "https://vidsrc.xyz/embed/tv/$cleanId/1-1" else "https://vidsrc.xyz/embed/movie/$cleanId"
         },
-        StreamServer("Server 4 (VidSrc Pro)", "Reliable HD") { id, title, isTv ->
-            if (id.isNotBlank()) {
-                if (isTv) "https://vidsrc.me/embed/tv?imdb=$id&season=1&episode=1" else "https://vidsrc.me/embed/movie?imdb=$id"
-            } else {
-                "https://vidsrc.me/embed/movie?imdb=${URLEncoder.encode(title, "UTF-8")}"
-            }
+        StreamServer("Server 4 (VidSrc Direct)", "Direct Stream") { id, title, isTv ->
+            val cleanId = id.ifBlank { "tt0816692" }
+            if (isTv) "https://vidsrc.net/embed/tv/$cleanId/1/1" else "https://vidsrc.net/embed/movie/$cleanId"
         },
-        StreamServer("Server 5 (SmashyStream)", "Direct Stream") { id, title, isTv ->
-            if (id.isNotBlank()) {
-                if (isTv) "https://embed.smashystream.com/playere.php?imdb=$id&season=1&episode=1" else "https://embed.smashystream.com/playere.php?imdb=$id"
-            } else {
-                "https://embed.smashystream.com/playere.php?imdb=${URLEncoder.encode(title, "UTF-8")}"
-            }
+        StreamServer("Server 5 (2Embed VIP)", "Reliable HD") { id, title, isTv ->
+            val cleanId = id.ifBlank { "tt0816692" }
+            if (isTv) "https://www.2embed.cc/embedtv/$cleanId&s=1&e=1" else "https://www.2embed.cc/embed/$cleanId"
         },
-        StreamServer("Server 6 (MultiEmbed)", "Global Mirror") { id, title, isTv ->
-            if (id.isNotBlank()) {
-                if (isTv) "https://multiembed.mov/?video_id=$id&s=1&e=1" else "https://multiembed.mov/?video_id=$id"
-            } else {
-                "https://multiembed.mov/?video_id=${URLEncoder.encode(title, "UTF-8")}"
-            }
+        StreamServer("Server 6 (Smashy Player)", "Instant Mirror") { id, title, isTv ->
+            val cleanId = id.ifBlank { "tt0816692" }
+            if (isTv) "https://embed.smashystream.com/playere.php?imdb=$cleanId&season=1&episode=1" else "https://embed.smashystream.com/playere.php?imdb=$cleanId"
         }
     )
 
@@ -117,7 +103,7 @@ class CinemaPlayerActivity : AppCompatActivity() {
         parseIntentExtras()
         setupViews()
         setupWebView()
-        loadServerStream(currentServerIndex)
+        startStreamPlayback(currentServerIndex)
     }
 
     private fun parseIntentExtras() {
@@ -183,10 +169,29 @@ class CinemaPlayerActivity : AppCompatActivity() {
             .setItems(serverOptions) { _, which ->
                 currentServerIndex = which
                 binding.btnServerSelector.text = "Server ${which + 1} ▾"
-                loadServerStream(which)
+                startStreamPlayback(which)
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun startStreamPlayback(index: Int) {
+        currentServerIndex = index
+        if (imdbId.isNotBlank() && imdbId.startsWith("tt", ignoreCase = true)) {
+            loadServerStream(index)
+        } else {
+            binding.llCinemaLoading.visibility = View.VISIBLE
+            binding.tvLoadingStatus.text = "Resolving Cinema ID for '$movieTitle'..."
+            lifecycleScope.launch(Dispatchers.IO) {
+                val resolved = MoviePlayRepository.resolveImdbId(movieTitle, isSeries)
+                withContext(Dispatchers.Main) {
+                    if (!resolved.isNullOrBlank()) {
+                        imdbId = resolved
+                    }
+                    loadServerStream(index)
+                }
+            }
+        }
     }
 
     private fun loadServerStream(index: Int) {
@@ -216,11 +221,13 @@ class CinemaPlayerActivity : AppCompatActivity() {
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
 
-        // Strict anti-ad & anti-popup settings
+        // Strict anti-ad & anti-popup settings:
+        // Set multiple windows to true so window.open() routes to onCreateWindow,
+        // which returns false to swallow popups completely.
+        settings.setSupportMultipleWindows(true)
         settings.javaScriptCanOpenWindowsAutomatically = false
-        settings.setSupportMultipleWindows(false)
 
-        // Set modern Chrome desktop-like user agent to avoid forced mobile app redirects
+        // Set modern Chrome user agent to prevent unwanted mobile redirects
         settings.userAgentString =
             "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro Build/UQ1A.240205.004) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
@@ -243,7 +250,7 @@ class CinemaPlayerActivity : AppCompatActivity() {
                     }
                 }, 800L)
 
-                // Inject CSS/JS to remove intrusive overlay buttons and autoplay video
+                // Inject CSS/JS to remove intrusive overlay buttons and ensure dark background
                 view?.evaluateJavascript(
                     """
                     (function() {
@@ -252,7 +259,7 @@ class CinemaPlayerActivity : AppCompatActivity() {
                             iframe[id*="google_ads"], div[class*="ad-"], div[id*="ad-"],
                             a[href*="betting"], a[href*="casino"], .banner-ad,
                             .ad-banner, .pop-overlay, #overlay, .jw-ad { display: none !important; }
-                            body, html { background-color: #000000 !important; overflow: hidden !important; }
+                            body, html { background-color: #000000 !important; }
                         `;
                         document.head.appendChild(style);
                     })();
@@ -271,13 +278,36 @@ class CinemaPlayerActivity : AppCompatActivity() {
                 val uri = Uri.parse(url)
                 val host = uri.host?.lowercase() ?: ""
 
-                // Strict Allowed Streaming & Infrastructure Domains
-                val isStreamingDomain = host.contains("autoembed") ||
-                        host.contains("vidsrc") ||
+                // Common ad network patterns
+                val isAdPattern = host.contains("doubleclick") ||
+                        host.contains("syndication") ||
+                        host.contains("popads") ||
+                        host.contains("popcash") ||
+                        host.contains("betting") ||
+                        host.contains("casino") ||
+                        host.contains("exoclick") ||
+                        host.contains("propeller") ||
+                        host.contains("trafficjunky") ||
+                        host.contains("juicyads") ||
+                        host.contains("adnxs")
+
+                if (isAdPattern) {
+                    return true // Swallow and block ad redirect silently
+                }
+
+                // If sub-frame (iframe video player, CDN stream, token handshake)
+                // NEVER block it! Let it load cleanly inside the player iframe
+                if (request?.isForMainFrame == false) {
+                    return false
+                }
+
+                // Strict Allowed Streaming & Infrastructure Domains for main frame
+                val isStreamingDomain = host.contains("vidsrc") ||
                         host.contains("vidlink") ||
-                        host.contains("smashystream") ||
-                        host.contains("multiembed") ||
+                        host.contains("smashy") ||
+                        host.contains("anyembed") ||
                         host.contains("2embed") ||
+                        host.contains("multiembed") ||
                         host.contains("superembed") ||
                         host.contains("rabbitstream") ||
                         host.contains("megacloud") ||
@@ -291,22 +321,7 @@ class CinemaPlayerActivity : AppCompatActivity() {
                     return false // Allow WebView to navigate internally
                 }
 
-                // Check for common ad / popup redirect patterns
-                val isAdPattern = host.contains("ad") ||
-                        host.contains("pop") ||
-                        host.contains("bet") ||
-                        host.contains("casino") ||
-                        host.contains("track") ||
-                        host.contains("click") ||
-                        host.contains("banner") ||
-                        host.contains("doubleclick") ||
-                        host.contains("syndication")
-
-                if (isAdPattern) {
-                    return true // Swallow and block ad redirect silently
-                }
-
-                // For any other unexpected external navigation, prevent leaving the app
+                // Block unexpected external navigations
                 return true
             }
 
@@ -326,6 +341,16 @@ class CinemaPlayerActivity : AppCompatActivity() {
         }
 
         wv.webChromeClient = object : WebChromeClient() {
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: android.os.Message?
+            ): Boolean {
+                // Silently block popups and unwanted new windows!
+                return false
+            }
+
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                 customView = view
                 customViewCallback = callback
@@ -341,6 +366,7 @@ class CinemaPlayerActivity : AppCompatActivity() {
                 binding.wvCinemaPlayer.visibility = View.VISIBLE
                 customViewCallback?.onCustomViewHidden()
                 customView = null
+                customViewCallback = null
                 customViewCallback = null
                 fadeControls(true)
             }

@@ -6,6 +6,7 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -16,11 +17,17 @@ import dev.brahmkshatriya.echo.common.models.ImageHolder.Companion.toImageHolder
 import dev.brahmkshatriya.echo.databinding.BottomSheetCinemaStudioBinding
 import dev.brahmkshatriya.echo.databinding.ItemMovieCardBinding
 import dev.brahmkshatriya.echo.utils.image.ImageUtils.loadInto
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class CinemaStudioBottomSheet : BottomSheetDialogFragment() {
 
     private var _binding: BottomSheetCinemaStudioBinding? = null
     private val binding get() = _binding!!
+    private var searchJob: Job? = null
 
     override fun getTheme() = R.style.EchoBottomSheetDialog
 
@@ -63,16 +70,46 @@ class CinemaStudioBottomSheet : BottomSheetDialogFragment() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val query = s?.toString()?.trim() ?: ""
-                filteredList = if (query.isBlank()) {
-                    allMovies
+                searchJob?.cancel()
+
+                if (query.isBlank()) {
+                    filteredList = allMovies
+                    binding.movieCountBadge.text = "${allMovies.size} TITLES"
+                    adapter.updateItems(filteredList)
                 } else {
-                    allMovies.filter {
+                    // Instant local match
+                    val localMatches = allMovies.filter {
                         it.title.contains(query, ignoreCase = true) ||
                                 it.genre.contains(query, ignoreCase = true) ||
                                 it.year.contains(query, ignoreCase = true)
                     }
+                    filteredList = localMatches
+                    binding.movieCountBadge.text = "${localMatches.size} TITLES"
+                    adapter.updateItems(localMatches)
+
+                    // Online live search if query >= 2 characters
+                    if (query.length >= 2) {
+                        searchJob = lifecycleScope.launch(Dispatchers.IO) {
+                            delay(350)
+                            val onlineResults = MoviePlayRepository.searchOnline(query)
+                            if (onlineResults.isNotEmpty()) {
+                                withContext(Dispatchers.Main) {
+                                    val seen = localMatches.map { it.title.lowercase().trim() }.toMutableSet()
+                                    val merged = localMatches.toMutableList()
+                                    for (item in onlineResults) {
+                                        val key = item.title.lowercase().trim()
+                                        if (seen.add(key)) {
+                                            merged.add(item)
+                                        }
+                                    }
+                                    filteredList = merged
+                                    binding.movieCountBadge.text = "${merged.size} TITLES"
+                                    adapter.updateItems(merged)
+                                }
+                            }
+                        }
+                    }
                 }
-                adapter.updateItems(filteredList)
             }
             override fun afterTextChanged(s: Editable?) {}
         })

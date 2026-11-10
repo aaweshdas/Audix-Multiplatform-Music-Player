@@ -17,8 +17,12 @@ def get_b64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
+# LATEST NIGHTLY ASSETS
 phone_b64 = get_b64(os.path.join(brain_dir, "phone_screen_updated.png"))
-desktop_b64 = get_b64(os.path.join(user_up_dir, "media_1791816044789_27efbb28.jpg"))
+# Use the brand new latest desktop UI!
+latest_desktop_path = os.path.join(images_dir, "latest_nightly_desktop_ui.png")
+desktop_b64 = get_b64(latest_desktop_path)
+
 cinema_b64 = get_b64(os.path.join(user_up_dir, "media_1793515096338_733c01cf.jpg"))
 logo_b64 = get_b64(os.path.join(brain_dir, "nightly_app_logo_1793742061187.jpg"))
 voice_b64 = get_b64(os.path.join(user_up_dir, "media_1793736510187_3fe70c95.png"))
@@ -45,7 +49,6 @@ def render_html(html_str, out_path, width=1200, height=675):
     else:
         print(f"FAILED: {os.path.basename(out_path)}")
 
-# ---------------- COMMON CSS HEAD ----------------
 COMMON_HEAD = '''
 <meta charset="utf-8">
 <style>
@@ -193,44 +196,24 @@ def build_hero_collage():
     justify-content: flex-end;
   }}
   .desktop-frame {{
-    width: 610px;
-    height: 380px;
+    width: 630px;
+    height: 385px;
     background: #11141E;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 35px 80px -15px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
     position: absolute;
     right: 20px;
     top: 50%;
     transform: translateY(-50%);
     z-index: 2;
   }}
-  .desktop-header {{
-    height: 34px;
-    background: #161B26;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    display: flex;
-    align-items: center;
-    padding: 0 14px;
-    gap: 8px;
-  }}
-  .dot {{ width: 10px; height: 10px; border-radius: 50%; }}
-  .dot-red {{ background: #FF5F56; opacity: 0.85; }}
-  .dot-yellow {{ background: #FFBD2E; opacity: 0.85; }}
-  .dot-green {{ background: #27C93F; opacity: 0.85; }}
-  .desktop-title {{
-    margin-left: 10px;
-    font-size: 11px;
-    font-weight: 500;
-    color: #64748B;
-  }}
   .desktop-img {{
     width: 100%;
-    flex: 1;
+    height: 100%;
     object-fit: cover;
+    object-position: top center;
   }}
   .phone-frame {{
     width: 185px;
@@ -289,11 +272,7 @@ def build_hero_collage():
   </div>
   <div class="right-col">
     <div class="desktop-frame">
-      <div class="desktop-header">
-        <div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div>
-        <span class="desktop-title">Nightly Desktop — Player & 28-Band FFT</span>
-      </div>
-      <img class="desktop-img" src="data:image/jpeg;base64,{desktop_b64}" />
+      <img class="desktop-img" src="data:image/png;base64,{desktop_b64}" />
     </div>
     <div class="phone-frame">
       <div class="phone-island"></div>
@@ -426,7 +405,6 @@ def build_architecture():
   </div>
 
   <div class="arch-cards">
-    <!-- Card 1 -->
     <div class="arch-card">
       <div class="card-top">
         <div class="card-num" style="color: #A78BFA;">01 / PRESENTATION</div>
@@ -440,7 +418,6 @@ def build_architecture():
       </div>
     </div>
 
-    <!-- Card 2 -->
     <div class="arch-card">
       <div class="card-top">
         <div class="card-num" style="color: #38BDF8;">02 / KMP SHARED CORE</div>
@@ -454,7 +431,6 @@ def build_architecture():
       </div>
     </div>
 
-    <!-- Card 3 -->
     <div class="arch-card">
       <div class="card-top">
         <div class="card-num" style="color: #34D399;">03 / HARDWARE & AI</div>
@@ -618,7 +594,7 @@ def build_mobile_showcase():
     render_html(html, os.path.join(images_dir, "02_Android_Mobile_Player.png"))
 
 # =========================================================================
-# ASSET 4: 03_Desktop_Player_Visualizer.png (Studio Desktop Showcase - 1200 x 675)
+# ASSET 4: 03_Desktop_Player_Visualizer.png (LATEST NIGHTLY DESKTOP SHOWCASE)
 # =========================================================================
 def build_desktop_showcase():
     html = f'''<!DOCTYPE html>
@@ -631,7 +607,7 @@ def build_desktop_showcase():
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 40px 65px;
+    padding: 36px 65px;
   }}
   .top-bar {{
     display: flex;
@@ -647,38 +623,17 @@ def build_desktop_showcase():
   }}
   .window-card {{
     width: 100%;
-    height: 440px;
+    height: 455px;
     background: #11141E;
     border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 40px 90px -20px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.06);
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    margin: 18px 0;
-  }}
-  .win-header {{
-    height: 36px;
-    background: #161B26;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    gap: 8px;
-  }}
-  .dot {{ width: 10px; height: 10px; border-radius: 50%; }}
-  .dot-red {{ background: #FF5F56; opacity: 0.85; }}
-  .dot-yellow {{ background: #FFBD2E; opacity: 0.85; }}
-  .dot-green {{ background: #27C93F; opacity: 0.85; }}
-  .win-title {{
-    margin-left: 12px;
-    font-size: 12px;
-    color: #64748B;
-    font-weight: 500;
+    margin: 14px 0;
   }}
   .win-img {{
     width: 100%;
-    flex: 1;
+    height: 100%;
     object-fit: cover;
     object-position: top center;
   }}
@@ -692,25 +647,21 @@ def build_desktop_showcase():
   <div class="glow-purple"></div>
   <div class="top-bar">
     <div>
-      <div class="badge"><div class="badge-dot"></div>Desktop Audio Station</div>
-      <h2>Audiophile 28-Band FFT Visualizer</h2>
+      <div class="badge"><div class="badge-dot"></div>Latest Desktop Release</div>
+      <h2>Nightly Desktop Station — 28-Band FFT & Cinema</h2>
     </div>
-    <div class="pill-chip">Windows • macOS • Linux</div>
+    <div class="pill-chip">libVLC Native C-Bindings • 60 FPS Direct3D</div>
   </div>
 
   <div class="window-card">
-    <div class="win-header">
-      <div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div>
-      <span class="win-title">Nightly Desktop — VLCJ Native libVLC Engine & Cooley-Tukey FFT</span>
-    </div>
-    <img class="win-img" src="data:image/jpeg;base64,{desktop_b64}" />
+    <img class="win-img" src="data:image/png;base64,{desktop_b64}" />
   </div>
 
   <div class="bottom-chips">
     <div class="pill-chip">✦ Mathematical 512-Point Radix-2 FFT</div>
-    <div class="pill-chip">✦ Hann Windowing & Spectral Filtering</div>
-    <div class="pill-chip">✦ Low-Latency Native libVLC C-Bindings</div>
-    <div class="pill-chip">✦ Gapless Audio & Local Library Indexing</div>
+    <div class="pill-chip">✦ In-App Cinema Theater (Movie Play)</div>
+    <div class="pill-chip">✦ Native libVLC Low-Latency Pipeline</div>
+    <div class="pill-chip">✦ Standalone Portable Zero-Install</div>
   </div>
 </body>
 </html>'''
@@ -730,7 +681,7 @@ def build_cinema_showcase():
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 40px 65px;
+    padding: 36px 65px;
   }}
   .top-bar {{
     display: flex;
@@ -746,15 +697,13 @@ def build_cinema_showcase():
   }}
   .window-card {{
     width: 100%;
-    height: 440px;
+    height: 455px;
     background: #11141E;
     border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 40px 90px -20px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.06);
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    margin: 18px 0;
+    margin: 14px 0;
   }}
   .win-header {{
     height: 36px;
@@ -777,7 +726,7 @@ def build_cinema_showcase():
   }}
   .win-img {{
     width: 100%;
-    flex: 1;
+    height: 100%;
     object-fit: cover;
     object-position: top center;
   }}
@@ -944,7 +893,7 @@ def build_voice_showcase():
     render_html(html, os.path.join(images_dir, "05_AI_Voice_Search_Modal.png"))
 
 # =========================================================================
-# ASSET 7: CAROUSEL SLIDES (6 Slides - 1080 x 1350 vertical 4:5)
+# ASSET 7: CAROUSEL SLIDES (WITH LATEST DESKTOP UI ON EVERY RELEVANT SLIDE)
 # =========================================================================
 CAROUSEL_HEAD = '''
 <meta charset="utf-8">
@@ -957,12 +906,12 @@ CAROUSEL_HEAD = '''
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     position: relative;
     overflow: hidden;
-    padding: 80px 80px 70px 80px;
+    padding: 70px 75px 60px 75px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     -webkit-font-smoothing: antialiased;
-  }}
+  }
   .glow-top {
     position: absolute;
     width: 750px; height: 500px;
@@ -1013,7 +962,7 @@ CAROUSEL_HEAD = '''
     justify-content: space-between;
     align-items: center;
     border-top: 1px solid rgba(255, 255, 255, 0.07);
-    padding-top: 24px;
+    padding-top: 22px;
     font-size: 14px;
     color: #64748B;
   }
@@ -1061,16 +1010,16 @@ def render_carousel_slide(slide_num, title, badge_text, body_html, next_text="Sw
     return out_file
 
 def build_carousel():
-    # Slide 1: Cover
+    # Slide 1: Cover with Latest Desktop Preview!
     s1_body = f'''
     <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
-      <div style="width: 280px; height: 280px; border-radius: 40px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 35px 80px -15px rgba(99, 102, 241, 0.35); margin-bottom: 48px;">
-        <img src="data:image/jpeg;base64,{logo_b64}" style="width: 100%; height: 100%; object-fit: cover;" />
+      <div style="width: 880px; height: 490px; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 35px 80px -15px rgba(99, 102, 241, 0.45); margin-bottom: 38px;">
+        <img src="data:image/png;base64,{desktop_b64}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;" />
       </div>
-      <h1 style="font-size: 64px; font-weight: 800; letter-spacing: -0.03em; color: #FFFFFF; line-height: 1.1; margin-bottom: 20px;">
+      <h1 style="font-size: 60px; font-weight: 800; letter-spacing: -0.03em; color: #FFFFFF; line-height: 1.1; margin-bottom: 16px;">
         Nightly <span style="background: linear-gradient(135deg, #A78BFA, #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🌙</span>
       </h1>
-      <p style="font-size: 24px; color: #94A3B8; max-width: 720px; line-height: 1.5; margin-bottom: 40px;">
+      <p style="font-size: 22px; color: #94A3B8; max-width: 780px; line-height: 1.5; margin-bottom: 32px;">
         The all-in-one open-source media & cinema player built with Kotlin Multiplatform.
       </p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
@@ -1110,55 +1059,59 @@ def build_carousel():
     '''
     render_carousel_slide(2, "The Problem", "THE VISION", s2_body)
 
-    # Slide 3: One Codebase. Two Engines.
-    s3_body = '''
+    # Slide 3: One Codebase. Two Native Engines. (With Latest Desktop & Mobile Showcase!)
+    s3_body = f'''
     <div>
-      <h2 style="font-size: 52px; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; line-height: 1.15; margin-bottom: 20px;">
+      <h2 style="font-size: 48px; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; line-height: 1.15; margin-bottom: 16px;">
         One Codebase.<br>Two Native Engines.
       </h2>
-      <p style="font-size: 20px; color: #94A3B8; line-height: 1.6; margin-bottom: 48px;">
+      <p style="font-size: 18px; color: #94A3B8; line-height: 1.5; margin-bottom: 24px;">
         Over 90% of code is shared across Android and Desktop with zero compromises in audio performance.
       </p>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px;">
-        <div style="background: rgba(15, 19, 29, 0.7); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 18px; padding: 32px 28px;">
-          <div style="font-size: 12px; font-weight: 700; color: #38BDF8; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px;">📱 MOBILE CLIENT</div>
-          <h3 style="font-size: 24px; color: #FFFFFF; font-weight: 700; margin-bottom: 16px;">Android (Media3)</h3>
-          <p style="font-size: 15px; color: #94A3B8; line-height: 1.6;">• AndroidX Media3 ExoPlayer<br>• Foreground Playback Service<br>• Lock-screen MediaSession<br>• Material 3 Dynamic Colors<br>• Min SDK 24 to Android 15</p>
-        </div>
-        <div style="background: rgba(15, 19, 29, 0.7); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 18px; padding: 32px 28px;">
-          <div style="font-size: 12px; font-weight: 700; color: #A78BFA; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px;">💻 DESKTOP CLIENT</div>
-          <h3 style="font-size: 24px; color: #FFFFFF; font-weight: 700; margin-bottom: 16px;">Desktop (libVLC)</h3>
-          <p style="font-size: 15px; color: #94A3B8; line-height: 1.6;">• Native VLCJ libVLC C-Bindings<br>• Gapless Lossless Audio Engine<br>• Windows, macOS & Linux<br>• 28-Band Real-Time Visualizer<br>• Zero-Install Portable Run</p>
-        </div>
+
+      <!-- Visual Showcase of Both Platforms -->
+      <div style="width: 100%; height: 380px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 25px 60px -10px rgba(0,0,0,0.8); margin-bottom: 28px;">
+        <img src="data:image/png;base64,{desktop_b64}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;" />
       </div>
-      <div style="background: rgba(30, 41, 59, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 18px 24px; text-align: center; font-size: 15px; color: #CBD5E1;">
-        ⚡ <strong>Compose Multiplatform</strong> powers 100% of the UI across phone, tablet, and PC.
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div style="background: rgba(15, 19, 29, 0.7); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; padding: 20px 22px;">
+          <div style="font-size: 11px; font-weight: 700; color: #38BDF8; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px;">📱 ANDROID CLIENT</div>
+          <h4 style="font-size: 18px; color: #FFFFFF; font-weight: 700; margin-bottom: 8px;">Media3 ExoPlayer</h4>
+          <p style="font-size: 13.5px; color: #94A3B8; line-height: 1.5;">Foreground background service, lock-screen session, and dynamic Material 3 theming.</p>
+        </div>
+        <div style="background: rgba(15, 19, 29, 0.7); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 14px; padding: 20px 22px;">
+          <div style="font-size: 11px; font-weight: 700; color: #A78BFA; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px;">💻 DESKTOP CLIENT</div>
+          <h4 style="font-size: 18px; color: #FFFFFF; font-weight: 700; margin-bottom: 8px;">VLCJ Native C-Bindings</h4>
+          <p style="font-size: 13.5px; color: #94A3B8; line-height: 1.5;">Gapless audio, Direct3D 60fps acceleration, 28-band FFT, and standalone portable execution.</p>
+        </div>
       </div>
     </div>
     '''
     render_carousel_slide(3, "Cross-Platform", "ARCHITECTURE", s3_body)
 
     # Slide 4: Universal Catalog & In-App Cinema
-    s4_body = '''
+    s4_body = f'''
     <div>
-      <h2 style="font-size: 52px; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; line-height: 1.15; margin-bottom: 20px;">
+      <h2 style="font-size: 48px; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; line-height: 1.15; margin-bottom: 16px;">
         Music & In-App Cinema.<br>All Under One Roof.
       </h2>
-      <p style="font-size: 20px; color: #94A3B8; line-height: 1.6; margin-bottom: 48px;">
+      <p style="font-size: 18px; color: #94A3B8; line-height: 1.5; margin-bottom: 24px;">
         One universal library that aggregates streaming platforms into a clean, ad-free station.
       </p>
-      <div style="display: flex; flex-direction: column; gap: 20px;">
-        <div style="background: rgba(15, 19, 29, 0.6); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 16px; padding: 24px 28px;">
-          <h3 style="font-size: 20px; color: #C7D2FE; font-weight: 600; margin-bottom: 6px;">🎶 Decoupled Extension SPI</h3>
-          <p style="font-size: 16px; color: #94A3B8; line-height: 1.5;">Modular plugin system supporting Spotify, JioSaavn, YouTube Music, SoundCloud, and global radio stations.</p>
+
+      <div style="width: 100%; height: 350px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 25px 60px -10px rgba(0,0,0,0.8); margin-bottom: 24px;">
+        <img src="data:image/png;base64,{desktop_b64}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;" />
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="background: rgba(15, 19, 29, 0.6); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 16px 22px;">
+          <h4 style="font-size: 16px; color: #C7D2FE; font-weight: 600; margin-bottom: 4px;">🎶 Decoupled Extension SPI</h4>
+          <p style="font-size: 14px; color: #94A3B8; line-height: 1.4;">Modular plugin system supporting Spotify, JioSaavn, YouTube Music, SoundCloud, and global radio.</p>
         </div>
-        <div style="background: rgba(15, 19, 29, 0.6); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 16px; padding: 24px 28px;">
-          <h3 style="font-size: 20px; color: #C7D2FE; font-weight: 600; margin-bottom: 6px;">🎬 In-App Cinema Studio</h3>
-          <p style="font-size: 16px; color: #94A3B8; line-height: 1.5;">Automated Cinemeta IMDb metadata mapping (`tt...`), episode indexing, and fallback stream mirrors.</p>
-        </div>
-        <div style="background: rgba(15, 19, 29, 0.6); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 16px; padding: 24px 28px;">
-          <h3 style="font-size: 20px; color: #C7D2FE; font-weight: 600; margin-bottom: 6px;">🛡️ Sandboxed Security Shield</h3>
-          <p style="font-size: 16px; color: #94A3B8; line-height: 1.5;">Isolated WebView container that strictly neutralizes popup redirects, ads, and third-party trackers.</p>
+        <div style="background: rgba(15, 19, 29, 0.6); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 16px 22px;">
+          <h4 style="font-size: 16px; color: #C7D2FE; font-weight: 600; margin-bottom: 4px;">🎬 In-App Cinema Theater & Security Shield</h4>
+          <p style="font-size: 14px; color: #94A3B8; line-height: 1.4;">Automated Cinemeta IMDb metadata mapping (`tt...`) inside a strictly popup-shielded container.</p>
         </div>
       </div>
     </div>
@@ -1221,7 +1174,7 @@ def build_carousel():
     '''
     render_carousel_slide(6, "Get Started", "OPEN SOURCE", s6_body, next_text="Done ✔")
 
-    # Combine into PDF
+    # Re-compile PDF
     slide_files = [os.path.join(slides_dir, f"Slide_{i+1}.png") for i in range(6)]
     pdf_path = os.path.join(base_dir, "Nightly_Showcase_Carousel.pdf")
     pil_imgs = [Image.open(f).convert("RGB") for f in slide_files]

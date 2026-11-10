@@ -39,7 +39,17 @@ for old_jar in glob.glob(os.path.join(PROJECT_ROOT, r'build\clean_ref_for_compil
 
 # Prepare clean reference jar without modified classes to avoid compilation/classpath duplicates
 clean_ref_jar = os.path.join(PROJECT_ROOT, f'build\\clean_ref_for_compile_{os.getpid()}.jar')
-target_jar = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar')
+target_jar = None
+ra_app = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app')
+if os.path.exists(ra_app):
+    rec_jars = [os.path.join(ra_app, f) for f in os.listdir(ra_app) if f.startswith('recovered_classes') and f.endswith('.jar')]
+    if rec_jars:
+        # Pick the most recently modified jar
+        rec_jars.sort(key=os.path.getmtime, reverse=True)
+        target_jar = rec_jars[0]
+if not target_jar or not os.path.exists(target_jar):
+    target_jar = os.path.join(PROJECT_ROOT, r'tools\recovered-reference\recovered_classes.jar')
+print(f"Using reference jar for compile: {target_jar}")
 
 with zipfile.ZipFile(target_jar, 'r') as zin, zipfile.ZipFile(clean_ref_jar, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
     for item in zin.infolist():

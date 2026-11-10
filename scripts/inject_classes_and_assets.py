@@ -180,14 +180,29 @@ def update_jar(jar_path):
         shutil.move(temp_jar, jar_path)
     print(f'   Successfully updated: {jar_path}')
 
-target_jars = [
-    os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar'),
-    os.path.join(PROJECT_ROOT, r'desktopApp\build\compose\binaries\main\app\Audix\app\recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar'),
-    os.path.join(PROJECT_ROOT, r'tools\recovered-reference\recovered_classes.jar')
-]
+target_jars = set()
+ra_app = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app')
+if os.path.exists(ra_app):
+    for f in os.listdir(ra_app):
+        if f.startswith('recovered_classes') and f.endswith('.jar'):
+            target_jars.add(os.path.join(ra_app, f))
 
-print('[4/5] Injecting into application target JARs...')
-for tj in target_jars:
+build_roots = [
+    os.path.join(PROJECT_ROOT, r'desktopApp\build\compose\binaries\main\app\Audix\app'),
+    os.path.join(PROJECT_ROOT, r'desktopApp\build\compose\binaries\main\app\Nightly\app')
+]
+for br in build_roots:
+    if os.path.exists(br):
+        for f in os.listdir(br):
+            if f.startswith('recovered_classes') and f.endswith('.jar'):
+                target_jars.add(os.path.join(br, f))
+
+ref_tool = os.path.join(PROJECT_ROOT, r'tools\recovered-reference\recovered_classes.jar')
+if os.path.exists(ref_tool):
+    target_jars.add(ref_tool)
+
+print(f'[4/5] Injecting into {len(target_jars)} application target JARs...')
+for tj in sorted(target_jars):
     if os.path.exists(tj):
         update_jar(tj)
 
@@ -278,9 +293,14 @@ for portable_zip in portable_zips:
     if os.path.exists(portable_zip):
         print(f'[5/5] Updating portable distribution zip: {portable_zip}...')
         zip_temp = portable_zip + '.tmp'
-        rel_in_zip = 'Audix-Windows-Portable/app/recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar'
+        # Locate active recovered_classes jar on disk
+        ra_app_dir = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app')
+        active_rec_jars = [os.path.join(ra_app_dir, f) for f in os.listdir(ra_app_dir) if f.startswith('recovered_classes') and f.endswith('.jar')]
+        active_rec_jars.sort(key=os.path.getmtime, reverse=True)
+        updated_jar = active_rec_jars[0] if active_rec_jars else os.path.join(PROJECT_ROOT, r'tools\recovered-reference\recovered_classes.jar')
+        active_jar_name = os.path.basename(updated_jar)
+        rel_in_zip = f'Audix-Windows-Portable/app/{active_jar_name}'
         rel_desktopapp = 'Audix-Windows-Portable/app/desktopApp-desktop-4130d35d0d637cce842324b8b1d9432.jar'
-        updated_jar = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\recovered_classes-54e5364f3b10821b1e94dbe7d5dd973.jar')
         desktop_jar_disk = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable\app\desktopApp-desktop-4130d35d0d637cce842324b8b1d9432.jar')
         with open(updated_jar, 'rb') as f_jar:
             jar_bytes = f_jar.read()
@@ -382,13 +402,19 @@ for portable_zip in portable_zips:
         portable_dir = os.path.join(PROJECT_ROOT, r'release-artifacts\Audix-Windows-Portable')
         audix_exe = os.path.join(portable_dir, 'Audix.exe')
         nightly_exe = os.path.join(portable_dir, 'Nightly.exe')
-        if os.path.exists(audix_exe):
-            shutil.copy2(audix_exe, nightly_exe)
+        if os.path.exists(audix_exe) and not os.path.exists(nightly_exe):
+            try:
+                shutil.copy2(audix_exe, nightly_exe)
+            except Exception:
+                pass
         
         audix_cfg = os.path.join(portable_dir, r'app\Audix.cfg')
         nightly_cfg = os.path.join(portable_dir, r'app\Nightly.cfg')
-        if os.path.exists(audix_cfg):
-            shutil.copy2(audix_cfg, nightly_cfg)
+        if os.path.exists(audix_cfg) and not os.path.exists(nightly_cfg):
+            try:
+                shutil.copy2(audix_cfg, nightly_cfg)
+            except Exception:
+                pass
 
         nightly_zip = os.path.join(PROJECT_ROOT, r'release-artifacts\Nightly-v1.0.4-Windows-Portable.zip')
         if os.path.exists(portable_zip) and portable_zip != nightly_zip:

@@ -315,6 +315,8 @@ fun MoviePlayScreen(
     var sortOrder by remember { mutableStateOf(MovieSortOrder.NAME_ASC) }
 
     var groupByLetter by remember { mutableStateOf(true) }
+    var showHeroBanner by remember { mutableStateOf(false) }
+    var showAlphabetRibbon by remember { mutableStateOf(false) }
 
     val alphabetList = remember {
 
@@ -420,13 +422,31 @@ fun MoviePlayScreen(
 
                     } else {
 
-                        allMovies
+                        allMovies.filter { m ->
+
+                            franchiseCollections.any { col ->
+
+                                col.keywords.any { kw -> m.title.contains(kw, ignoreCase = true) }
+
+                            }
+
+                        }
 
                     }
 
                 }
 
                 else -> allMovies
+
+            }
+
+        }
+
+        if (selectedFranchise != null && selectedTab != "Franchises" && q.isBlank()) {
+
+            list = list.filter { m ->
+
+                selectedFranchise?.keywords?.any { kw -> m.title.contains(kw, ignoreCase = true) } == true
 
             }
 
@@ -621,491 +641,139 @@ fun MoviePlayScreen(
         ) {
 
             // ------------------------------------------------------------------------------------
-
-            // 1. HEADER: Title & Cinema Studio Status
-
+            // 1. SLEEK UNIFIED TOP COMMAND BAR & SEARCH NAVIGATION
             // ------------------------------------------------------------------------------------
-
             item {
-
-                Row(
-
-                    modifier = Modifier.fillMaxWidth(),
-
-                    verticalAlignment = Alignment.CenterVertically,
-
-                    horizontalArrangement = Arrangement.SpaceBetween
-
-                ) {
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-
-                        Row(
-
-                            verticalAlignment = Alignment.CenterVertically,
-
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-
-                        ) {
-
-                            LiquidGlassBox(
-
-                                shape = RoundedCornerShape(6.dp),
-
-                                borderColor = Color(0xFFE11D48).copy(alpha = 0.40f)
-
-                            ) {
-
-                                Text(
-
-                                    text = "MOVIEBOX CORE • 1,534+ CINEMA & SERIES TITLES",
-
-                                    fontSize = 10.sp,
-
-                                    fontWeight = FontWeight.Bold,
-
-                                    color = Color(0xFFE11D48),
-
-                                    letterSpacing = 0.5.sp,
-
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-
-                                )
-
-                            }
-
-                            // Live server status pill
-
-                            LiquidGlassBox(
-
-                                shape = RoundedCornerShape(6.dp),
-
-                                borderColor = if (isServerOnline) Color(0xFF10B981).copy(alpha = 0.40f) else Color(0xFF38BDF8).copy(alpha = 0.40f)
-
-                            ) {
-
-                                Text(
-
-                                    text = if (isServerOnline) "● Server 3000 Online" else "● Local Master Cache",
-
-                                    fontSize = 10.sp,
-
-                                    fontWeight = FontWeight.Bold,
-
-                                    color = if (isServerOnline) Color(0xFF10B981) else Color(0xFF38BDF8),
-
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-
-                                )
-
-                            }
-
-                        }
-
-                        Text(
-
-                            text = "Movie Play Cinema Studio",
-
-                            style = MaterialTheme.typography.headlineMedium.copy(
-
-                                fontWeight = FontWeight.ExtraBold,
-
-                                letterSpacing = (-0.5).sp
-
-                            ),
-
-                            color = Color.White
-
-                        )
-
-                        Text(
-
-                            text = "Direct high-speed cinema streams, franchise universes, 4K releases, live TV & continuous soundtrack jukeboxes.",
-
-                            style = MaterialTheme.typography.bodyMedium,
-
-                            color = Color.White.copy(alpha = 0.85f)
-
-                        )
-
-                    }
-
-                    // Action buttons (Open Web Studio / Cinema Screensaver)
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-
-                        LiquidGlassBox(
-
-                            shape = RoundedCornerShape(12.dp),
-
-                            modifier = Modifier
-
-                                .clip(RoundedCornerShape(12.dp))
-
-                                .clickable { MoviePlayRepository.openInBrowser("http://127.0.0.1:3000") }
-
-                        ) {
-
-                            Row(
-
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-
-                                verticalAlignment = Alignment.CenterVertically,
-
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-
-                            ) {
-
-                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(15.dp))
-
-                                Text("Web Studio", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-
-                            }
-
-                        }
-
-                        LiquidGlassBox(
-
-                            shape = RoundedCornerShape(12.dp),
-
-                            modifier = Modifier
-
-                                .clip(RoundedCornerShape(12.dp))
-
-                                .clickable { onLaunchScreensaver() }
-
-                        ) {
-
-                            Row(
-
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-
-                                verticalAlignment = Alignment.CenterVertically,
-
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-
-                            ) {
-
-                                Icon(Icons.Default.Theaters, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(15.dp))
-
-                                Text("Cinema Mode", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-            // ------------------------------------------------------------------------------------
-
-            // 2. HERO CINEMA SPOTLIGHT BANNER
-
-            // ------------------------------------------------------------------------------------
-
-            if (searchQuery.isBlank() && heroMovie != null && selectedTab != "Live TV") {
-
-                item {
-
-                    LiquidGlassBox(
-
-                        modifier = Modifier
-
-                            .fillMaxWidth()
-
-                            .height(220.dp),
-
-                        shape = RoundedCornerShape(20.dp),
-
-                        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.45f),
-
-                        borderColor = Color(0xFFE11D48).copy(alpha = 0.35f)
-
-                    ) {
-
-                        Row(
-
-                            modifier = Modifier
-
-                                .fillMaxSize()
-
-                                .padding(18.dp),
-
-                            verticalAlignment = Alignment.CenterVertically,
-
-                            horizontalArrangement = Arrangement.spacedBy(22.dp)
-
-                        ) {
-
-                            // Poster
-
-                            Box(
-
-                                modifier = Modifier
-
-                                    .width(135.dp)
-
-                                    .height(180.dp)
-
-                                    .shadow(12.dp, RoundedCornerShape(14.dp), spotColor = Color(0xFFE11D48))
-
-                                    .clip(RoundedCornerShape(14.dp))
-
-                                    .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(14.dp))
-
-                            ) {
-
-                                AsyncImage(
-
-                                    model = heroMovie.coverUrl.ifBlank { heroMovie.bannerUrl },
-
-                                    contentDescription = heroMovie.title,
-
-                                    contentScale = ContentScale.Crop,
-
-                                    modifier = Modifier.fillMaxSize()
-
-                                )
-
-                            }
-
-                            // Details
-
-                            Column(
-
-                                modifier = Modifier.weight(1f),
-
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-
-                            ) {
-
-                                Row(
-
-                                    verticalAlignment = Alignment.CenterVertically,
-
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-
-                                ) {
-
-                                    LiquidGlassBox(
-
-                                        shape = RoundedCornerShape(6.dp),
-
-                                        borderColor = Color(0xFFE11D48).copy(alpha = 0.60f)
-
-                                    ) {
-
-                                        Text(heroMovie.qualityBadge.ifBlank { "4K UHD" }, color = Color(0xFFE11D48), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-
-                                    }
-
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-
-                                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(13.dp))
-
-                                        Text("${heroMovie.rating} IMDB", color = Color(0xFFFBBF24), fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
-
-                                    }
-
-                                    Text(
-
-                                        text = "•  ${heroMovie.year}  •  ${heroMovie.duration.ifBlank { "2h" }}  •  ${heroMovie.genre}",
-
-                                        color = Color.White.copy(alpha = 0.70f),
-
-                                        fontSize = 11.sp,
-
-                                        fontWeight = FontWeight.Medium
-
-                                    )
-
-                                }
-
-                                Text(
-
-                                    text = heroMovie.title,
-
-                                    fontSize = 24.sp,
-
-                                    fontWeight = FontWeight.ExtraBold,
-
-                                    color = Color.White,
-
-                                    maxLines = 1,
-
-                                    overflow = TextOverflow.Ellipsis
-
-                                )
-
-                                Text(
-
-                                    text = heroMovie.description,
-
-                                    fontSize = 12.sp,
-
-                                    color = Color.White.copy(alpha = 0.85f),
-
-                                    maxLines = 2,
-
-                                    overflow = TextOverflow.Ellipsis,
-
-                                    lineHeight = 16.sp
-
-                                )
-
-                                Spacer(Modifier.height(4.dp))
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-
-                                    // Watch Stream
-
-                                    Button(
-
-                                        onClick = {
-
-                                            scope.launch {
-
-                                                MoviePlayRepository.playMovieDirect(heroMovie) { toastMessage = it }
-
-                                            }
-
-                                        },
-
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
-
-                                        shape = RoundedCornerShape(10.dp)
-
-                                    ) {
-
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-
-                                        Spacer(Modifier.width(6.dp))
-
-                                        Text("Stream Movie", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-
-                                    }
-
-                                    // Trailer
-
-                                    Button(
-
-                                        onClick = {
-
-                                            val tUrl = MoviePlayRepository.getTrailerUrl(heroMovie.title)
-
-                                            MoviePlayRepository.openInBrowser(tUrl)
-
-                                            toastMessage = "🎬 Opening Official Trailer for ${heroMovie.title}..."
-
-                                        },
-
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.12f)),
-
-                                        shape = RoundedCornerShape(10.dp)
-
-                                    ) {
-
-                                        Icon(Icons.Default.Theaters, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-
-                                        Spacer(Modifier.width(6.dp))
-
-                                        Text("Trailer", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-
-                                    }
-
-                                    // Jukebox
-
-                                    Button(
-
-                                        onClick = {
-
-                                            scope.launch {
-
-                                                toastMessage = "🎵 Finding Original Soundtrack for ${heroMovie.title}..."
-
-                                                val tracks = MoviePlayRepository.resolveSoundtrackForMovie(heroMovie.title)
-
-                                                if (tracks.isNotEmpty()) {
-
-                                                    playerViewModel.playWithQueue(tracks.first(), tracks)
-
-                                                    toastMessage = "▶ Playing Soundtrack: ${heroMovie.title} (${tracks.size} tracks queued)"
-
-                                                } else {
-
-                                                    toastMessage = "⚠ No audio album found for ${heroMovie.title}"
-
-                                                }
-
-                                            }
-
-                                        },
-
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.12f)),
-
-                                        shape = RoundedCornerShape(10.dp)
-
-                                    ) {
-
-                                        Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
-
-                                        Spacer(Modifier.width(6.dp))
-
-                                        Text("Soundtrack Jukebox", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-
-                                    }
-
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-            // ------------------------------------------------------------------------------------
-
-            // 3. NAVIGATION TABS & VIBE DISCOVERY RAILS
-
-            // ------------------------------------------------------------------------------------
-
-            item {
-
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Top Command Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Left: Studio Branding & Live Count Badge
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Cinema Studio",
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = (-0.5).sp
+                                ),
+                                color = Color.White
+                            )
+
+                            LiquidGlassBox(
+                                shape = RoundedCornerShape(8.dp),
+                                borderColor = if (isServerOnline) Color(0xFF10B981).copy(alpha = 0.40f) else Color(0xFF38BDF8).copy(alpha = 0.40f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isServerOnline) Color(0xFF10B981) else Color(0xFF38BDF8))
+                                    )
+                                    Text(
+                                        text = if (isServerOnline) "1,534+ Titles Online" else "1,534+ Master Titles",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isServerOnline) Color(0xFF10B981) else Color(0xFF38BDF8)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Right: Quick Actions (Spotlight Toggle, Cinema Mode, Web Studio)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Spotlight Toggle Button
+                            if (selectedTab == "All" && heroMovie != null && searchQuery.isBlank()) {
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(10.dp),
+                                    isSelected = showHeroBanner,
+                                    selectedBgColor = Color(0xFFE11D48).copy(alpha = 0.20f),
+                                    borderColor = if (showHeroBanner) Color(0xFFE11D48).copy(alpha = 0.50f) else Color.White.copy(alpha = 0.15f),
+                                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { showHeroBanner = !showHeroBanner }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Star,
+                                            contentDescription = null,
+                                            tint = if (showHeroBanner) Color(0xFFFBBF24) else Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = if (showHeroBanner) "Hide Spotlight" else "Show Spotlight",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (showHeroBanner) Color.White else Color.White.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Cinema Mode
+                            LiquidGlassBox(
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { onLaunchScreensaver() }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.Theaters, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(14.dp))
+                                    Text("Cinema Mode", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                                }
+                            }
+
+                            // Web Studio
+                            LiquidGlassBox(
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { MoviePlayRepository.openInBrowser("http://127.0.0.1:3000") }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(14.dp))
+                                    Text("Web Studio", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                                }
+                            }
+                        }
+                    }
 
                     // Search Bar
-
                     OutlinedTextField(
-
                         value = searchQuery,
-
                         onValueChange = {
-
                             searchQuery = it
-
                             if (it.isNotBlank()) selectedLetter = "All"
-
                         },
-
                         modifier = Modifier.fillMaxWidth(),
-
-                        shape = RoundedCornerShape(14.dp),
-
-                        placeholder = { Text("Search 1,534+ movies & shows by name, e.g. Avengers, Deadpool, Dune, Oppenheimer, Batman...", fontSize = 13.sp) },
-
+                        shape = RoundedCornerShape(12.dp),
+                        placeholder = { Text("Search 1,534+ movies & shows by name, e.g. Avengers, Deadpool, Dune, Oppenheimer...", fontSize = 12.5.sp) },
                         leadingIcon = {
-
-                            Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(20.dp))
-
+                            Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(18.dp))
                         },
-
                         trailingIcon = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1130,508 +798,607 @@ fun MoviePlayScreen(
                                 )
                             }
                         },
-
                         singleLine = true,
-
                         colors = OutlinedTextFieldDefaults.colors(
-
                             focusedTextColor = Color.White,
-
                             unfocusedTextColor = Color.White,
-
                             focusedBorderColor = Color(0xFFE11D48),
-
                             unfocusedBorderColor = Color.White.copy(alpha = 0.18f),
-
                             focusedContainerColor = Color(0xFF0A0C10).copy(alpha = 0.40f),
-
                             unfocusedContainerColor = Color(0xFF0A0C10).copy(alpha = 0.30f)
-
                         )
-
                     )
 
                     // Primary Navigation Tabs
-
                     LazyRow(
-
                         modifier = Modifier.fillMaxWidth(),
-
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
-
                     ) {
-
                         items(tabs, key = { it }) { tab ->
-
                             val isSelected = tab == selectedTab
-
                             val count = when (tab) {
-
                                 "All" -> allMovies.size
-
                                 "Movies" -> allMovies.count { it.type == "movie" }
-
                                 "TV Shows" -> allMovies.count { it.type == "series" }
-
                                 "4K Ultra HD" -> allMovies.count { it.qualityBadge.contains("4k", true) || it.genre.contains("Action", true) }
-
                                 "Franchises" -> franchiseCollections.size
-
                                 "Live TV" -> liveChannels.size
-
                                 else -> 0
-
                             }
-
                             SeniorFilterPill(
-
                                 title = "$tab ($count)",
-
                                 isSelected = isSelected,
-
                                 onClick = {
-
                                     selectedTab = tab
-
                                     searchQuery = ""
-
                                     selectedLetter = "All"
-
+                                    if (tab != "Franchises") selectedFranchise = null
                                 }
-
                             )
-
                         }
-
                     }
-
-                    // A-Z Alphabetical Index Filter Ribbon (when not in Live TV)
-
-                    if (selectedTab != "Live TV") {
-
-                        AlphabeticalRibbon(
-
-                            letters = alphabetList,
-
-                            selectedLetter = selectedLetter,
-
-                            letterCounts = letterCounts,
-
-                            onLetterSelected = {
-
-                                selectedLetter = it
-
-                                if (it != "All") searchQuery = ""
-
-                            }
-
-                        )
-
-                    }
-
-                    // Vibe discovery pills (when not in Live TV)
-
-                    if (selectedTab != "Live TV") {
-
-                        LazyRow(
-
-                            modifier = Modifier.fillMaxWidth(),
-
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-
-                        ) {
-
-                            items(vibes, key = { it }) { vibe ->
-
-                                val isSelected = vibe == selectedVibe
-
-                                MovieVibePill(
-
-                                    title = vibe,
-
-                                    isSelected = isSelected,
-
-                                    onClick = { selectedVibe = vibe }
-
-                                )
-
-                            }
-
-                        }
-
-                    }
-
                 }
-
             }
 
             // ------------------------------------------------------------------------------------
-
-            // 4. FRANCHISE UNIVERSES ROW (When in All or Franchises tab)
-
+            // 2. FEATURED HERO SPOTLIGHT BANNER (Expandable / Collapsible)
             // ------------------------------------------------------------------------------------
-
-            if ((selectedTab == "All" || selectedTab == "Franchises") && searchQuery.isBlank()) {
-
-                item {
-
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-
-                        Row(
-
-                            modifier = Modifier.fillMaxWidth(),
-
-                            verticalAlignment = Alignment.CenterVertically,
-
-                            horizontalArrangement = Arrangement.SpaceBetween
-
+            if (searchQuery.isBlank() && heroMovie != null && selectedTab == "All" && selectedLetter == "All" && selectedVibe == "All" && selectedFranchise == null) {
+                if (showHeroBanner) {
+                    item {
+                        LiquidGlassBox(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(190.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.45f),
+                            borderColor = Color(0xFFE11D48).copy(alpha = 0.35f)
                         ) {
-
-                            Text(
-
-                                text = "Franchise Universes & Studios (${franchiseCollections.size})",
-
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-
-                                color = Color.White
-
-                            )
-
                             Row(
-
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-
+                                horizontalArrangement = Arrangement.spacedBy(18.dp)
                             ) {
-
-                                if (selectedFranchise != null) {
-
-                                    Text(
-
-                                        text = "Clear filter",
-
-                                        fontSize = 11.5.sp,
-
-                                        color = Color(0xFF38BDF8),
-
-                                        modifier = Modifier.clickable { selectedFranchise = null }
-
+                                // Poster
+                                Box(
+                                    modifier = Modifier
+                                        .width(115.dp)
+                                        .height(160.dp)
+                                        .shadow(12.dp, RoundedCornerShape(12.dp), spotColor = Color(0xFFE11D48))
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(12.dp))
+                                ) {
+                                    AsyncImage(
+                                        model = heroMovie.coverUrl.ifBlank { heroMovie.bannerUrl },
+                                        contentDescription = heroMovie.title,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
                                     )
-
-                                    Spacer(Modifier.width(4.dp))
-
                                 }
 
-                                // Carousel scroll buttons
-
-                                LiquidGlassBox(
-
-                                    shape = CircleShape,
-
-                                    modifier = Modifier.size(28.dp).pointerHoverIcon(PointerIcon.Hand),
-
-                                    onClick = {
-
-                                        scope.launch {
-
-                                            val current = franchiseListState.firstVisibleItemIndex
-
-                                            franchiseListState.animateScrollToItem((current - 3).coerceAtLeast(0))
-
-                                        }
-
-                                    }
-
+                                // Details
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(5.dp)
                                 ) {
-
-                                    Icon(Icons.Default.ChevronLeft, contentDescription = "Scroll Left", tint = Color.White, modifier = Modifier.size(16.dp))
-
-                                }
-
-                                LiquidGlassBox(
-
-                                    shape = CircleShape,
-
-                                    modifier = Modifier.size(28.dp).pointerHoverIcon(PointerIcon.Hand),
-
-                                    onClick = {
-
-                                        scope.launch {
-
-                                            val current = franchiseListState.firstVisibleItemIndex
-
-                                            franchiseListState.animateScrollToItem((current + 3).coerceAtMost(franchiseCollections.size - 1))
-
-                                        }
-
-                                    }
-
-                                ) {
-
-                                    Icon(Icons.Default.ChevronRight, contentDescription = "Scroll Right", tint = Color.White, modifier = Modifier.size(16.dp))
-
-                                }
-
-                            }
-
-                        }
-
-                        LazyRow(
-
-                            state = franchiseListState,
-
-                            modifier = Modifier.fillMaxWidth(),
-
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-
-                        ) {
-
-                            items(franchiseCollections, key = { it.id }) { col ->
-
-                                val isSelected = selectedFranchise?.id == col.id
-
-                                FranchiseCard(
-
-                                    collection = col,
-
-                                    isSelected = isSelected,
-
-                                    onClick = {
-
-                                        selectedFranchise = if (isSelected) null else col
-
-                                    }
-
-                                )
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-            // ------------------------------------------------------------------------------------
-
-            // 5. LIVE TV CHANNELS (When in Live TV tab)
-
-            // ------------------------------------------------------------------------------------
-
-            if (selectedTab == "Live TV") {
-
-                item {
-
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-
-                        Text(
-
-                            text = "Verified 24/7 Live IPTV Channels (${liveChannels.size})",
-
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-
-                            color = Color.White
-
-                        )
-
-                        val chunkedChannels = liveChannels.chunked(3)
-
-                        for (row in chunkedChannels) {
-
-                            Row(
-
-                                modifier = Modifier.fillMaxWidth(),
-
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-
-                            ) {
-
-                                for (ch in row) {
-
-                                    Box(modifier = Modifier.weight(1f)) {
-
-                                        LiveChannelCard(
-
-                                            channel = ch,
-
-                                            onPlay = {
-
-                                                MoviePlayRepository.launchVideoStream(ch.url, ch.name)
-
-                                                toastMessage = "▶ Launching Live Stream: ${ch.name}..."
-
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            LiquidGlassBox(
+                                                shape = RoundedCornerShape(6.dp),
+                                                borderColor = Color(0xFFE11D48).copy(alpha = 0.60f)
+                                            ) {
+                                                Text(heroMovie.qualityBadge.ifBlank { "4K UHD" }, color = Color(0xFFE11D48), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp))
                                             }
 
-                                        )
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(13.dp))
+                                                Text("${heroMovie.rating} IMDB", color = Color(0xFFFBBF24), fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                            }
 
+                                            Text(
+                                                text = "•  ${heroMovie.year}  •  ${heroMovie.duration.ifBlank { "2h" }}  •  ${heroMovie.genre}",
+                                                color = Color.White.copy(alpha = 0.70f),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+
+                                        // Close/Collapse button
+                                        LiquidGlassBox(
+                                            shape = CircleShape,
+                                            modifier = Modifier.size(24.dp).pointerHoverIcon(PointerIcon.Hand),
+                                            onClick = { showHeroBanner = false }
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = "Hide Spotlight", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                                        }
                                     }
 
+                                    Text(
+                                        text = heroMovie.title,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+
+                                    Text(
+                                        text = heroMovie.description,
+                                        fontSize = 11.5.sp,
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        lineHeight = 15.sp
+                                    )
+
+                                    Spacer(Modifier.height(2.dp))
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = {
+                                                scope.launch {
+                                                    MoviePlayRepository.playMovieDirect(heroMovie) { toastMessage = it }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text("Stream Movie", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                val tUrl = MoviePlayRepository.getTrailerUrl(heroMovie.title)
+                                                MoviePlayRepository.openInBrowser(tUrl)
+                                                toastMessage = "🎬 Opening Official Trailer for ${heroMovie.title}..."
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.12f)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Theaters, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text("Trailer", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                scope.launch {
+                                                    toastMessage = "🎵 Finding Original Soundtrack for ${heroMovie.title}..."
+                                                    val tracks = MoviePlayRepository.resolveSoundtrackForMovie(heroMovie.title)
+                                                    if (tracks.isNotEmpty()) {
+                                                        playerViewModel.playWithQueue(tracks.first(), tracks)
+                                                        toastMessage = "▶ Playing Soundtrack: ${heroMovie.title} (${tracks.size} tracks queued)"
+                                                    } else {
+                                                        toastMessage = "⚠ No audio album found for ${heroMovie.title}"
+                                                    }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.12f)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(15.dp))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text("Soundtrack Jukebox", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp)
+                                        }
+                                    }
                                 }
-
-                                val rem = 3 - row.size
-
-                                if (rem > 0) {
-
-                                    for (i in 0 until rem) Spacer(Modifier.weight(1f))
-
-                                }
-
                             }
-
                         }
-
                     }
+                } else {
+                    // Sleek, compact one-line featured pill
+                    item {
+                        LiquidGlassBox(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { showHeroBanner = true },
+                            shape = RoundedCornerShape(10.dp),
+                            borderColor = Color(0xFFE11D48).copy(alpha = 0.25f),
+                            backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.35f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(15.dp))
+                                    Text(
+                                        text = "Featured Spotlight:",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFFBBF24)
+                                    )
+                                    Text(
+                                        text = "${heroMovie.title} (${heroMovie.year}) • ★ ${heroMovie.rating} IMDB • ${heroMovie.qualityBadge.ifBlank { "HD" }}",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color.White
+                                    )
+                                }
 
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Expand Details ▼",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFE11D48)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
-
             }
 
             // ------------------------------------------------------------------------------------
-
-            // 6. MOVIE CATALOG GRID & A-Z ALPHABETICAL SECTIONS (1,534+ Titles)
-
+            // 3. UNIFIED DISCOVERY & UTILITY BAR (Vibes + A-Z Toggle + Sort + View Mode)
             // ------------------------------------------------------------------------------------
-
             if (selectedTab != "Live TV") {
-
-                item(key = "catalog_header_controls") {
-
-                    val headerTitle = when {
-
-                        searchQuery.isNotBlank() -> "Search Results for \"$searchQuery\" (${displayMovies.size} Titles)"
-
-                        selectedLetter != "All" -> "Letter '$selectedLetter' Titles (${displayMovies.size})"
-
-                        selectedFranchise != null -> "${selectedFranchise?.name} Saga (${displayMovies.size} Titles)"
-
-                        selectedVibe != "All" -> "$selectedVibe Movies & Shows (${displayMovies.size})"
-
-                        else -> "$selectedTab Cinema Catalog (${displayMovies.size} Titles)"
-
-                    }
-
+                item {
                     Row(
-
-                        modifier = Modifier
-
-                            .fillMaxWidth()
-
-                            .padding(top = 8.dp, bottom = 4.dp),
-
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-
                         horizontalArrangement = Arrangement.SpaceBetween
-
                     ) {
-
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-
-                            Text(
-
-                                text = headerTitle,
-
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-
-                                color = Color.White
-
-                            )
-
-                            Text(
-
-                                text = "Showing ${displayMovies.size} titles • Organized by ${sortOrder.label}",
-
-                                fontSize = 11.5.sp,
-
-                                color = Color.White.copy(alpha = 0.70f)
-
-                            )
-
+                        // Left: Genre / Vibe pills horizontally scrollable
+                        LazyRow(
+                            modifier = Modifier.weight(1f).padding(end = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            items(vibes, key = { it }) { vibe ->
+                                val isSelected = vibe == selectedVibe
+                                MovieVibePill(
+                                    title = vibe,
+                                    isSelected = isSelected,
+                                    onClick = { selectedVibe = vibe }
+                                )
+                            }
                         }
 
+                        // Right: Utility Controls (A-Z Toggle, Sort Selector, Grid Mode)
                         Row(
-
                             verticalAlignment = Alignment.CenterVertically,
-
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
-
                         ) {
-
-                            if (selectedLetter == "All" && searchQuery.isBlank() && sortOrder == MovieSortOrder.NAME_ASC) {
-
-                                LiquidGlassBox(
-
-                                    shape = RoundedCornerShape(8.dp),
-
-                                    borderColor = if (groupByLetter) Color(0xFFE11D48).copy(alpha = 0.60f) else Color.White.copy(alpha = 0.15f),
-
-                                    isSelected = groupByLetter,
-
-                                    selectedBgColor = Color(0xFFE11D48).copy(alpha = 0.22f)
-
+                            val hasLetterFilter = selectedLetter != "All"
+                            LiquidGlassBox(
+                                shape = RoundedCornerShape(8.dp),
+                                isSelected = showAlphabetRibbon || hasLetterFilter,
+                                selectedBgColor = Color(0xFFE11D48).copy(alpha = 0.20f),
+                                borderColor = if (hasLetterFilter) Color(0xFFE11D48) else if (showAlphabetRibbon) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.15f)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (hasLetterFilter) {
+                                                selectedLetter = "All"
+                                            } else {
+                                                showAlphabetRibbon = !showAlphabetRibbon
+                                            }
+                                        }
+                                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-
                                     Text(
-
-                                        text = if (groupByLetter) "✓ A-Z Grouped" else "Flat Grid",
-
+                                        text = if (hasLetterFilter) "🔤 '$selectedLetter' (${letterCounts[selectedLetter] ?: 0}) ✕" else if (showAlphabetRibbon) "🔤 A-Z ▲" else "🔤 A-Z ▼",
                                         fontSize = 11.5.sp,
-
                                         fontWeight = FontWeight.SemiBold,
-
-                                        color = if (groupByLetter) Color.White else Color.White.copy(alpha = 0.75f),
-
-                                        modifier = Modifier.clickable { groupByLetter = !groupByLetter }.padding(horizontal = 10.dp, vertical = 6.dp)
-
+                                        color = if (hasLetterFilter) Color(0xFFE11D48) else if (showAlphabetRibbon) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.8f)
                                     )
-
                                 }
-
-                            }
-
-                            if (selectedLetter != "All") {
-
-                                LiquidGlassBox(
-
-                                    shape = RoundedCornerShape(8.dp),
-
-                                    borderColor = Color(0xFF38BDF8).copy(alpha = 0.40f)
-
-                                ) {
-
-                                    Text(
-
-                                        text = "Reset Letter filter ×",
-
-                                        fontSize = 11.5.sp,
-
-                                        fontWeight = FontWeight.SemiBold,
-
-                                        color = Color(0xFF38BDF8),
-
-                                        modifier = Modifier.clickable { selectedLetter = "All" }.padding(horizontal = 10.dp, vertical = 6.dp)
-
-                                    )
-
-                                }
-
                             }
 
                             MovieSortSelector(
-
                                 currentSort = sortOrder,
-
                                 onSortSelected = { sortOrder = it }
-
                             )
 
+                            if (selectedLetter == "All" && searchQuery.isBlank() && sortOrder == MovieSortOrder.NAME_ASC) {
+                                LiquidGlassBox(
+                                    shape = RoundedCornerShape(8.dp),
+                                    borderColor = if (groupByLetter) Color(0xFFE11D48).copy(alpha = 0.50f) else Color.White.copy(alpha = 0.15f),
+                                    isSelected = groupByLetter,
+                                    selectedBgColor = Color(0xFFE11D48).copy(alpha = 0.20f)
+                                ) {
+                                    Text(
+                                        text = if (groupByLetter) "A-Z Sections" else "Flat Grid",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (groupByLetter) Color.White else Color.White.copy(alpha = 0.75f),
+                                        modifier = Modifier.clickable { groupByLetter = !groupByLetter }.padding(horizontal = 9.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ------------------------------------------------------------------------------------
+            // 4. EXPANDABLE A-Z ALPHABETICAL RIBBON (Only when toggled or active)
+            // ------------------------------------------------------------------------------------
+            if (selectedTab != "Live TV" && (showAlphabetRibbon || selectedLetter != "All")) {
+                item {
+                    LiquidGlassBox(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        borderColor = Color.White.copy(alpha = 0.15f),
+                        backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.40f)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Alphabetical Title Index (Jump to Letter)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    letterSpacing = 0.5.sp
+                                )
+                                Text(
+                                    text = "Hide A-Z ✕",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF38BDF8),
+                                    modifier = Modifier.clickable {
+                                        showAlphabetRibbon = false
+                                        selectedLetter = "All"
+                                    }
+                                )
+                            }
+                            AlphabeticalRibbon(
+                                letters = alphabetList,
+                                selectedLetter = selectedLetter,
+                                letterCounts = letterCounts,
+                                onLetterSelected = {
+                                    selectedLetter = it
+                                    if (it != "All") searchQuery = ""
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ------------------------------------------------------------------------------------
+            // 5. FRANCHISE UNIVERSES ROW (Dedicated to Franchises Tab or Active Franchise)
+            // ------------------------------------------------------------------------------------
+            if ((selectedTab == "Franchises" || selectedFranchise != null) && searchQuery.isBlank()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Franchise Universes & Studios (${franchiseCollections.size})",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (selectedFranchise != null) {
+                                    Text(
+                                        text = "Clear filter",
+                                        fontSize = 11.5.sp,
+                                        color = Color(0xFF38BDF8),
+                                        modifier = Modifier.clickable { selectedFranchise = null }
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                }
+
+                                LiquidGlassBox(
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(28.dp).pointerHoverIcon(PointerIcon.Hand),
+                                    onClick = {
+                                        scope.launch {
+                                            val current = franchiseListState.firstVisibleItemIndex
+                                            franchiseListState.animateScrollToItem((current - 3).coerceAtLeast(0))
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.ChevronLeft, contentDescription = "Scroll Left", tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+
+                                LiquidGlassBox(
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(28.dp).pointerHoverIcon(PointerIcon.Hand),
+                                    onClick = {
+                                        scope.launch {
+                                            val current = franchiseListState.firstVisibleItemIndex
+                                            franchiseListState.animateScrollToItem((current + 3).coerceAtMost(franchiseCollections.size - 1))
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.ChevronRight, contentDescription = "Scroll Right", tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                            }
                         }
 
+                        LazyRow(
+                            state = franchiseListState,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(franchiseCollections, key = { it.id }) { col ->
+                                val isSelected = selectedFranchise?.id == col.id
+                                FranchiseCard(
+                                    collection = col,
+                                    isSelected = isSelected,
+                                    onClick = {
+                                        selectedFranchise = if (isSelected) null else col
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ------------------------------------------------------------------------------------
+            // 6. LIVE TV CHANNELS (When in Live TV tab)
+            // ------------------------------------------------------------------------------------
+            if (selectedTab == "Live TV") {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text(
+                            text = "Verified 24/7 Live IPTV Channels (${liveChannels.size})",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+
+                        val chunkedChannels = liveChannels.chunked(3)
+                        for (row in chunkedChannels) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                for (ch in row) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        LiveChannelCard(
+                                            channel = ch,
+                                            onPlay = {
+                                                MoviePlayRepository.launchVideoStream(ch.url, ch.name)
+                                                toastMessage = "▶ Launching Live Stream: ${ch.name}..."
+                                            }
+                                        )
+                                    }
+                                }
+                                val rem = 3 - row.size
+                                if (rem > 0) {
+                                    for (i in 0 until rem) Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ------------------------------------------------------------------------------------
+            // 7. CATALOG HEADER & ACTIVE FILTER SUMMARY
+            // ------------------------------------------------------------------------------------
+            if (selectedTab != "Live TV") {
+                item(key = "catalog_header_controls") {
+                    val hasActiveFilters = searchQuery.isNotBlank() || selectedLetter != "All" || selectedVibe != "All" || selectedFranchise != null
+
+                    val headerTitle = when {
+                        searchQuery.isNotBlank() -> "Search Results for \"$searchQuery\" (${displayMovies.size} Titles)"
+                        selectedLetter != "All" -> "Letter '$selectedLetter' Titles (${displayMovies.size})"
+                        selectedFranchise != null -> "${selectedFranchise?.name} Saga (${displayMovies.size} Titles)"
+                        selectedVibe != "All" -> "$selectedVibe Movies & Shows (${displayMovies.size})"
+                        else -> "$selectedTab Cinema Catalog (${displayMovies.size} Titles)"
                     }
 
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = headerTitle,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+
+                            Text(
+                                text = "Showing ${displayMovies.size} titles • Organized by ${sortOrder.label}",
+                                fontSize = 11.5.sp,
+                                color = Color.White.copy(alpha = 0.65f)
+                            )
+                        }
+
+                        // Active Filter Pills Row
+                        if (hasActiveFilters) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Active:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.5f)
+                                )
+
+                                if (searchQuery.isNotBlank()) {
+                                    ActiveFilterPill("Search: \"$searchQuery\"") { searchQuery = "" }
+                                }
+                                if (selectedLetter != "All") {
+                                    ActiveFilterPill("Letter: '$selectedLetter'") { selectedLetter = "All" }
+                                }
+                                if (selectedVibe != "All") {
+                                    ActiveFilterPill(selectedVibe) { selectedVibe = "All" }
+                                }
+                                if (selectedFranchise != null) {
+                                    ActiveFilterPill(selectedFranchise?.name ?: "Franchise") { selectedFranchise = null }
+                                }
+
+                                Spacer(Modifier.weight(1f))
+
+                                Text(
+                                    text = "Reset All ×",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFE11D48),
+                                    modifier = Modifier
+                                        .clickable {
+                                            searchQuery = ""
+                                            selectedLetter = "All"
+                                            selectedVibe = "All"
+                                            selectedFranchise = null
+                                        }
+                                        .padding(4.dp)
+                                )
+                            }
+                        }
+                    }
                 }
+            }
+
+            if (selectedTab != "Live TV") {
 
                 if (groupedSections != null) {
 
@@ -4231,3 +3998,23 @@ fun MovieSortSelector(
 
 }
 
+
+@Composable
+private fun ActiveFilterPill(label: String, onRemove: () -> Unit) {
+    LiquidGlassBox(
+        shape = RoundedCornerShape(8.dp),
+        borderColor = Color(0xFFE11D48).copy(alpha = 0.50f),
+        backgroundColor = Color(0xFFE11D48).copy(alpha = 0.15f)
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable { onRemove() }
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text(text = label, fontSize = 11.5.sp, color = Color.White, fontWeight = FontWeight.Medium)
+            Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
+        }
+    }
+}

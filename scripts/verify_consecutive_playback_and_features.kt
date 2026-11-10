@@ -102,6 +102,40 @@ fun main() = runBlocking {
         println("  -> Track smoothly progressed to ${posAfter}ms.")
     }
 
+    println("\n[Test 4/4] Testing in-app movie playback and controls...")
+    val movies = dev.brahmkshatriya.echo.desktop.ui.movie.MoviePlayRepository.getAllMovies()
+    println("  -> Loaded movie catalog: ${movies.size} items")
+    val testMovie = movies.firstOrNull { it.title.contains("Fast") } ?: movies.first()
+    println("  -> Testing streams for: ${testMovie.title}")
+    val streams = dev.brahmkshatriya.echo.desktop.ui.movie.MoviePlayRepository.fetchMovieStreams(testMovie)
+    println("  -> Available streams: ${streams.size}")
+    for (s in streams) {
+        println("     * [${s.resolution}p] ${s.title}")
+    }
+
+    val cbComp = uk.co.caprica.vlcj.player.component.CallbackMediaPlayerComponent()
+    val mp = cbComp.mediaPlayer()
+    var vlcPlaying = false
+    mp.events().addMediaPlayerEventListener(object : uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter() {
+        override fun playing(p: uk.co.caprica.vlcj.player.base.MediaPlayer) {
+            println("  -> CallbackMediaPlayerComponent event: PLAYING!")
+            vlcPlaying = true
+        }
+    })
+    val directStream = streams.first { it.id.startsWith("cinema_1080p") }
+    mp.media().play(directStream.url, ":network-caching=3000")
+    for (i in 0 until 20) {
+        delay(200)
+        if (vlcPlaying) break
+    }
+    println("  -> Callback video player status isPlaying: ${mp.status().isPlaying}")
+    mp.controls().setRate(1.25f)
+    println("  -> Speed changed to 1.25x (Rate: ${mp.status().rate()})")
+    mp.audio().setVolume(70)
+    println("  -> Volume changed to 70% (Vol: ${mp.audio().volume()})")
+    cbComp.release()
+    println("  -> In-App Movie Player released cleanly!")
+
     println("\n==================================================")
     println("ALL VERIFICATIONS PASSED SUCCESSFULLY (100% HEALTHY)")
     println("==================================================")

@@ -87,7 +87,6 @@ class HeaderAdapter(
             CinemaStudioBottomSheet().show(parentFragmentManager, null)
         }
         binding.tileCinemaStudio.setOnClickListener(openCinema)
-        binding.btnViewAllMovies.setOnClickListener(openCinema)
 
         // Tapping Now Playing card opens screensaver
         binding.cardNowPlayingSoundstage.setOnClickListener {
@@ -143,7 +142,8 @@ class HeaderAdapter(
             notifyItemChanged(0)
         }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) = with(holder.binding) {
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        with(holder.binding) {
         super.onBindViewHolder(holder, position)
         val context = root.context
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
@@ -198,14 +198,8 @@ class HeaderAdapter(
             ivLivePlayIcon.setImageResource(R.drawable.ic_play)
             liveVinylAnimator?.pause()
         }
-
-        // Horizontal Movie Carousel
-        if (rvHeaderMovies.adapter == null) {
-            val movies = MoviePlayRepository.getMovies(context)
-            rvHeaderMovies.adapter = CinemaStudioBottomSheet.CinemaAdapter(movies) { movie ->
-                CinemaDetailsBottomSheet.newInstance(movie).show(fragment.parentFragmentManager, null)
-            }
         }
+
     }
 
     class ViewHolder(

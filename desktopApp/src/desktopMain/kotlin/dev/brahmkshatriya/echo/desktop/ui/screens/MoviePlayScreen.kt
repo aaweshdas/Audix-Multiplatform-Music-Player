@@ -83,6 +83,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 
 import androidx.compose.material.icons.Icons
 
@@ -169,6 +170,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 
 import androidx.compose.ui.input.pointer.PointerIcon
 
@@ -176,6 +178,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 
 import androidx.compose.ui.layout.ContentScale
 
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 
 import androidx.compose.ui.text.style.TextAlign
@@ -693,54 +696,87 @@ fun MoviePlayScreen(
                         }
 
                         // Center: Sleek Compact Search Bar with Voice Search
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = {
-                                searchQuery = it
-                                if (it.isNotBlank()) selectedLetter = "All"
-                            },
+                        LiquidGlassBox(
                             modifier = Modifier
                                 .widthIn(min = 280.dp, max = 460.dp)
                                 .height(46.dp),
                             shape = RoundedCornerShape(12.dp),
-                            placeholder = { Text("Search 1,534+ movies & series...", fontSize = 12.sp) },
-                            leadingIcon = {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFE11D48), modifier = Modifier.size(17.dp))
-                            },
-                            trailingIcon = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(end = 4.dp)
-                                ) {
-                                    if (isSearchingOnline) {
-                                        CircularProgressIndicator(
-                                            color = Color(0xFFE11D48),
-                                            strokeWidth = 2.dp,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    }
-                                    if (searchQuery.isNotBlank()) {
-                                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
-                                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.70f), modifier = Modifier.size(15.dp))
+                            backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.45f),
+                            borderColor = if (searchQuery.isNotBlank()) Color(0xFFE11D48).copy(alpha = 0.65f) else Color.White.copy(alpha = 0.18f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = Color(0xFFE11D48),
+                                    modifier = Modifier.size(18.dp)
+                                )
+
+                                BasicTextField(
+                                    value = searchQuery,
+                                    onValueChange = {
+                                        searchQuery = it
+                                        if (it.isNotBlank()) selectedLetter = "All"
+                                    },
+                                    singleLine = true,
+                                    textStyle = TextStyle(
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Normal
+                                    ),
+                                    cursorBrush = SolidColor(Color(0xFFE11D48)),
+                                    modifier = Modifier.weight(1f),
+                                    decorationBox = { innerTextField ->
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            contentAlignment = Alignment.CenterStart
+                                        ) {
+                                            if (searchQuery.isEmpty()) {
+                                                Text(
+                                                    "Search 1,534+ movies & series...",
+                                                    color = Color.White.copy(alpha = 0.45f),
+                                                    fontSize = 13.sp
+                                                )
+                                            }
+                                            innerTextField()
                                         }
                                     }
-                                    AudixVoiceSearchTriggerButton(
-                                        tint = Color(0xFFE11D48),
-                                        onClick = { showVoiceSearchModal = true }
+                                )
+
+                                if (isSearchingOnline) {
+                                    CircularProgressIndicator(
+                                        color = Color(0xFFE11D48),
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(14.dp)
                                     )
                                 }
-                            },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color(0xFFE11D48),
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.18f),
-                                focusedContainerColor = Color(0xFF0A0C10).copy(alpha = 0.50f),
-                                unfocusedContainerColor = Color(0xFF0A0C10).copy(alpha = 0.35f)
-                            )
-                        )
+
+                                if (searchQuery.isNotBlank()) {
+                                    IconButton(
+                                        onClick = { searchQuery = "" },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Clear",
+                                            tint = Color.White.copy(alpha = 0.70f),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+                                }
+
+                                AudixVoiceSearchTriggerButton(
+                                    tint = Color(0xFFE11D48),
+                                    onClick = { showVoiceSearchModal = true }
+                                )
+                            }
+                        }
 
                         // Right: Quick Actions (Spotlight, Cinema Mode, Web Studio)
                         Row(

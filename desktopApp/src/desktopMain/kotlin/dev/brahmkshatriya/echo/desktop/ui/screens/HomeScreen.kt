@@ -61,7 +61,6 @@ import dev.brahmkshatriya.echo.common.models.*
 import dev.brahmkshatriya.echo.core.extensions.ExtensionManager
 import dev.brahmkshatriya.echo.desktop.download.DesktopDownloadManager
 import dev.brahmkshatriya.echo.desktop.library.DesktopLibraryManager
-import dev.brahmkshatriya.echo.desktop.ui.movie.MovieSoundtrack
 import dev.brahmkshatriya.echo.desktop.library.UserPlaylist
 import dev.brahmkshatriya.echo.desktop.library.toTrack
 import dev.brahmkshatriya.echo.desktop.ui.components.ShelfRow
@@ -456,7 +455,6 @@ fun HomeScreen(
 
     val userPlaylists by libraryManager.playlists.collectAsState()
     var selectedPlaylistForModal by remember { mutableStateOf<CuratedHomePlaylist?>(null) }
-    var selectedMovieForModal by remember { mutableStateOf<MovieSoundtrack?>(null) }
     var selectedShelfForModal by remember { mutableStateOf<Shelf?>(null) }
     var selectedMediaForDetail by remember { mutableStateOf<EchoMediaItem?>(null) }
     var playlistToastMessage by remember { mutableStateOf<String?>(null) }
@@ -492,7 +490,7 @@ fun HomeScreen(
     val topArtists = remember { libraryManager.getUserFavoriteArtists().take(3) }
     val dynamicTasteSubline = remember(topArtists) {
         if (topArtists.isNotEmpty()) {
-            "Tuned to your affinity for ${topArtists.joinToString(", ")} • 320 kbps Studio Stream"
+            "Tuned to your affinity for ${topArtists.joinToString(", ")}"
         } else {
             "Master Studio Streaming • Zero Distortion Hi-Fi Audio"
         }
@@ -591,25 +589,6 @@ fun HomeScreen(
                     onAddToPlaylist = { trackForPlaylist = it },
                     onDownload = { downloadManager.downloadTrack(it) },
                     onLaunchScreensaver = onLaunchScreensaver
-                )
-            }
-
-            // ------------------------------------------------------------------------------------
-            // 3.5. FLAGSHIP MOVIE PLAY (Curated Blockbuster Cinema Soundtracks & Jukeboxes)
-            // ------------------------------------------------------------------------------------
-            item {
-                SeniorMoviePlaySection(
-                    onPlayMovie = { movie ->
-                        if (movie.tracks.isNotEmpty()) {
-                            playerViewModel.playWithQueue(movie.tracks.first(), movie.tracks)
-                            playlistToastMessage = "▶ Playing Movie Jukebox: ${movie.title} (${movie.tracks.size} tracks queued)"
-                        } else {
-                            playlistToastMessage = "⚠ Loading tracks for ${movie.title}..."
-                        }
-                    },
-                    onSelectMovie = { movie ->
-                        selectedMovieForModal = movie
-                    }
                 )
             }
 
@@ -907,43 +886,6 @@ fun HomeScreen(
             item {
                 Spacer(Modifier.height(52.dp))
             }
-        }
-
-        // ========================================================================================
-        // 1.5. MOVIE DETAIL & JUKEBOX MODAL
-        // ========================================================================================
-        selectedMovieForModal?.let { movie ->
-            SeniorMovieDetailModal(
-                movie = movie,
-                onDismiss = { selectedMovieForModal = null },
-                onPlayAll = {
-                    if (movie.tracks.isNotEmpty()) {
-                        playerViewModel.playWithQueue(movie.tracks.first(), movie.tracks)
-                        playlistToastMessage = "▶ Playing Movie Jukebox: ${movie.title} (${movie.tracks.size} tracks queued)"
-                        selectedMovieForModal = null
-                    }
-                },
-                onShufflePlay = {
-                    if (movie.tracks.isNotEmpty()) {
-                        val shuffled = movie.tracks.shuffled()
-                        playerViewModel.playWithQueue(shuffled.first(), shuffled)
-                        playlistToastMessage = "🔀 Shuffled Movie Jukebox: ${movie.title} (${movie.tracks.size} tracks queued)"
-                        selectedMovieForModal = null
-                    }
-                },
-                onPlayTrack = { track ->
-                    val idx = movie.tracks.indexOfFirst { it.id == track.id }
-                    val q = if (idx >= 0) movie.tracks.drop(idx) + movie.tracks.take(idx) else listOf(track)
-                    playerViewModel.playWithQueue(track, q)
-                    playlistToastMessage = "▶ Playing: ${track.title} (${movie.tracks.size} songs in movie jukebox queue)"
-                },
-                onAddToPlaylist = { track ->
-                    trackForPlaylist = track
-                },
-                onDownloadTrack = { track ->
-                    downloadManager.downloadTrack(track)
-                }
-            )
         }
 
         // ========================================================================================
@@ -2684,47 +2626,16 @@ private fun SeniorExecutiveMasthead(
                     modifier = Modifier.widthIn(max = 650.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    // Top Kicker & Studio Lossless Pill
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = kicker,
-                            color = accentColor,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        // 320 kbps Studio Lossless Pill
-                        LiquidGlassBox(
-                            shape = RoundedCornerShape(16.dp),
-                            backgroundColor = Color(0xFF0A0C10).copy(alpha = 0.35f),
-                            borderColor = Color(0xFF10B981).copy(alpha = 0.40f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(5.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF10B981))
-                                )
-                                Text(
-                                    text = "320 kbps Lossless",
-                                    color = Color(0xFF34D399),
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
+                    // Top Kicker
+                    Text(
+                        text = kicker,
+                        color = accentColor,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
                     // Large Typographic Display Greeting
                     Text(
@@ -2843,6 +2754,8 @@ private fun SeniorSourceAndMoodBar(
     onSelectExtension: (MusicExtension?) -> Unit,
     onSelectMood: (String) -> Unit
 ) {
+    var activeCategory by remember { mutableStateOf(if (currentExtension != null) "sources" else if (selectedMood != "For You") "vibes" else "sources") }
+
     LiquidGlassCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -2852,83 +2765,122 @@ private fun SeniorSourceAndMoodBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 9.dp),
+                .padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Source Indicator Tag
+            // Segmented Category Switcher: Sources vs Vibes
             Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.05f))
+                    .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
+                    .padding(3.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(end = 12.dp)
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Icon(
-                    Icons.Default.Tune,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(15.dp)
-                )
-                Text(
-                    text = "CATALOG",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp
-                )
-            }
+                val isSources = activeCategory == "sources"
+                val isVibes = activeCategory == "vibes"
 
-            // Scrollable Sources Pills
-            LazyRow(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val isAllActive = currentExtension == null
-                item {
-                    SeniorFilterPill(
-                        title = "Master Collection",
-                        isSelected = isAllActive,
-                        onClick = { onSelectExtension(null) }
-                    )
+                // Sources Tab
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isSources) Color.White.copy(alpha = 0.20f) else Color.Transparent)
+                        .clickable { activeCategory = "sources" }
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = if (isSources) Color.White else Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        val sourceLabel = if (currentExtension != null) "Sources (${currentExtension.metadata.name})" else "Sources"
+                        Text(
+                            text = sourceLabel,
+                            color = if (isSources) Color.White else Color.White.copy(alpha = 0.65f),
+                            fontSize = 11.sp,
+                            fontWeight = if (isSources) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
                 }
 
-                items(musicExtensions, key = { it.metadata.id }) { ext ->
-                    val isSelected = currentExtension?.metadata?.id == ext.metadata.id
-                    SeniorFilterPill(
-                        title = ext.metadata.name,
-                        isSelected = isSelected,
-                        onClick = { onSelectExtension(ext) }
-                    )
+                // Vibes Tab
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isVibes) Color.White.copy(alpha = 0.20f) else Color.Transparent)
+                        .clickable { activeCategory = "vibes" }
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = if (isVibes) Color.White else Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        val vibeLabel = if (selectedMood != "For You") "Vibes ($selectedMood)" else "Vibes"
+                        Text(
+                            text = vibeLabel,
+                            color = if (isVibes) Color.White else Color.White.copy(alpha = 0.65f),
+                            fontSize = 11.sp,
+                            fontWeight = if (isVibes) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
                 }
             }
 
             // Vertical Hairline Divider
             Box(
                 modifier = Modifier
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 12.dp)
                     .width(1.dp)
                     .height(20.dp)
                     .background(Color.White.copy(alpha = 0.12f))
             )
 
-            // Mood Taste Filters
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            // Scrollable Active Filter Pills (Spacious, well-arranged, no overlap!)
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("For You", "Top Charts", "Focus Sanctuary", "Midnight Lo-Fi", "Hi-Res Masters").forEach { mood ->
-                    val isMoodActive = selectedMood == mood
-                    LiquidGlassBox(
-                        shape = RoundedCornerShape(16.dp),
-                        isSelected = isMoodActive,
-                        modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
-                        onClick = { onSelectMood(mood) }
-                    ) {
-                        Text(
-                            text = mood,
-                            color = if (isMoodActive) Color.White else Color.White.copy(alpha = 0.65f),
-                            fontSize = 11.5.sp,
-                            fontWeight = if (isMoodActive) FontWeight.SemiBold else FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                if (activeCategory == "sources") {
+                    val isAllActive = currentExtension == null
+                    item {
+                        SeniorFilterPill(
+                            title = "Master Collection",
+                            isSelected = isAllActive,
+                            onClick = { onSelectExtension(null) }
+                        )
+                    }
+
+                    items(musicExtensions, key = { it.metadata.id }) { ext ->
+                        val isSelected = currentExtension?.metadata?.id == ext.metadata.id
+                        SeniorFilterPill(
+                            title = ext.metadata.name,
+                            isSelected = isSelected,
+                            onClick = { onSelectExtension(ext) }
+                        )
+                    }
+                } else {
+                    val moods = listOf("For You", "Top Charts", "Focus Sanctuary", "Midnight Lo-Fi", "Hi-Res Masters")
+                    items(moods) { mood ->
+                        val isMoodActive = selectedMood == mood
+                        SeniorFilterPill(
+                            title = mood,
+                            isSelected = isMoodActive,
+                            onClick = { onSelectMood(mood) }
                         )
                     }
                 }
@@ -3183,9 +3135,8 @@ private fun BillboardSoundstageVisualizer(
     ) {
         Canvas(
             modifier = Modifier
-                .widthIn(max = 165.dp)
-                .fillMaxWidth(0.40f)
-                .height(20.dp)
+                .fillMaxWidth(0.85f)
+                .height(46.dp)
         ) {
             if (size.width <= 15f || size.height <= 6f) return@Canvas
             val w = size.width
@@ -3700,20 +3651,20 @@ private fun SeniorEditorialBillboard(
             }
 
             // ====================================================================================
-            // ZONE 2 (CENTER): Dynamic Studio Soundstage Spectrum & Option Controls
+            // ZONE 2 (CENTER): Dynamic Studio Soundstage Spectrum & Audio Engine
             // ====================================================================================
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Tier 1: Telemetry Header
+                // Tier 1: Telemetry Header (Clean, centered, and balanced)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
@@ -3723,91 +3674,34 @@ private fun SeniorEditorialBillboard(
                         Icon(
                             imageVector = Icons.Default.GraphicEq,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = Color(0xFF38BDF8),
                             modifier = Modifier.size(12.dp)
                         )
                         Text(
-                            text = "STUDIO SOUNDSTAGE",
-                            color = Color.White,
+                            text = "STUDIO SOUNDSTAGE  •  320 KBPS LOSSLESS  •  44.1 KHZ",
+                            color = Color.White.copy(alpha = 0.85f),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.1.sp
                         )
                     }
-
-                    Text(
-                        text = "320 KBPS AAC  •  STEREO 44.1 KHZ",
-                        color = Color.White,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.8.sp
-                    )
                 }
 
-                // Tier 2: Real Animated Multi-Band Audio Spectrum Visualizer
+                // Tier 2: Real Animated Multi-Band Audio Spectrum Visualizer (Spacious 46dp)
                 BillboardSoundstageVisualizer(
-                    isPlaying = isCurrentSession && isPlaying
+                    isPlaying = isCurrentSession && isPlaying,
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
 
-                // Tier 3: Working Options Bar ("along with their options")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 1. Screensaver Quick Launch
-                    BillboardOptionPill(
-                        icon = Icons.Default.Tv,
-                        label = "Screensaver",
-                        onClick = onLaunchScreensaver
-                    )
-
-                    // 2. Audio Effects / Equalizer
-                    val showAudioEffects by playerViewModel.showAudioEffectsDialog.collectAsState()
-                    BillboardOptionPill(
-                        icon = Icons.Default.Equalizer,
-                        label = "Equalizer",
-                        isActive = showAudioEffects,
-                        onClick = { playerViewModel.toggleAudioEffectsDialog() }
-                    )
-
-                    // 3. Shuffle Toggle
-                    val isShuffle by playerViewModel.shuffleEnabled.collectAsState()
-                    BillboardOptionPill(
-                        icon = Icons.Default.Shuffle,
-                        label = "Shuffle",
-                        isActive = isShuffle,
-                        onClick = { playerViewModel.setShuffle(!isShuffle) }
-                    )
-
-                    // 4. Repeat Mode Cycle
-                    val currentRepeat by playerViewModel.repeatMode.collectAsState()
-                    val isRepeatActive = currentRepeat != dev.brahmkshatriya.echo.core.platform.RepeatMode.NONE
-                    BillboardOptionPill(
-                        icon = if (currentRepeat == dev.brahmkshatriya.echo.core.platform.RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                        label = when (currentRepeat) {
-                            dev.brahmkshatriya.echo.core.platform.RepeatMode.ONE -> "Repeat 1"
-                            dev.brahmkshatriya.echo.core.platform.RepeatMode.ALL -> "Repeat All"
-                            else -> "Repeat"
-                        },
-                        isActive = isRepeatActive,
-                        onClick = {
-                            val nextMode = when (currentRepeat) {
-                                dev.brahmkshatriya.echo.core.platform.RepeatMode.NONE -> dev.brahmkshatriya.echo.core.platform.RepeatMode.ALL
-                                dev.brahmkshatriya.echo.core.platform.RepeatMode.ALL -> dev.brahmkshatriya.echo.core.platform.RepeatMode.ONE
-                                else -> dev.brahmkshatriya.echo.core.platform.RepeatMode.NONE
-                            }
-                            playerViewModel.setRepeatMode(nextMode)
-                        }
-                    )
-
-                    // 5. Now Playing Fullscreen / Details
-                    BillboardOptionPill(
-                        icon = Icons.Default.OpenInFull,
-                        label = "Now Playing",
-                        onClick = { playerViewModel.toggleNowPlaying() }
-                    )
-                }
+                // Tier 3: Sleek Equalizer & Studio Acoustics Action Pill
+                val showAudioEffects by playerViewModel.showAudioEffectsDialog.collectAsState()
+                BillboardOptionPill(
+                    icon = Icons.Default.Equalizer,
+                    label = "Studio Equalizer & Effects",
+                    isActive = showAudioEffects,
+                    activeColor = Color(0xFF38BDF8),
+                    onClick = { playerViewModel.toggleAudioEffectsDialog() }
+                )
             }
 
             // ====================================================================================

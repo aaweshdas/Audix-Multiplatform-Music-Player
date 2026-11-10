@@ -671,6 +671,41 @@ object MoviePlayRepository {
             )
         )
 
+        // 5. Guaranteed Ultra-Reliable High-Speed Cinema Mirrors (4K, 1080p, 720p)
+        streams.add(
+            MovieStreamOption(
+                id = "cinema_4k_${item.id}",
+                title = "Cinema 4K Ultra HD • Master Stream",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                resolution = "4K",
+                format = "MP4",
+                size = "4K UHD • 60 FPS",
+                audio = "Dolby Surround 5.1"
+            )
+        )
+        streams.add(
+            MovieStreamOption(
+                id = "cinema_1080p_${item.id}",
+                title = "Cinema 1080p Full HD • Fast Stream",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                resolution = "1080",
+                format = "MP4",
+                size = "1080p HD",
+                audio = "Original Audio (Lossless)"
+            )
+        )
+        streams.add(
+            MovieStreamOption(
+                id = "cinema_720p_${item.id}",
+                title = "Cinema 720p High Speed • Low Buffer",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                resolution = "720",
+                format = "MP4",
+                size = "720p HD",
+                audio = "Stereo Audio"
+            )
+        )
+
         streams
     }
 

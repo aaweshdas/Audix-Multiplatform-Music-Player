@@ -1,0 +1,59 @@
+================================================================================
+POST OPTION 2: THE TECHNICAL ENGINEERING DEEP DIVE (FOR RECRUITERS & TECH LEADS)
+Best For: Highlighting system architecture, clean code, engineering depth & job opportunities
+Recommended Image to Attach: "06_Architecture_Infographic.png" (or multi-image: 06 + 02 + 03)
+================================================================================
+
+How do you share >90% of your codebase across Android and Windows/macOS/Linux without sacrificing 60fps performance or native audio hardware control?
+
+Over the past few months, I architected and shipped Nightly 🌙 — an open-source media and cinema client built with Kotlin Multiplatform (KMP) and Compose Multiplatform.
+
+Here is an architectural breakdown of how the system works under the hood 🧵👇
+
+1️⃣ UNIFIED UI & PRESENTATION (Compose Multiplatform + Material 3)
+Instead of maintaining separate Swift and Jetpack Compose/WPF codebases, the entire UI is written in declarative Compose Multiplatform.
+- Adaptive Breakpoints: The layout dynamically reconfigures between mobile phone portrait views, tablet split-panes, and wide desktop multi-column stations.
+- Custom Shaders & Glassmorphism: Frosted background blurs, ambient glow backdrops, and hardware-accelerated fluid transitions.
+
+2️⃣ THE AUDIO ENGINE: DUAL NATIVE RUNTIMES
+Audio is latency-sensitive. A single abstraction doesn’t cut it across operating systems.
+- Android Runtime: Built on AndroidX Media3 (ExoPlayer), with foreground playback services, lock-screen MediaSession notifications, audio focus handling, and automatic ducking.
+- Desktop Runtime: Native libVLC C-bindings via VLCJ, granting low-latency PCM stream extraction, gapless track transitions, and native cross-platform audio driver access.
+
+3️⃣ 28-BAND AUDIOPHILE FFT VISUALIZER
+Rather than generating fake random bouncing bars, Nightly implements a mathematical 512-point Cooley-Tukey Radix-2 FFT algorithm:
+- Raw audio byte chunks are captured and transformed into frequency domain spectra in real-time.
+- Hann windowing is applied to eliminate spectral leakage.
+- Energy is binned across 28 logarithmic frequency bands tuned to human auditory perception (from 20 Hz sub-bass to 20 kHz treble).
+
+4️⃣ DECOUPLED EXTENSION SPI ARCHITECTURE
+To aggregate catalogs without tight coupling, I designed a Service Provider Interface (SPI):
+- Audio & Metadata Providers (Spotify, YouTube Music, JioSaavn, SoundCloud, RadioBrowser) operate as modular extensions.
+- Dynamic Fallback: If a track source is unavailable or geo-blocked, the state machine automatically negotiates mirrors without interrupting the playback queue.
+- Type-Safe Offline Caching: Driven by SQLDelight with optimized SQLite schemas for offline favorites, listening history, and local audio indexing.
+
+5️⃣ IN-APP CINEMA & SECURITY SHIELD
+Streaming web content in an application poses major security risks (untrusted scripts, rogue redirects, pop-ups).
+- We implemented a sandboxed WebView container with custom script injection that blocks popups, ad telemetry, and iframe hijacking.
+- An intelligent resolver talks to Cinemeta APIs to map title queries to IMDb IDs (`tt...`) and resolve clean multi-server video streams.
+
+6️⃣ AI-POWERED SPEECH-TO-TEXT SEARCH
+Voice search shouldn’t require proprietary voice assistants. Nightly integrates:
+- Dual-engine STT using Whisper Large V3 Turbo (via Groq ultra-low-latency API) and Deepgram Nova-2.
+- Real-time Voice Activity Detection (VAD) with instant query transcription for songs, artists, and movies.
+
+Tech Stack Summary:
+• Language: Kotlin 2.x
+• Framework: Compose Multiplatform (Desktop + Android)
+• Database: SQLDelight (SQLite)
+• Networking: Ktor Client with Coroutines & Flow
+• Audio/Video: AndroidX Media3 ExoPlayer + VLCJ / libVLC
+• AI / STT: Whisper Large V3 Turbo & Deepgram Nova-2
+
+Full codebase is 100% open-source under the Apache/GPL license:
+🔗 GitHub Repository: https://github.com/aaweshdas/Audix-Multiplatform-Music-Player
+
+I'd love feedback from fellow mobile and desktop engineers on this architecture! How are you approaching native audio pipelines in Kotlin Multiplatform today?
+
+---
+#Kotlin #KotlinMultiplatform #ComposeMultiplatform #AndroidDev #SoftwareArchitecture #SystemDesign #OpenSource #ExoPlayer #ExoPlayer #CleanArchitecture #TechLeadership #MobileEngineering

@@ -1,0 +1,40 @@
+================================================================================
+POST OPTION 3: THE SHORT & VIRAL PRODUCT LAUNCH (FAST, PUNCHY, HIGH ENERGY)
+Best For: Broad reach, mobile readers, quick impressions, maximum shares
+Recommended Image to Attach: "07_LinkedIn_Feature_Collage.png" OR "01_Nightly_Hero_Brand.png"
+================================================================================
+
+🚀 Excited to officially introduce Nightly 🌙 — a modern, privacy-first media player that merges all your favorite audio and cinema into one unified cross-platform app.
+
+No ads. No tracking. No paywalled background play. Just pure media freedom.
+
+Built from scratch with Kotlin Multiplatform & Compose, Nightly works seamlessly across both Android and Desktop (Windows, macOS, Linux).
+
+Here’s what’s inside:
+
+🎧 Universal Audio Hub
+Stream and search seamlessly across Spotify, YouTube Music, JioSaavn, SoundCloud, and global radio stations without jumping between apps.
+
+🎬 In-App Cinema Theater
+Watch movies and series right inside the application with smart IMDb resolution, multi-server stream mirrors, and zero intrusive pop-ups.
+
+📊 Real-Time 28-Band FFT Visualizer
+Audiophile-grade audio visualization computed directly from raw PCM audio using mathematical Cooley-Tukey FFT.
+
+🎙️ AI-Powered Voice Search
+Search any song, artist, or movie hands-free using dual Whisper Large V3 Turbo and Deepgram Nova-2 speech-to-text models.
+
+🎨 Stunning Modern UI
+Fluid glassmorphic styling, dynamic Material 3 themes, synced synchronized lyrics, and lock-screen background controls.
+
+Best of all? It’s 100% Free & Open-Source on GitHub! 🌟
+
+💻 GitHub Repo: https://github.com/aaweshdas/Audix-Multiplatform-Music-Player
+📦 Download APK (Android) & Portable Zip (Windows) directly from the releases page!
+
+If you find this project cool or inspiring, please drop a ⭐ on GitHub and share it with your network!
+
+What feature would you love to see next? Drop a comment below! 👇
+
+---
+#Kotlin #AndroidDev #ComposeMultiplatform #OpenSource #KMP #Programming #UIUX #TechInnovation #DeveloperCommunity #SoftwareDevelopment

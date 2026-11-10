@@ -1,0 +1,43 @@
+================================================================================
+POST OPTION 1: THE BUILDER & FOUNDER STORY (HIGH VIRAL & STORYTELLING ANGLE)
+Best For: Maximum engagement, relatable journey, building personal brand & network
+Recommended Image to Attach: "07_LinkedIn_Feature_Collage.png" OR "01_Nightly_Hero_Brand.png"
+================================================================================
+
+Tired of ad interruptions, paywalled background play, and juggling separate apps for music and video?
+
+I decided to stop complaining and built something better.
+
+Meet Nightly 🌙 — a modern, privacy-focused, cross-platform audio & cinema streaming powerhouse built completely with Kotlin Multiplatform and Compose.
+
+Here is why I built it from the ground up:
+
+Most modern streaming applications are bloated. They consume gigabytes of RAM, force telemetry on users, block basic features like background playback behind subscriptions, and lock you into a single catalog.
+
+I wanted an all-in-one media workstation that is:
+✅ 100% Free & Open-Source (Zero ads, zero tracking)
+✅ Unified across Android and Desktop (Windows, macOS, Linux)
+✅ Aggregated across Spotify, YouTube Music, JioSaavn, SoundCloud, and Radio stations
+✅ An In-App Cinema Theater with smart IMDb resolvers & ad-blocking playback
+✅ Powered by AI Voice Search (Whisper Large V3 Turbo + Deepgram Nova-2)
+✅ Equipped with an audiophile-grade real-time 28-band FFT spectrum visualizer
+
+Building this was easily one of the most rewarding engineering challenges of my career.
+
+Some of the technical hurdles we conquered:
+🔹 True Cross-Platform UI: Sharing >90% of declarative UI code between Android and Desktop using Compose Multiplatform while maintaining smooth 60fps animations and Material 3 adaptive themes.
+🔹 Dual Native Media Engines: Powering desktop with low-latency libVLC C-bindings (via VLCJ) and Android with an AndroidX Media3 ExoPlayer background foreground service.
+🔹 Decoupled Plugin SPI: Creating a dynamic extension architecture where audio sources (Spotify, Saavn, YouTube Music, SoundCloud, Genius Lyrics) act as modular, sandboxed plugins.
+🔹 Seamless Video Streaming: Integrating an in-app Cinema studio that automatically queries Cinemeta IMDb metadata and renders video inside a popup-shielded sandbox.
+
+The result? An ultra-smooth, lightweight app that plays anything you throw at it, anywhere you want it.
+
+Huge shoutout to the Kotlin and Compose Multiplatform community for making modern cross-platform engineering such a joy.
+
+Check out the code, star the repository, or download the portable release on GitHub:
+👉 https://github.com/aaweshdas/Audix-Multiplatform-Music-Player
+
+I'd love to hear your thoughts! What’s your biggest pet peeve with current streaming apps? Drop a comment below! 👇
+
+---
+#Kotlin #KotlinMultiplatform #ComposeMultiplatform #AndroidDev #OpenSource #SoftwareEngineering #MobileDevelopment #DesktopApp #UIUX #Audiophile #BuildInPublic

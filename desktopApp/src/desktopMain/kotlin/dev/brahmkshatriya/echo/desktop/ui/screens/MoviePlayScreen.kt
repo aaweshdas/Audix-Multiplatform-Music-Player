@@ -1710,9 +1710,9 @@ fun MoviePlayScreen(
 
                 onStreamSelected = { stream, allStreams ->
 
-                    MoviePlayRepository.launchVideoStream(stream.url, movie.title, allStreams)
+                    MoviePlayRepository.startInAppPlayback(movie.title, stream, allStreams, movie)
 
-                    toastMessage = "▶ Launching: ${stream.title}..."
+                    toastMessage = "▶ In-App Cinema: ${movie.title} (${stream.title})"
 
                 },
 
@@ -1784,6 +1784,17 @@ fun MoviePlayScreen(
 
             )
 
+        }
+
+        // ------------------------------------------------------------------------------------
+        // IN-APP CINEMA VIDEO PLAYER MODAL (VLC-POWERED NATIVE 4K EMBEDDED DIRECT STREAMING)
+        // ------------------------------------------------------------------------------------
+        val activeSession by dev.brahmkshatriya.echo.desktop.ui.movie.MoviePlayRepository.activeMovieSession.collectAsState()
+        activeSession?.let { s ->
+            dev.brahmkshatriya.echo.desktop.ui.movie.AudixInAppCinemaPlayer(
+                session = s,
+                onDismiss = { dev.brahmkshatriya.echo.desktop.ui.movie.MoviePlayRepository.stopInAppPlayback() }
+            )
         }
 
     }

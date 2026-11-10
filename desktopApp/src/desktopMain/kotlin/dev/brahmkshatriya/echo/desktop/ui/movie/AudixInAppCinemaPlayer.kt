@@ -312,7 +312,7 @@ fun AudixInAppCinemaPlayer(
                 contentAlignment = Alignment.Center
             ) {
                 SwingPanel(
-                    background = java.awt.Color.BLACK,
+                    background = Color.Black,
                     modifier = Modifier.fillMaxSize(),
                     factory = {
                         initLibVlcSearchPaths()

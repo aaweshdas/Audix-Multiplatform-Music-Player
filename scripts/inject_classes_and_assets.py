@@ -117,7 +117,12 @@ if os.path.exists(mb_dir):
     print(f'[3.5/5] Loaded moviebox catalog & collection assets from {mb_dir}')
 
 def update_jar(jar_path):
-    temp_jar = jar_path + '.tmp'
+    temp_dir = os.path.join(PROJECT_ROOT, 'build')
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_jar = os.path.join(temp_dir, f'temp_inject_{os.getpid()}_{os.path.basename(jar_path)}.tmp')
+    if os.path.exists(temp_jar):
+        try: os.remove(temp_jar)
+        except Exception: pass
     with zipfile.ZipFile(jar_path, 'r') as zin, zipfile.ZipFile(temp_jar, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
         for item in zin.infolist():
             if item.filename in classes_to_update:
@@ -167,17 +172,24 @@ def update_jar(jar_path):
             zout.writestr(path, data)
             
     import time
-    for attempt in range(5):
+    for attempt in range(10):
         try:
-            os.replace(temp_jar, jar_path)
-            break
-        except PermissionError:
+            if os.path.exists(jar_path):
+                try:
+                    os.replace(temp_jar, jar_path)
+                    break
+                except (PermissionError, FileNotFoundError, OSError):
+                    time.sleep(0.5)
+                    shutil.copy2(temp_jar, jar_path)
+                    try: os.remove(temp_jar)
+                    except Exception: pass
+                    break
+        except Exception:
             time.sleep(0.6)
     else:
-        time.sleep(1.0)
-        if os.path.exists(jar_path):
-            os.remove(jar_path)
-        shutil.move(temp_jar, jar_path)
+        shutil.copy2(temp_jar, jar_path)
+        try: os.remove(temp_jar)
+        except Exception: pass
     print(f'   Successfully updated: {jar_path}')
 
 target_jars = set()

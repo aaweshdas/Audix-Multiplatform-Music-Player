@@ -27,7 +27,10 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.ui.zIndex
 import dev.brahmkshatriya.echo.desktop.ui.screens.MoviePlayScreen
+import dev.brahmkshatriya.echo.desktop.ui.movie.AudixInAppCinemaPlayer
+import dev.brahmkshatriya.echo.desktop.ui.movie.MoviePlayRepository
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -144,6 +147,7 @@ fun EchoDesktopApp() {
             val playerViewModel = koinInject<PlayerViewModel>()
             val settings = runCatching { koinInject<EchoSettings>() }.getOrNull()
 
+            val activeMovieSession by MoviePlayRepository.activeMovieSession.collectAsState()
             var isScreensaverActive by remember { mutableStateOf(false) }
             val lastActivityTime = remember { java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis()) }
             val screensaverActivatedAt = remember { java.util.concurrent.atomic.AtomicLong(0L) }
@@ -418,6 +422,28 @@ fun EchoDesktopApp() {
                             lastActivityTime.set(System.currentTimeMillis())
                         }
                     )
+                }
+
+                // Flagship In-App Cinema Theater Overlay
+                activeMovieSession?.let { session ->
+                    LaunchedEffect(session) {
+                        if (playerViewModel.isPlaying.value) {
+                            playerViewModel.pause()
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(9999f)
+                    ) {
+                        AudixInAppCinemaPlayer(
+                            session = session,
+                            onDismiss = {
+                                MoviePlayRepository.stopInAppPlayback()
+                            }
+                        )
+                    }
                 }
             }
         }

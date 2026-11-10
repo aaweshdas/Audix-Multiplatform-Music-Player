@@ -106,6 +106,13 @@ data class MovieStreamOption(
     val sourceType: String = "moviebox"
 )
 
+data class ActiveMovieSession(
+    val title: String,
+    val currentStream: MovieStreamOption,
+    val allStreams: List<MovieStreamOption> = emptyList(),
+    val movieItem: MovieBoxItem? = null
+)
+
 enum class MovieSortOrder(val label: String) {
     NAME_ASC("Name (A → Z)"),
     NAME_DESC("Name (Z → A)"),
@@ -136,6 +143,27 @@ data class MovieSoundtrack(
 // =========================================================================
 
 object MoviePlayRepository {
+
+    val activeMovieSession = kotlinx.coroutines.flow.MutableStateFlow<ActiveMovieSession?>(null)
+
+    fun startInAppPlayback(
+        title: String,
+        stream: MovieStreamOption,
+        allStreams: List<MovieStreamOption> = emptyList(),
+        item: MovieBoxItem? = null
+    ) {
+        val streamsList = if (allStreams.isNotEmpty()) allStreams else listOf(stream)
+        activeMovieSession.value = ActiveMovieSession(
+            title = title,
+            currentStream = stream,
+            allStreams = streamsList,
+            movieItem = item
+        )
+    }
+
+    fun stopInAppPlayback() {
+        activeMovieSession.value = null
+    }
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -651,11 +679,18 @@ object MoviePlayRepository {
         val streams = fetchMovieStreams(item)
         val best = streams.firstOrNull { !it.isEmbed } ?: streams.firstOrNull()
         if (best != null) {
-            onToast("▶ Playing: ${item.title} (${best.title})")
-            launchVideoStream(best.url, item.title, streams)
+            onToast("▶ In-App Cinema: ${item.title} (${best.title})")
+            startInAppPlayback(item.title, best, streams, item)
         } else {
-            onToast("🎬 Opening ${item.title}...")
-            launchVideoStream("$MOVIEBOX_SERVER_URL/?id=${item.id}&play=true", item.title)
+            val fallback = MovieStreamOption(
+                id = "stream_${item.id}",
+                title = "Cinema 1080p Stream",
+                url = "$MOVIEBOX_SERVER_URL/api/stream-proxy?id=${item.id}",
+                resolution = "1080",
+                format = "MP4"
+            )
+            onToast("▶ In-App Cinema: ${item.title}")
+            startInAppPlayback(item.title, fallback, listOf(fallback), item)
         }
     }
 

@@ -131,6 +131,7 @@ def update_jar(jar_path):
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/AiStudio') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$AiStudio') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/HomeScreenKt') or
+                  item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/NeonCardiacSkiaState') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$HomeScreenKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/EchoScreensaverKt') or
                   item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/ComposableSingletons$EchoScreensaverKt') or
@@ -200,6 +201,7 @@ if os.path.exists(ra_app):
             target_jars.add(os.path.join(ra_app, f))
 
 build_roots = [
+    os.path.join(PROJECT_ROOT, r'release-artifacts\Nightly-Windows-Portable\app'),
     os.path.join(PROJECT_ROOT, r'desktopApp\build\compose\binaries\main\app\Audix\app'),
     os.path.join(PROJECT_ROOT, r'desktopApp\build\compose\binaries\main\app\Nightly\app')
 ]

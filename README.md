@@ -4,6 +4,7 @@
 
 # Nightly — Multiplatform Music Player
 
+![Release](https://img.shields.io/badge/Release-v1.0.4-FF1E44?style=for-the-badge)
 ![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
 ![Compose Multiplatform](https://img.shields.io/badge/Compose-Multiplatform-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-SDK%2024%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
@@ -11,58 +12,58 @@
 ![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
 
 <p align="center">
-  <b>A modern, high-performance, extension-based music player built for Android and Desktop (Nightly).</b><br>
-  Powered by Kotlin Multiplatform, Compose Multiplatform, SQLDelight, and VLC audio playback.
+  <b>A flagship, high-performance, extension-based music player built for Windows Desktop and Android.</b><br>
+  Powered by Kotlin Multiplatform, Compose Multiplatform, SQLDelight, LibVLC, Skia GPU rendering, and native Windows WASAPI Loopback DSP.
 </p>
 
 </div>
 
 ---
 
-## ⚡ Latest Release — v1.0.1
+## ⚡ Latest Release — v1.0.4
 
 | Platform | Format | File | Size | Download |
 | :--- | :--- | :--- | :--- | :--- |
-| 📱 **Android** (SDK 24+) | **APK** | `Nightly-v1.0.4-Android.apk` | ~14.4 MB | [⬇️ **Download APK**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Android.apk) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
-| 💻 **Windows** (x64) | **EXE Setup** | `Nightly-v1.0.4-Windows-Installer.exe` | ~166 MB | [⬇️ **Download EXE**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Installer.exe) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
-| 💻 **Windows** (x64) | **MSI Installer** | `Nightly-v1.0.4-Windows-Installer.msi` | ~165 MB | [⬇️ **Download MSI**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Installer.msi) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
-| 📦 **Windows** (x64) | **Portable ZIP** | `Nightly-v1.0.4-Windows-Portable.zip` | ~234 MB | [⬇️ **Download ZIP**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Portable.zip) \| [GitHub Release](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest) |
+| 🛡️ **Windows** (x64) | **Trusted Setup ZIP** *(Recommended)* | `Nightly-v1.0.4-Windows-Trusted-Setup.zip` | 396.9 MB | [⬇️ **Download Trusted Setup**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Trusted-Setup.zip) \| [Release Notes](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/tag/v1.0.4) |
+| 💻 **Windows** (x64) | **EXE Setup** *(Signed)* | `Nightly-v1.0.4-Windows-Installer.exe` | 398.8 MB | [⬇️ **Download EXE**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Installer.exe) \| [Release Notes](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/tag/v1.0.4) |
+| 💻 **Windows** (x64) | **MSI Installer** *(Signed)* | `Nightly-v1.0.4-Windows-Installer.msi` | 398.1 MB | [⬇️ **Download MSI**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Installer.msi) \| [Release Notes](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/tag/v1.0.4) |
+| 📦 **Windows** (x64) | **Portable ZIP** *(No Install)* | `Nightly-v1.0.4-Windows-Portable.zip` | 411.3 MB | [⬇️ **Download Portable**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Windows-Portable.zip) \| [Release Notes](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/tag/v1.0.4) |
+| 📱 **Android** (SDK 24+) | **APK** | `Nightly-v1.0.4-Android.apk` | 14.9 MB | [⬇️ **Download APK**](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/latest/download/Nightly-v1.0.4-Android.apk) \| [Release Notes](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases/tag/v1.0.4) |
 
 > [!TIP]
-> **New to Nightly?** Follow the quick steps below to load your music and install extensions in seconds!
-
-### 📥 How to Install & Add Extensions in Nightly
-1. **Download & Install**: Install `Nightly-v1.0.4-Android.apk` on your Android device (or run `Nightly-v1.0.4-Windows-Installer.exe` on Windows).
-2. **Open Extensions**: Tap the **Extensions** icon in the navigation bar.
-3. **Tap Add (`+`)**: Tap the **Add Extension** button.
-4. **Enter Shortcode or URL**:
-   - Simply type **`extension`** (or leave it blank) and tap **Add**.
-   - Or paste the official community repository URL:
-     ```
-     https://raw.githubusercontent.com/itsmechinmoy/echo-extensions/main/echo_extensions.json
-     ```
-5. **Select Your Sources**: Check **YouTube Music**, **Saavn Music**, **SoundCloud**, **Radio Browser**, or **Lyrics** providers and tap **Add**.
-6. **Enjoy Music!** All songs, search results, charts, and radio stations will immediately load on your home feed.
+> **Windows Quick Setup:** Download `Nightly-v1.0.4-Windows-Trusted-Setup.zip`, extract it, and run **`Install-Nightly-Trusted.bat`** as administrator for verified publisher trust with zero SmartScreen prompts.
 
 ---
 
-### ✨ What's New in v1.0.1
-- 🎛️ **Flagship 3-Zone Studio Billboard**: Redesigned hero section with balanced 3-part layout (Track identity & hero playback actions, live 28-band frequency spectrum visualizer, and 3D spinning vinyl gatefold with smooth animations).
-- 🔘 **Crisp Action Matrix**: Completely redesigned high-contrast circular action buttons (Favorite, Playlist, Download, Share, Next) with zero glare obscuration.
-- ⚡ **Interactive Studio Options**: Direct access to Screensaver, Equalizer, Shuffle, Repeat modes, and Now Playing.
-- 💻 **Standalone Windows .EXE Installer**: Native Windows installer `.exe` with bundled Java 21 runtime and automatic desktop & Start Menu shortcuts.
-- 📱 **Optimized Android APK**: Fresh release APK built with R8 optimization and signing for instant installation across all Android devices.
-- 🚀 **Cross-Platform Audio Engine**: Support for Media3 ExoPlayer on Android and VLCJ on Windows Desktop.
-- 🔌 **Dynamic Extension Loader**: Resolved all package discovery, DEX loading, and URL shortener resolution issues.
-- 🎵 **Built-In Offline & Spotify Playback**: Instant playback of your local music library and popular Spotify charts.
+### ✨ What's New in v1.0.4
+
+- 💓 **Real-Time Music-Vibration ECG Heartbeat Visualizer**:
+  - **Native Windows WASAPI Loopback Audio Tap** via JNA COM (`AUDCLNT_STREAMFLAGS_LOOPBACK`) — zero interference with LibVLC's native output, equalizer, volume, or headphone/Bluetooth device switches.
+  - **1024-Point FFT + Adaptive AGC + Dual-Band Spectral-Flux Beat Detector**: Locks onto real kick drums, bass drops, and snare hits at any volume (15%–100%), while live 96-sample PCM vibration ripples directly through the crimson laser beam.
+  - **GPU Skia Gaussian Neon Bloom & Zero-GC Engine**: Hardware-accelerated `MaskFilter.makeBlur`, seamless elliptical radial crimson aura, razor-sharp needle apexes, waveform-locked telemetry spark, and 0 Compose recompositions/sec (~1.3%–2.6% normalized CPU).
+- 🎤 **Synchronized Karaoke Lyrics Studio**: Built-in LRCLIB-powered scrolling lyrics modal directly accessible from the Soundstage Billboard header (`LYRICS`), complete with active-line glow highlight and click-to-seek timestamp navigation.
+- ⏱️ **Nightly Sleep Timer**: Configurable presets (15m / 30m / 45m / 60m), live countdown, optional auto-exit, and a smooth 30-second exponential audio fade-out ramp before pausing.
+- 🎬 **In-App Direct3D Cinema Theater & Movie Play**: Unified 2-row Movie Play command dock and integrated Direct3D video theater.
+- 🎨 **Complete Nightly Brand & Media Accuracy**: Unified **Nightly v1.0.4** identity, high-resolution artwork & metadata resolution across all 10 bundled extensions, and Authenticode-signed Windows `.exe` / `.msi` installers with RFC3161 timestamps.
+
+---
+
+### 📥 How to Install & Configure Extensions
+1. **Install Nightly**: Run **`Nightly-v1.0.4-Windows-Installer.exe`** (or extract the Portable ZIP) on Windows, or install **`Nightly-v1.0.4-Android.apk`** on Android.
+2. **Pre-Bundled Desktop Extensions**: All 10 flagship desktop extensions (YouTube Music, JioSaavn, SoundCloud, Spotify, Radio Browser, LRCLIB, Musixmatch, Genius, Discord RPC, Last.fm) are automatically bundled and synchronized on launch.
+3. **Adding Community Extensions (Android / Custom)**:
+   - Open **Extensions** -> tap **Add (`+`)** -> paste:
+     ```
+     https://raw.githubusercontent.com/itsmechinmoy/echo-extensions/main/echo_extensions.json
+     ```
 
 ---
 
 ## 📖 Overview
 
-**Nightly** is an extensible, privacy-conscious audio player. Rather than hardcoding fixed streaming services, Nightly features a decoupled **Extension SPI Architecture** that dynamically loads audio sources, metadata providers, synchronized lyrics engines, and social integrations at runtime.
+**Nightly** is an extensible, privacy-conscious audio player. Rather than hardcoding closed streaming services, Nightly uses a decoupled **Extension SPI Architecture** that dynamically loads audio sources, metadata providers, synchronized lyrics engines, and social integrations at runtime.
 
-The desktop client (**Nightly**) provides an immersive, desktop-grade interface featuring smooth animations, hardware-accelerated playback, dynamic lyrics sync, visualizers, system tray minimization, and media key support.
+The desktop client (**Nightly Desktop**) delivers a studio-grade interface featuring Direct3D hardware acceleration, liquid-glass design, real-time WASAPI audio telemetry, synchronized lyrics, AI Studio, system tray integration, and global Windows media key support.
 
 > [!NOTE]
 > Nightly is designed as an offline player and extension host. The application itself hosts zero content and does not condone piracy. Users configure their own extensions and manage their own local libraries.
@@ -71,11 +72,9 @@ The desktop client (**Nightly**) provides an immersive, desktop-grade interface 
 
 ## 🏗️ Architecture & Modules
 
-The workspace is organized into four modular Kotlin Multiplatform (KMP) modules:
-
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                           Nightly Workspace                       │
+│                       Nightly Workspace                         │
 ├─────────────────┬─────────────────┬──────────────┬──────────────┤
 │      :app       │   :desktopApp   │    :core     │   :common    │
 │  (Android App)  │(Compose Desktop)│(DB & Engine) │ (Domain SPI) │
@@ -84,149 +83,100 @@ The workspace is organized into four modular Kotlin Multiplatform (KMP) modules:
 
 | Module | Target | Description |
 | :--- | :--- | :--- |
-| [**:app**](file:///s:/All%20Code/Antigravity/echo-nightly/app) | Android (SDK 24–36) | Android application with Material 3 UI, background playback services, home widgets, and Media3 ExoPlayer. App name: **Nightly**. |
-| [**:desktopApp**](file:///s:/All%20Code/Antigravity/echo-nightly/desktopApp) | JVM / Desktop | Modern Compose Multiplatform desktop client (**Nightly**). Implements Decompose navigation, Koin DI, VLC audio playback, and Windows tray/media keys. |
-| [**:core**](file:///s:/All%20Code/Antigravity/echo-nightly/core) | Common & JVM | Shared business logic, SQLDelight database (`EchoDatabase`), VLCJ playback engine, and dynamic JAR extension loader. |
-| [**:common**](file:///s:/All%20Code/Antigravity/echo-nightly/common) | Kotlin Multiplatform | Core domain models (`Track`, `Album`, `Artist`, `Playlist`), client interfaces, and Extension SPI. |
+| [**:app**](./app) | Android (SDK 24–36) | Android application with Material 3 UI, background playback services, home widgets, and Media3 ExoPlayer. |
+| [**:desktopApp**](./desktopApp) | JVM / Desktop | Compose Multiplatform desktop client (**Nightly Desktop**) with Decompose navigation, Koin DI, Skia GPU visualizers, Cinema Theater, Lyrics Studio, Sleep Timer, and Windows tray/media keys. |
+| [**:core**](./core) | Common & JVM | Shared business logic, SQLDelight database (`EchoDatabase`), LibVLC playback engine, Windows WASAPI Loopback DSP (`AudioVisualizerManager`), and dynamic JAR extension loader. |
+| [**:common**](./common) | Kotlin Multiplatform | Core domain models (`Track`, `Album`, `Artist`, `Playlist`), client interfaces, centralized `FlavorConfig`, and Extension SPI. |
 
 ---
 
-## 📂 Directory Layout
+## 📂 Repository Structure
 
-The workspace has been organized cleanly order-wise at the root:
-
-```
+```text
 echo-nightly/
-├── .github/                         # GitHub Actions workflows & issue templates
-├── .gitignore                       # Git ignore specifications
-├── AI_POLICY.md                     # Project AI and contribution policies
-├── LICENSE.md                       # GNU General Public License v3.0
-├── README.md                        # Master project documentation
-├── Run-Nightly.bat                    # Primary Windows desktop launcher script
-├── Run-Echo.bat                     # Fallback Windows desktop launcher script
+├── .github/                              # GitHub Actions workflows & issue templates
+├── .gitignore                            # Build, cache, and artifact ignore rules
+├── AI_POLICY.md                          # Project AI & contribution policy
+├── LICENSE.md                            # GNU General Public License v3.0
+├── README.md                             # Project documentation & release links
+├── SUMMARY.md                            # Engineering & security resolution summary
+├── NIGHTLY_COMPLETE_APPLICATION_SPECIFICATION.txt
+├── Run-Nightly.bat                       # Primary Windows desktop launcher
+├── Trust-Nightly-Certificate.bat         # Windows trusted root certificate helper
+├── Nightly-CodeSigning-CA.cer            # Public Nightly code-signing CA certificate
 │
-├── app/                             # [Module] Android Application (Audix)
-│   ├── src/main/                    # Android source code & resources
-│   └── build.gradle.kts             # Android build configuration
-│
-├── common/                          # [Module] KMP Extension SPI & Domain Models
-│   ├── src/commonMain/kotlin/       # Shared interfaces (AlbumClient, TrackClient, etc.)
-│   └── build.gradle.kts             # Common multiplatform build script
-│
-├── core/                            # [Module] Platform Engine, DB & Extensions
-│   ├── src/commonMain/sqldelight/   # SQLDelight database schemas (Downloads, Extensions, Users)
-│   ├── src/desktopMain/kotlin/      # VLC player, JarExtensionRepository, LocalMusicExtension
-│   └── build.gradle.kts             # Core build script
-│
-├── desktopApp/                      # [Module] Audix Compose Desktop Application
-│   ├── src/desktopMain/kotlin/      # Compose UI, screens, viewmodels, desktop entry
-│   └── build.gradle.kts             # Compose Multiplatform packaging & native distribution
-│
-├── gradle/                          # Gradle wrapper & dependency version catalog
-│   ├── libs.versions.toml           # Unified version catalog
-│   └── wrapper/                     # Gradle wrapper JAR and properties
-│
-├── scripts/                         # Developer & maintenance utilities
-│   └── scratch_capture.ps1          # Diagnostic window capture utility
-│
-├── tools/                           # Development tools and reference assets
-│   ├── assets/                      # Official branding & logo artwork (audix_logo.jpg)
-│   ├── sample-extensions/           # Sample extension packages and manifests
-│   │   ├── test_ext.zip             # Dalvik/DEX sample Android extension APK
-│   │   └── saavn-manifest/          # Unpacked Saavn Music extension manifest
-│   └── recovered-reference/         # Decompiled source code & class reference archives
-│
-├── build.gradle.kts                 # Root Gradle build script
-├── settings.gradle.kts              # Root Gradle settings (module registry & repos)
-├── gradle.properties                # JVM, Kotlin & build configuration flags
-├── gradlew / gradlew.bat            # Gradle wrapper scripts
-├── jitpack.yml                      # JitPack build configuration
-└── local.properties                 # Local Android SDK path configuration
+├── app/                                  # [Module] Android Application (Media3 ExoPlayer)
+├── common/                               # [Module] KMP Domain Models & Extension SPI
+├── core/                                 # [Module] LibVLC Engine, WASAPI DSP & SQLDelight
+├── desktopApp/                           # [Module] Nightly Compose Desktop UI & ViewModels
+├── extensions/                           # [Modules] Source code for bundled extensions
+├── gradle/                               # Gradle wrapper & unified libs.versions.toml
+├── scripts/                              # Build, inject, sign, verify & release toolchain
+│   ├── README.md                         # Toolchain documentation
+│   ├── compile_desktop_app.py            # Embedded Kotlin/Compose compiler pipeline
+│   ├── inject_classes_and_assets.py      # Bytecode, asset & extension JAR injector
+│   ├── build_windows_installers.py       # jpackage + WiX MSI/EXE & bundle packager
+│   ├── sign_all_release_binaries.py      # SHA-256 Authenticode signer & verifier
+│   ├── publish_github_release.py         # GitHub Releases API publisher with SHA-256
+│   ├── launch_and_verify.py              # Process health & launch verifier
+│   └── archive/                          # Historical migration scripts
+└── tools/                                # Brand artwork, manifests & recovered references
 ```
 
 ---
 
-## 🧩 Extension Ecosystem
-
-Audix features a modular plugin architecture where capabilities are added through standalone extension JARs loaded at runtime:
+## 🧩 Bundled Extension Ecosystem
 
 | Extension | Category | Capability |
 | :--- | :--- | :--- |
-| **YouTube Music** (`youtube.jar`) | Audio Streaming | Search, browse charts, stream audio streams with adaptive bitrates. |
+| **YouTube Music** (`youtube.jar`) | Audio Streaming | Search, browse charts, and stream audio with adaptive bitrates. |
 | **JioSaavn** (`saavn.jar`) | Audio Streaming | High-bitrate Bollywood, regional, and international catalog streaming. |
-| **SoundCloud** (`soundcloud.jar`) | Audio Streaming | User tracks, indie releases, and playlists. |
-| **Radio Browser** (`radiobrowser.jar`) | Radio Stations | Global directory of thousands of live internet radio streams. |
-| **LRCLIB** (`lrclib.jar`) | Synchronized Lyrics | Time-synced scrolling lyrics database. |
+| **SoundCloud** (`soundcloud.jar`) | Audio Streaming | Independent tracks, mixes, and curated playlists. |
+| **Spotify** (`spotify.jar`) | Catalog & Charts | Popular charts, curated catalogs, and metadata integration. |
+| **Radio Browser** (`radiobrowser.jar`) | Live Radio | Global directory of thousands of live internet radio stations. |
+| **LRCLIB** (`lrclib.jar`) | Synchronized Lyrics | Time-synced karaoke scrolling lyrics database. |
 | **Musixmatch** (`musixmatch.jar`) | Lyrics Provider | Comprehensive lyrics search and rich text lyrics. |
-| **Genius** (`genius.jar`) | Lyrics & Annotations | Song lyrics, background notes, and track annotations. |
-| **Discord RPC** (`discordrpc.jar`) | Social Integration | Live Discord Rich Presence with track title, artist, and playback status. |
-| **Last.fm** (`lastfm.jar`) | Scrobbling | Automatic playback scrobbling and listening history synchronization. |
+| **Genius** (`genius.jar`) | Lyrics & Annotations | Song lyrics, background stories, and annotations. |
+| **Discord RPC** (`discordrpc.jar`) | Social Integration | Live Discord Rich Presence with track title, artist, and status. |
+| **Last.fm** (`lastfm.jar`) | Scrobbling | Automatic playback scrobbling and listening history sync. |
 
-Extensions are stored locally under:
-- **Windows**: `%APPDATA%\Echo\extensions\`
+Desktop extensions are synchronized automatically to `%APPDATA%\Echo\extensions\`.
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Building & Running Locally
 
 ### Prerequisites
+- **JDK 21** (OpenJDK 21 LTS recommended)
+- **Python 3.10+** (for desktop compilation, packaging, and signing automation)
+- **Android SDK** (API 36 / minSdk 24) for Android builds
 
-- **JDK 21** or higher (Java 21 LTS recommended)
-- **Android SDK** (API 34+ build-tools) for building the Android application
-- **VLC Media Player** (64-bit) installed for desktop playback via `vlcj`
-
-### Launch Desktop (Audix)
-
-To quickly run the desktop application on Windows:
+### Quick Launch (Windows)
 ```cmd
 .\Run-Nightly.bat
 ```
 
-Or via Gradle directly:
+### Compile, Package & Sign Desktop (Windows)
 ```powershell
-.\gradlew.bat :desktopApp:run
+python scripts/compile_desktop_app.py
+python scripts/inject_classes_and_assets.py
+python scripts/build_windows_installers.py
 ```
-
-### Package Desktop Executable / Installer
-
-Build a standalone native Windows distribution for Audix (bundled with JRE):
-```powershell
-.\gradlew.bat :desktopApp:packageDistributionForCurrentOS
-```
-The output executable will be created in:
-`desktopApp/build/compose/binaries/main/app/Audix/Audix.exe`
 
 ### Build Android APK
-
-Build a debug or nightly APK for Audix:
 ```powershell
 .\gradlew.bat :app:assembleNightly
 ```
 
 ---
 
-## 🛠️ Diagnostics & Developer Scripts
-
-- **Inspect Project Modules**:
-  ```powershell
-  .\gradlew.bat projects
-  ```
-- **Capture Window Diagnostics**:
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File scripts\scratch_capture.ps1
-  ```
-- **Sample Extensions & Manifests**:
-  Inspect sample extension manifests in `tools/sample-extensions/saavn-manifest/META-INF/MANIFEST.MF`.
-
----
-
 ## 📜 Community & Support
 
-Join the official community for news, extension development guides, and nightly updates:
+- **GitHub Releases**: [Latest Releases](https://github.com/aaweshdas/Audix-Multiplatform-Music-Player/releases)
 - **Discord**: [Join Official Server](https://discord.gg/J3WvbBUU8Z)
 
 ---
 
 ## ⚖️ License
 
-Nightly is free software licensed under the **GNU General Public License v3.0** (GPL-3.0). See [LICENSE.md](file:///s:/All%20Code/Antigravity/echo-nightly/LICENSE.md) for full details.
+Nightly is free software licensed under the **GNU General Public License v3.0** (GPL-3.0). See [LICENSE.md](./LICENSE.md) for full details.

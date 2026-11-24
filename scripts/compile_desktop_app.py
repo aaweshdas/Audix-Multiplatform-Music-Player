@@ -58,6 +58,7 @@ with zipfile.ZipFile(target_jar, 'r') as zin, zipfile.ZipFile(clean_ref_jar, 'w'
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$AiStudio') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/player/') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/HomeScreenKt') and
+            not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/NeonCardiacSkiaState') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screens/ComposableSingletons$HomeScreenKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/EchoScreensaverKt') and
             not item.filename.startswith('dev/brahmkshatriya/echo/desktop/ui/screensaver/ComposableSingletons$EchoScreensaverKt') and

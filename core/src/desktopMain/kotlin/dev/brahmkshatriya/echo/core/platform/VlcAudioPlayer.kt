@@ -488,7 +488,7 @@ class VlcAudioPlayer(
             add(":drop-late-frames=true")
             add(":no-video")
             val ua = source.request.headers["User-Agent"]
-                ?: "Nightly/1.0.0 (Windows; OpenJDK 21)"
+                ?: "Nightly/1.0.4 (Windows; OpenJDK 21)"
             add(":http-user-agent=${cleanOpt(ua)}")
             source.request.headers["Referer"]?.let { if (it.isNotBlank()) add(":http-referrer=${cleanOpt(it)}") }
             source.request.headers["Origin"]?.let { if (it.isNotBlank()) add(":http-origin=${cleanOpt(it)}") }

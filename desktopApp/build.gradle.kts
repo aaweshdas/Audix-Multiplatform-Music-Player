@@ -100,7 +100,7 @@ compose.desktop {
             }
 
             macOS {
-                bundleID = "com.audix.music"
+                bundleID = "dev.brahmkshatriya.nightly"
             }
 
             linux {

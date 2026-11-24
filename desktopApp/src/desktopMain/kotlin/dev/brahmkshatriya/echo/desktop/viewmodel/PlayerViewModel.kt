@@ -146,7 +146,7 @@ class PlayerViewModel(
                 if (trackers.isEmpty()) return@collect
                 val details = track?.let {
                     TrackDetails(
-                        extensionId = track.extras["extension_id"] ?: extensionManager.current.value?.id ?: "audix_player",
+                        extensionId = track.extras["extension_id"] ?: extensionManager.current.value?.id ?: "nightly_player",
                         track = track,
                         context = null,
                         currentPosition = player.positionMs.value,
@@ -169,7 +169,7 @@ class PlayerViewModel(
                 val track = player.currentTrack.value
                 val details = track?.let {
                     TrackDetails(
-                        extensionId = track.extras["extension_id"] ?: extensionManager.current.value?.id ?: "audix_player",
+                        extensionId = track.extras["extension_id"] ?: extensionManager.current.value?.id ?: "nightly_player",
                         track = track,
                         context = null,
                         currentPosition = player.positionMs.value,
@@ -196,7 +196,7 @@ class PlayerViewModel(
                     val track = player.currentTrack.value ?: return@collect
                     val isPlay = player.isPlaying.value
                     val details = TrackDetails(
-                        extensionId = track.extras["extension_id"] ?: extensionManager.current.value?.id ?: "audix_player",
+                        extensionId = track.extras["extension_id"] ?: extensionManager.current.value?.id ?: "nightly_player",
                         track = track,
                         context = null,
                         currentPosition = pos,
@@ -312,7 +312,101 @@ class PlayerViewModel(
     private val _showNowPlaying = kotlinx.coroutines.flow.MutableStateFlow(false)
     val showNowPlaying: StateFlow<Boolean> = _showNowPlaying
 
-    fun toggleNowPlaying() {
+        // -------------------------------------------------------------------------
+    // SLEEP TIMER & NIGHTLY AUTO-SHUTDOWN ENGINE
+    // -------------------------------------------------------------------------
+    private val _sleepTimerSecondsRemaining = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val sleepTimerSecondsRemaining: StateFlow<Int> = _sleepTimerSecondsRemaining
+
+    private val _sleepTimerActive = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val sleepTimerActive: StateFlow<Boolean> = _sleepTimerActive
+
+    private val _sleepTimerMinutes = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val sleepTimerMinutes: StateFlow<Int> = _sleepTimerMinutes
+
+    private val _sleepFadeOut = kotlinx.coroutines.flow.MutableStateFlow(true)
+    val sleepFadeOut: StateFlow<Boolean> = _sleepFadeOut
+
+    private val _sleepCloseApp = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val sleepCloseApp: StateFlow<Boolean> = _sleepCloseApp
+
+    private val _showSleepTimerDialog = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val showSleepTimerDialog: StateFlow<Boolean> = _showSleepTimerDialog
+
+    fun toggleSleepTimerDialog() {
+        _showSleepTimerDialog.value = !_showSleepTimerDialog.value
+    }
+
+    fun setSleepTimerDialog(open: Boolean) {
+        _showSleepTimerDialog.value = open
+    }
+
+    private var sleepTimerJob: Job? = null
+    private var originalVolumeBeforeSleep: Float = 1.0f
+
+    fun startSleepTimer(minutes: Int, fadeOut: Boolean = true, closeApp: Boolean = false) {
+        sleepTimerJob?.cancel()
+        if (minutes <= 0) {
+            cancelSleepTimer()
+            return
+        }
+        _sleepTimerMinutes.value = minutes
+        _sleepTimerSecondsRemaining.value = minutes * 60
+        _sleepFadeOut.value = fadeOut
+        _sleepCloseApp.value = closeApp
+        _sleepTimerActive.value = true
+        originalVolumeBeforeSleep = volume.value
+
+        sleepTimerJob = scope.launch {
+            while (_sleepTimerActive.value && _sleepTimerSecondsRemaining.value > 0) {
+                delay(1000L)
+                _sleepTimerSecondsRemaining.value -= 1
+
+                // Smooth audio fade-out during final 30 seconds
+                if (_sleepFadeOut.value && _sleepTimerSecondsRemaining.value in 1..30) {
+                    val factor = _sleepTimerSecondsRemaining.value / 30f
+                    setVolume((originalVolumeBeforeSleep * factor).coerceIn(0.01f, 1f))
+                }
+            }
+
+            if (_sleepTimerActive.value && _sleepTimerSecondsRemaining.value <= 0) {
+                pause()
+                if (_sleepFadeOut.value) {
+                    setVolume(originalVolumeBeforeSleep)
+                }
+                _sleepTimerActive.value = false
+                _sleepTimerMinutes.value = 0
+                _sleepTimerSecondsRemaining.value = 0
+                if (_sleepCloseApp.value) {
+                    kotlin.system.exitProcess(0)
+                }
+            }
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        if (_sleepTimerActive.value && _sleepFadeOut.value) {
+            setVolume(originalVolumeBeforeSleep)
+        }
+        _sleepTimerActive.value = false
+        _sleepTimerMinutes.value = 0
+        _sleepTimerSecondsRemaining.value = 0
+    }
+
+    private val _showLyricsDialog = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val showLyricsDialog: StateFlow<Boolean> = _showLyricsDialog
+
+    fun toggleLyricsDialog() {
+        _showLyricsDialog.value = !_showLyricsDialog.value
+    }
+
+    fun setLyricsDialog(open: Boolean) {
+        _showLyricsDialog.value = open
+    }
+
+fun toggleNowPlaying() {
         _showNowPlaying.value = !_showNowPlaying.value
     }
 
@@ -321,13 +415,6 @@ class PlayerViewModel(
 
     fun toggleAudioEffectsDialog() {
         _showAudioEffectsDialog.value = !_showAudioEffectsDialog.value
-    }
-
-    private val _showSleepTimerDialog = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val showSleepTimerDialog: StateFlow<Boolean> = _showSleepTimerDialog
-
-    fun toggleSleepTimerDialog() {
-        _showSleepTimerDialog.value = !_showSleepTimerDialog.value
     }
 
     fun setRepeatMode(mode: RepeatMode) {
@@ -413,7 +500,7 @@ class PlayerViewModel(
         if (clean in setOf(
             "song", "video", "episode", "podcast", "audio", "track",
             "unknown", "unknown artist", "youtube music", "spotify artist",
-            "various artists", "audix artist", "audix music", "audix hi-res audio",
+            "various artists", "nightly artist", "nightly music", "nightly hi-res audio",
             "music video", "official", "vevo", "lyric video", "lyrics", "full song",
             "t-series", "sonymusicindiavevo", "zee music company", "tips official",
             "speed records", "white hill music", "geet mp3", "sony music india",

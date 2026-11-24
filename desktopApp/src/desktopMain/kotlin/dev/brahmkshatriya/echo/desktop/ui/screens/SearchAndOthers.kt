@@ -1,5 +1,7 @@
 package dev.brahmkshatriya.echo.desktop.ui.screens
 
+import java.net.URLEncoder
+
 import dev.brahmkshatriya.echo.desktop.voice.AudixVoiceSearchTriggerButton
 import dev.brahmkshatriya.echo.desktop.voice.AudixVoiceSearchModal
 
@@ -1269,10 +1271,25 @@ fun SearchTrackItemRow(
                     }
                 }
             }
+            val displayArtist = remember(track) {
+                val list = track.artists.map { it.name.trim() }
+                    .filter { it.isNotBlank() && !it.equals("Unknown Artist", true) && !it.equals("Unknown", true) && !it.equals("Various Artists", true) && !it.equals("YouTube Music", true) }
+                if (list.isNotEmpty()) {
+                    list.joinToString(", ")
+                } else {
+                    val sub = track.subtitle?.trim()
+                    if (!sub.isNullOrBlank() && !sub.equals("Unknown Artist", true) && !sub.equals("Unknown", true)) {
+                        sub
+                    } else {
+                        track.extras["artist_name"]?.takeIf { it.isNotBlank() && !it.equals("Unknown Artist", true) }
+                            ?: "Nightly Artist"
+                    }
+                }
+            }
             Text(
-                text = track.subtitle ?: "Unknown Artist",
+                text = displayArtist,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
+                color = Color.White.copy(alpha = 0.70f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1695,10 +1712,17 @@ fun AddToPlaylistDialog(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            val previewArtist = remember(track) {
+                                val list = track.artists.map { it.name.trim() }
+                                    .filter { it.isNotBlank() && !it.equals("Unknown Artist", true) && !it.equals("Unknown", true) }
+                                if (list.isNotEmpty()) list.joinToString(", ")
+                                else track.subtitle?.takeIf { !it.equals("Unknown Artist", true) }
+                                    ?: track.extras["artist_name"] ?: "Nightly Artist"
+                            }
                             Text(
-                                text = track.subtitle ?: "Unknown Artist",
+                                text = previewArtist,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary,
+                                color = Color.White.copy(alpha = 0.70f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1887,19 +1911,27 @@ object UnifiedCatalogEngine {
         // 1. Fetch Tracks
         runCatching {
             val url = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&ctx=android&p=1&n=25&q=$encoded"
-            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
+            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.4 (Windows; OpenJDK 21)").build()
             okHttpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     val body = resp.body?.string() ?: ""
                     val root = jsonParser.parseToJsonElement(body).jsonObject
                     val results = root["results"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
+                    val seenSearchTitles = mutableSetOf<String>()
                     val tracks = results.mapNotNull { elem ->
                         val obj = elem.jsonObject
                         val id = obj["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
-                        val rawTitle = obj["song"]?.jsonPrimitive?.content ?: "Unknown Track"
-                        val rawArtist = obj["primary_artists"]?.jsonPrimitive?.content ?: "Unknown Artist"
+                        val rawTitle = obj["song"]?.jsonPrimitive?.content ?: obj["title"]?.jsonPrimitive?.content ?: "Unknown Track"
                         val realTitle = unescapeHtml(rawTitle)
-                        val realArtist = unescapeHtml(rawArtist)
+                        val normKey = realTitle.replace(Regex("""\s*[\(\[\{].*?[\)\]\}]"""), "").trim().lowercase()
+                        if (!seenSearchTitles.add(normKey)) return@mapNotNull null
+
+                        val rawArtist = obj["primary_artists"]?.jsonPrimitive?.content
+                            ?: obj["singers"]?.jsonPrimitive?.content
+                            ?: obj["artist"]?.jsonPrimitive?.content
+                            ?: obj["more_info"]?.jsonObject?.get("primary_artists")?.jsonPrimitive?.content
+                            ?: query
+                        val realArtist = unescapeHtml(rawArtist).ifBlank { query }
                         val rawImage = obj["image"]?.jsonPrimitive?.content ?: ""
                         val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500")
                         val durSec = obj["duration"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
@@ -1932,6 +1964,7 @@ object UnifiedCatalogEngine {
                         Track(
                             id = id,
                             title = realTitle,
+                            subtitle = realArtist,
                             artists = artistList,
                             album = if (albumName.isNotBlank()) Album(id = albumName, title = albumName, cover = coverHolder) else null,
                             cover = coverHolder,
@@ -1945,6 +1978,7 @@ object UnifiedCatalogEngine {
                                 if (streamUrl.isNotBlank()) put("stream_url", streamUrl)
                                 put("track_title", realTitle)
                                 put("artist_name", realArtist)
+                                put("subtitle", realArtist)
                                 if (highResImage.isNotBlank()) put("cover_url", highResImage)
                                 if (albumName.isNotBlank()) put("album_name", albumName)
                             }
@@ -1960,7 +1994,7 @@ object UnifiedCatalogEngine {
         // 2. Fetch Albums
         runCatching {
             val url = "https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&ctx=android&p=1&n=12&q=$encoded"
-            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
+            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.4 (Windows; OpenJDK 21)").build()
             okHttpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     val body = resp.body?.string() ?: ""
@@ -2002,7 +2036,7 @@ object UnifiedCatalogEngine {
         // 3. Fetch Artists
         runCatching {
             val url = "https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&ctx=android&p=1&n=8&q=$encoded"
-            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
+            val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.4 (Windows; OpenJDK 21)").build()
             okHttpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     val body = resp.body?.string() ?: ""
@@ -2064,25 +2098,50 @@ object UnifiedCatalogEngine {
             }
         }
 
-        val albumId = album.extras["album_id"] ?: album.id.takeIf { it.all { ch -> ch.isDigit() } }
+        // 1. Resolve numeric album id (either directly or via JioSaavn album search)
+        var albumId = album.extras["album_id"] ?: album.id.takeIf { it.all { ch -> ch.isDigit() } }
+        if (albumId.isNullOrBlank()) {
+            val artistName = album.artists.firstOrNull()?.name ?: ""
+            val targetQuery = if (artistName.isNotBlank()) "${album.title} $artistName" else album.title
+            val encoded = URLEncoder.encode(targetQuery, "UTF-8")
+            val searchUrl = "https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&ctx=android&p=1&n=1&q=$encoded"
+            albumId = runCatching {
+                val req = Request.Builder().url(searchUrl).header("User-Agent", "Nightly/1.0.4 (Windows; OpenJDK 21)").build()
+                okHttpClient.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string() ?: ""
+                        val root = jsonParser.parseToJsonElement(body).jsonObject
+                        val results = root["results"]?.jsonArray
+                        if (!results.isNullOrEmpty()) {
+                            results[0].jsonObject["albumid"]?.jsonPrimitive?.content ?: results[0].jsonObject["id"]?.jsonPrimitive?.content
+                        } else null
+                    } else null
+                }
+            }.getOrNull()
+        }
+
         if (!albumId.isNullOrBlank()) {
             val tracks = runCatching {
                 val url = "https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=$albumId"
-                val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.0 (Windows; OpenJDK 21)").build()
+                val req = Request.Builder().url(url).header("User-Agent", "Nightly/1.0.4 (Windows; OpenJDK 21)").build()
                 okHttpClient.newCall(req).execute().use { resp ->
                     if (resp.isSuccessful) {
                         val body = resp.body?.string() ?: ""
                         val root = jsonParser.parseToJsonElement(body).jsonObject
                         val songs = root["songs"]?.jsonArray ?: return@use emptyList<Track>()
+                        val seenTrackTitles = mutableSetOf<String>()
                         songs.mapNotNull { elem ->
                             val obj = elem.jsonObject
                             val sId = obj["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
-                            val rawTitle = obj["song"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                            val rawTitle = obj["song"]?.jsonPrimitive?.content ?: obj["title"]?.jsonPrimitive?.content ?: return@mapNotNull null
                             val realTitle = unescapeHtml(rawTitle)
+                            val normKey = realTitle.replace(Regex("""\s*[\(\[\{].*?[\)\]\}]"""), "").trim().lowercase()
+                            if (!seenTrackTitles.add(normKey)) return@mapNotNull null
+
                             val rawArtist = obj["primary_artists"]?.jsonPrimitive?.content ?: ""
-                            val realArtist = unescapeHtml(rawArtist)
+                            val realArtist = unescapeHtml(rawArtist).ifBlank { album.artists.firstOrNull()?.name ?: "Nightly Artist" }
                             val rawImage = obj["image"]?.jsonPrimitive?.content ?: ""
-                            val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500")
+                            val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500").replace("50x50.webp", "500x500.jpg").replace("150x150.webp", "500x500.jpg")
                             val durSec = obj["duration"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
                             val coverHolder = if (highResImage.isNotBlank()) ImageHolder.NetworkRequestImageHolder(highResImage.toGetRequest(), false) else album.cover
 
@@ -2107,6 +2166,7 @@ object UnifiedCatalogEngine {
                             Track(
                                 id = sId,
                                 title = realTitle,
+                                subtitle = realArtist,
                                 artists = if (realArtist.isNotBlank()) listOf(Artist(id = realArtist, name = realArtist)) else album.artists,
                                 album = album,
                                 cover = coverHolder,
@@ -2119,7 +2179,8 @@ object UnifiedCatalogEngine {
                                     put("song_id", sId)
                                     if (streamUrl.isNotBlank()) put("stream_url", streamUrl)
                                     put("track_title", realTitle)
-                                    if (realArtist.isNotBlank()) put("artist_name", realArtist)
+                                    put("artist_name", realArtist)
+                                    put("subtitle", realArtist)
                                     if (highResImage.isNotBlank()) put("cover_url", highResImage)
                                 }
                             )
@@ -2142,6 +2203,159 @@ object UnifiedCatalogEngine {
         emptyList()
     }
 
+    suspend fun fetchSaavnArtistDetails(artist: Artist): Pair<List<Track>, List<Album>> = withContext(Dispatchers.IO) {
+        val cleanArtist = artist.name.trim()
+        if (cleanArtist.isBlank()) return@withContext Pair<List<Track>, List<Album>>(emptyList(), emptyList())
+        runCatching {
+            val directId = artist.extras["artist_id"] ?: artist.id.takeIf { it.isNotBlank() && it.all { ch -> ch.isDigit() } }
+            val artistId = if (!directId.isNullOrBlank()) {
+                directId
+            } else {
+                val encoded = URLEncoder.encode(cleanArtist, "UTF-8")
+                val searchUrl = "https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&ctx=android&p=1&n=1&q=$encoded"
+                val req1 = Request.Builder().url(searchUrl).header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)").build()
+                okHttpClient.newCall(req1).execute().use { resp ->
+                    if (!resp.isSuccessful) return@use null
+                    val body = resp.body?.string() ?: ""
+                    val root = jsonParser.parseToJsonElement(body).jsonObject
+                    val results = root["results"]?.jsonArray ?: return@use null
+                    if (results.isEmpty()) return@use null
+                    val first = results[0].jsonObject
+                    first["artistId"]?.jsonPrimitive?.content ?: first["id"]?.jsonPrimitive?.content
+                }
+            } ?: return@runCatching Pair<List<Track>, List<Album>>(emptyList(), emptyList())
+
+            // 2. Fetch artist page details
+            val pageUrl = "https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&_format=json&ctx=android&artistId=$artistId&n_song=40&n_album=25"
+            val req2 = Request.Builder().url(pageUrl).header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)").build()
+            okHttpClient.newCall(req2).execute().use { resp ->
+                if (!resp.isSuccessful) return@use Pair<List<Track>, List<Album>>(emptyList(), emptyList())
+                val body = resp.body?.string() ?: ""
+                val root = jsonParser.parseToJsonElement(body).jsonObject
+
+                // Parse top songs
+                val songsArray = when (val ts = root["topSongs"]) {
+                    is kotlinx.serialization.json.JsonObject -> ts["songs"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
+                    is kotlinx.serialization.json.JsonArray -> ts
+                    else -> kotlinx.serialization.json.JsonArray(emptyList())
+                }
+
+                val seenTitles = mutableSetOf<String>()
+                val tracks = mutableListOf<Track>()
+
+                for (elem in songsArray) {
+                    val obj = elem.jsonObject
+                    val sId = obj["id"]?.jsonPrimitive?.content ?: continue
+                    val rawTitle = obj["song"]?.jsonPrimitive?.content ?: obj["title"]?.jsonPrimitive?.content ?: continue
+                    val realTitle = unescapeHtml(rawTitle)
+                    val rawArtist = obj["primary_artists"]?.jsonPrimitive?.content ?: obj["singers"]?.jsonPrimitive?.content ?: cleanArtist
+                    val realArtist = unescapeHtml(rawArtist).ifBlank { cleanArtist }
+
+                    // Normalize title for deduplication
+                    val normKey = realTitle.replace(Regex("""\s*[\(\[\{].*?[\)\]\}]"""), "").trim().lowercase()
+                    if (!seenTitles.add(normKey)) continue
+
+                    val rawImage = obj["image"]?.jsonPrimitive?.content ?: obj["imageUrl"]?.jsonPrimitive?.content ?: ""
+                    val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500").replace("50x50.webp", "500x500.jpg").replace("150x150.webp", "500x500.jpg")
+                    val durSec = obj["duration"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                    val albumName = unescapeHtml(obj["album"]?.jsonPrimitive?.content ?: "")
+
+                    val encUrl = obj["encrypted_media_url"]?.jsonPrimitive?.content
+                    val previewUrl = obj["media_preview_url"]?.jsonPrimitive?.content
+                    val streamUrl = encUrl?.let { decryptSaavnUrl(it) } ?: previewUrl ?: ""
+
+                    val coverHolder = if (highResImage.isNotBlank()) ImageHolder.NetworkRequestImageHolder(highResImage.toGetRequest(), false) else null
+                    val artistList = if (realArtist.contains(",") || realArtist.contains("&")) {
+                        realArtist.split(REGEX_ARTIST_SPLIT).map { it.trim() }.filter { it.isNotBlank() }.map { Artist(id = it, name = it) }
+                    } else listOf(Artist(id = realArtist, name = realArtist))
+
+                    val streamable = if (streamUrl.isNotBlank()) {
+                        Streamable.server(
+                            id = sId,
+                            quality = 320,
+                            title = "320 kbps (JioSaavn HQ)",
+                            extras = mapOf(
+                                "stream_url" to streamUrl,
+                                "extension_id" to "saavn_music",
+                                "track_title" to realTitle,
+                                "artist_name" to realArtist
+                            )
+                        )
+                    } else null
+
+                    tracks.add(
+                        Track(
+                            id = sId,
+                            title = realTitle,
+                            subtitle = realArtist,
+                            artists = artistList,
+                            album = if (albumName.isNotBlank()) Album(id = albumName, title = albumName, cover = coverHolder) else null,
+                            cover = coverHolder,
+                            streamables = if (streamable != null) listOf(streamable) else emptyList(),
+                            duration = durSec * 1000L,
+                            extras = buildMap {
+                                put("extension_id", "saavn_music")
+                                put("source_name", "JioSaavn")
+                                put("source", "JioSaavn")
+                                put("song_id", sId)
+                                if (streamUrl.isNotBlank()) put("stream_url", streamUrl)
+                                put("track_title", realTitle)
+                                put("artist_name", realArtist)
+                                put("subtitle", realArtist)
+                                if (highResImage.isNotBlank()) put("cover_url", highResImage)
+                                if (albumName.isNotBlank()) put("album_name", albumName)
+                            }
+                        )
+                    )
+                }
+
+                // Parse top albums
+                val albumsArray = when (val ta = root["topAlbums"]) {
+                    is kotlinx.serialization.json.JsonObject -> ta["albums"]?.jsonArray ?: kotlinx.serialization.json.JsonArray(emptyList())
+                    is kotlinx.serialization.json.JsonArray -> ta
+                    else -> kotlinx.serialization.json.JsonArray(emptyList())
+                }
+
+                val seenAlbums = mutableSetOf<String>()
+                val albums = mutableListOf<Album>()
+
+                for (elem in albumsArray) {
+                    val obj = elem.jsonObject
+                    val aId = obj["albumid"]?.jsonPrimitive?.content ?: obj["id"]?.jsonPrimitive?.content ?: continue
+                    val rawTitle = obj["album"]?.jsonPrimitive?.content ?: obj["title"]?.jsonPrimitive?.content ?: continue
+                    val realTitle = unescapeHtml(rawTitle)
+
+                    val normAlbKey = realTitle.replace(Regex("""\s*[\(\[\{].*?[\)\]\}]"""), "").trim().lowercase()
+                    if (!seenAlbums.add(normAlbKey)) continue
+
+                    val rawImage = obj["image"]?.jsonPrimitive?.content ?: obj["imageUrl"]?.jsonPrimitive?.content ?: ""
+                    val highResImage = rawImage.replace("150x150", "500x500").replace("50x50", "500x500").replace("50x50.webp", "500x500.jpg").replace("150x150.webp", "500x500.jpg")
+                    val year = obj["year"]?.jsonPrimitive?.content ?: ""
+                    val albArtist = unescapeHtml(obj["primaryArtists"]?.jsonPrimitive?.content ?: obj["primary_artists"]?.jsonPrimitive?.content ?: cleanArtist)
+                    val coverHolder = if (highResImage.isNotBlank()) ImageHolder.NetworkRequestImageHolder(highResImage.toGetRequest(), false) else null
+
+                    albums.add(
+                        Album(
+                            id = aId,
+                            title = realTitle,
+                            artists = listOf(Artist(id = albArtist, name = albArtist)),
+                            cover = coverHolder,
+                            subtitle = year,
+                            extras = buildMap {
+                                put("extension_id", "saavn_music")
+                                put("source_name", "JioSaavn")
+                                put("album_id", aId)
+                                if (highResImage.isNotBlank()) put("cover_url", highResImage)
+                            }
+                        )
+                    )
+                }
+
+                Pair<List<Track>, List<Album>>(tracks, albums)
+            }
+        }.getOrDefault(Pair<List<Track>, List<Album>>(emptyList(), emptyList()))
+    }
+
     suspend fun loadArtistDiscography(artist: Artist, extensionManager: ExtensionManager): Pair<List<Track>, List<Album>> = withContext(Dispatchers.IO) {
         val extId = artist.extras["extension_id"]
         val allMusic = extensionManager.music.value
@@ -2151,7 +2365,13 @@ object UnifiedCatalogEngine {
         var loadedTracks = emptyList<Track>()
         var loadedAlbums = emptyList<Album>()
 
-        if (ext != null) {
+        // 1. First fetch high-quality distinct top songs and studio albums directly from JioSaavn artist details
+        val (saavnTracks, saavnAlbums) = fetchSaavnArtistDetails(artist)
+        if (saavnTracks.isNotEmpty()) loadedTracks = saavnTracks
+        if (saavnAlbums.isNotEmpty()) loadedAlbums = saavnAlbums
+
+        // 2. If needed, supplement with extension feed
+        if (ext != null && (loadedTracks.isEmpty() || loadedAlbums.isEmpty())) {
             val artistClient = runCatching {
                 (ext.instance.value ?: ext.instance.value().getOrNull()) as? dev.brahmkshatriya.echo.common.clients.ArtistClient
             }.getOrNull()
@@ -2162,12 +2382,13 @@ object UnifiedCatalogEngine {
                     val shelves = pagedData?.loadAll() ?: emptyList<Shelf>()
                     val tracks = shelves.filterIsInstance<Shelf.Lists.Tracks>().flatMap { it.list }
                     val albums = shelves.filterIsInstance<Shelf.Lists.Items>().flatMap { it.list }.filterIsInstance<Album>()
-                    if (tracks.isNotEmpty()) loadedTracks = tracks.map { t -> t.copy(extras = t.extras + ("extension_id" to ext.id) + ("source_name" to ext.metadata.name)) }
-                    if (albums.isNotEmpty()) loadedAlbums = albums
+                    if (loadedTracks.isEmpty() && tracks.isNotEmpty()) loadedTracks = tracks.map { t -> t.copy(extras = t.extras + ("extension_id" to ext.id) + ("source_name" to ext.metadata.name)) }
+                    if (loadedAlbums.isEmpty() && albums.isNotEmpty()) loadedAlbums = albums
                 }
             }
         }
 
+        // 3. Fallback to catalog search if still empty
         if (loadedTracks.isEmpty() || loadedAlbums.isEmpty()) {
             val saavnShelves = fetchSaavnSearchCatalog(artist.name)
             if (loadedTracks.isEmpty()) {
@@ -6847,7 +7068,7 @@ fun SettingsScreen(
                                         val usedMem = totalMem - freeMem
                                         val diag = buildString {
                                             appendLine("=== NIGHTLY DESKTOP DIAGNOSTICS ===")
-                                            appendLine("Version: 1.0.3-UNIFIED")
+                                            appendLine("Version: 1.0.4-UNIFIED")
                                             appendLine("OS: ${System.getProperty("os.name")} (${System.getProperty("os.arch")})")
                                             appendLine("Java: ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")}")
                                             appendLine("Memory: Used ${usedMem}MB / Total ${totalMem}MB / Max ${maxMem}MB")
@@ -7188,7 +7409,7 @@ fun SettingsScreen(
                                     val usedMem = totalMem - freeMem
                                     val diag = buildString {
                                         appendLine("=== NIGHTLY DESKTOP DIAGNOSTICS ===")
-                                        appendLine("Version: 1.0.3-UNIFIED")
+                                        appendLine("Version: 1.0.4-UNIFIED")
                                         appendLine("OS: ${System.getProperty("os.name")} (${System.getProperty("os.arch")})")
                                         appendLine("Java: ${System.getProperty("java.version")} - ${System.getProperty("java.vendor")}")
                                         appendLine("Memory: Used ${usedMem}MB / Total ${totalMem}MB / Max ${maxMem}MB")

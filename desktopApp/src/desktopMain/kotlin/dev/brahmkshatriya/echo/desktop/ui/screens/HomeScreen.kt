@@ -1,5 +1,9 @@
 package dev.brahmkshatriya.echo.desktop.ui.screens
 
+import dev.brahmkshatriya.echo.desktop.viewmodel.LyricsViewModel
+import dev.brahmkshatriya.echo.desktop.viewmodel.LyricsUiState
+import androidx.compose.foundation.lazy.rememberLazyListState
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -45,6 +49,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import org.jetbrains.skia.FilterBlurMode
+import org.jetbrains.skia.MaskFilter
+import org.jetbrains.skia.Paint as SkiaPaint
+import org.jetbrains.skia.PaintMode as SkiaPaintMode
+import org.jetbrains.skia.PaintStrokeCap as SkiaStrokeCap
+import org.jetbrains.skia.PaintStrokeJoin as SkiaStrokeJoin
+import org.jetbrains.skia.Path as SkiaPath
+import org.jetbrains.skia.Point as SkiaPoint
+import org.jetbrains.skia.Rect as SkiaRect
+import org.jetbrains.skia.Shader as SkiaShader
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
@@ -106,154 +122,154 @@ private fun stampTrackWithSource(track: Track, extId: String, extName: String): 
 
 private val curatedFlagshipAlbums = listOf(
     Album(
-        id = "alb_after_hours",
+        id = "19531208",
         title = "After Hours",
-        artists = listOf(Artist("ar_the_weeknd", "The Weeknd")),
+        artists = listOf(Artist("615155", "The Weeknd")),
         cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/077/After-Hours-English-2020-20260804045014-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/077/After-Hours-English-2020-20260804045014-500x500.jpg")
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "19531208", "cover_url" to "https://c.saavncdn.com/077/After-Hours-English-2020-20260804045014-500x500.jpg")
     ),
     Album(
-        id = "alb_starboy",
+        id = "3084994",
         title = "Starboy",
-        artists = listOf(Artist("ar_the_weeknd", "The Weeknd")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/431/Starboy-English-2016-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/431/Starboy-English-2016-500x500.jpg")
+        artists = listOf(Artist("615155", "The Weeknd")),
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/372/Starboy-English-2016-20261007033842-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "3084994", "cover_url" to "https://c.saavncdn.com/372/Starboy-English-2016-20261007033842-500x500.jpg")
     ),
     Album(
-        id = "alb_aashiqui2",
+        id = "1139549",
         title = "Aashiqui 2",
-        artists = listOf(Artist("ar_mithoon", "Mithoon"), Artist("ar_ankit", "Ankit Tiwari")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/264/Aashiqui-2-Hindi-2013-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/264/Aashiqui-2-Hindi-2013-500x500.jpg")
+        artists = listOf(Artist("ar_mithoon", "Mithoon"), Artist("459320", "Arijit Singh")),
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/430/Aashiqui-2-Hindi-2013-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "1139549", "cover_url" to "https://c.saavncdn.com/430/Aashiqui-2-Hindi-2013-500x500.jpg")
     ),
     Album(
-        id = "alb_kabir_singh",
+        id = "16188900",
         title = "Kabir Singh",
         artists = listOf(Artist("ar_sachet", "Sachet-Parampara"), Artist("ar_vishal", "Vishal Mishra")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/352/Kabir-Singh-Hindi-2019-20190614075009-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/352/Kabir-Singh-Hindi-2019-20190614075009-500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/807/Kabir-Singh-Hindi-2019-20240131131003-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "16188900", "cover_url" to "https://c.saavncdn.com/807/Kabir-Singh-Hindi-2019-20240131131003-500x500.jpg")
     ),
     Album(
-        id = "alb_rockstar",
+        id = "1045274",
         title = "Rockstar",
         artists = listOf(Artist("ar_ar_rahman", "A.R. Rahman")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/188/Rockstar-Hindi-2011-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/188/Rockstar-Hindi-2011-500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/408/Rockstar-Hindi-2011-20221212023139-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "1045274", "cover_url" to "https://c.saavncdn.com/408/Rockstar-Hindi-2011-20221212023139-500x500.jpg")
     ),
     Album(
-        id = "alb_am",
+        id = "10131765",
         title = "AM",
         artists = listOf(Artist("ar_arctic_monkeys", "Arctic Monkeys")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/974/AM-English-2013-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/974/AM-English-2013-500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/795/AM-English-2013-20240402165515-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "10131765", "cover_url" to "https://c.saavncdn.com/795/AM-English-2013-20240402165515-500x500.jpg")
     ),
     Album(
-        id = "alb_future_nostalgia",
+        id = "22251959",
         title = "Future Nostalgia",
-        artists = listOf(Artist("ar_dua_lipa", "Dua Lipa")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/642/Future-Nostalgia-English-2020-20200326084534-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/642/Future-Nostalgia-English-2020-20200326084534-500x500.jpg")
+        artists = listOf(Artist("1274170", "Dua Lipa")),
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/962/Club-Future-Nostalgia-DJ-Mix-English-2020-20231110075206-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "22251959", "cover_url" to "https://c.saavncdn.com/962/Club-Future-Nostalgia-DJ-Mix-English-2020-20231110075206-500x500.jpg")
     ),
     Album(
-        id = "alb_midnights",
+        id = "39269421",
         title = "Midnights",
-        artists = listOf(Artist("ar_taylor_swift", "Taylor Swift")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/839/Midnights-English-2022-20221021035041-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/839/Midnights-English-2022-20221021035041-500x500.jpg")
+        artists = listOf(Artist("565990", "Taylor Swift")),
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/739/Midnights-3am-Edition-English-2022-20221021123048-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "39269421", "cover_url" to "https://c.saavncdn.com/739/Midnights-3am-Edition-English-2022-20221021123048-500x500.jpg")
     ),
     Album(
-        id = "alb_divide",
+        id = "10340705",
         title = "Divide (÷)",
-        artists = listOf(Artist("ar_ed_sheeran", "Ed Sheeran")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/139/Divide-English-2017-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/139/Divide-English-2017-500x500.jpg")
+        artists = listOf(Artist("578407", "Ed Sheeran")),
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/330/Deluxe--English-2017-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "10340705", "cover_url" to "https://c.saavncdn.com/330/Deluxe--English-2017-500x500.jpg")
     ),
     Album(
-        id = "alb_justice",
+        id = "26030221",
         title = "Justice",
         artists = listOf(Artist("ar_justin_bieber", "Justin Bieber")),
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/393/Justice-English-2021-20210319041008-500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/393/Justice-English-2021-20210319041008-500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/983/Justice-English-2021-20210325102906-500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "album_id" to "26030221", "cover_url" to "https://c.saavncdn.com/983/Justice-English-2021-20210325102906-500x500.jpg")
     )
 )
 
 private val curatedFlagshipArtists = listOf(
     Artist(
-        id = "ar_the_weeknd",
+        id = "615155",
         name = "The Weeknd",
         subtitle = "112M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/The_Weeknd_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/The_Weeknd_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/The_Weeknd_002_20241003071400_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "615155", "cover_url" to "https://c.saavncdn.com/artists/The_Weeknd_002_20241003071400_500x500.jpg")
     ),
     Artist(
-        id = "ar_arijit_singh",
+        id = "459320",
         name = "Arijit Singh",
         subtitle = "105M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Arijit_Singh_002_20230323062147_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Arijit_Singh_002_20230323062147_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Arijit_Singh_004_20241118063717_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "459320", "cover_url" to "https://c.saavncdn.com/artists/Arijit_Singh_004_20241118063717_500x500.jpg")
     ),
     Artist(
-        id = "ar_taylor_swift",
+        id = "565990",
         name = "Taylor Swift",
         subtitle = "101M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Taylor_Swift_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Taylor_Swift_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Taylor_Swift_003_20200226074119_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "565990", "cover_url" to "https://c.saavncdn.com/artists/Taylor_Swift_003_20200226074119_500x500.jpg")
     ),
     Artist(
-        id = "ar_ed_sheeran",
+        id = "578407",
         name = "Ed Sheeran",
         subtitle = "88M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Ed_Sheeran_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Ed_Sheeran_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Ed_Sheeran_002_20250625073038_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "578407", "cover_url" to "https://c.saavncdn.com/artists/Ed_Sheeran_002_20250625073038_500x500.jpg")
     ),
     Artist(
-        id = "ar_dua_lipa",
+        id = "1274170",
         name = "Dua Lipa",
         subtitle = "75M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Dua_Lipa_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Dua_Lipa_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Dua_Lipa_004_20231120090922_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "1274170", "cover_url" to "https://c.saavncdn.com/artists/Dua_Lipa_004_20231120090922_500x500.jpg")
     ),
     Artist(
-        id = "ar_drake",
+        id = "512453",
         name = "Drake",
         subtitle = "82M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Drake_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Drake_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Drake_006_20260520062317_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "512453", "cover_url" to "https://c.saavncdn.com/artists/Drake_006_20260520062317_500x500.jpg")
     ),
     Artist(
-        id = "ar_billie_eilish",
+        id = "1918741",
         name = "Billie Eilish",
         subtitle = "98M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Billie_Eilish_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Billie_Eilish_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Billie_Eilish_20190211151539_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "1918741", "cover_url" to "https://c.saavncdn.com/artists/Billie_Eilish_20190211151539_500x500.jpg")
     ),
     Artist(
-        id = "ar_shreya_ghoshal",
+        id = "455130",
         name = "Shreya Ghoshal",
         subtitle = "62M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Shreya_Ghoshal_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Shreya_Ghoshal_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Shreya_Ghoshal_007_20241101074144_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "455130", "cover_url" to "https://c.saavncdn.com/artists/Shreya_Ghoshal_007_20241101074144_500x500.jpg")
     ),
     Artist(
-        id = "ar_post_malone",
+        id = "910050",
         name = "Post Malone",
         subtitle = "79M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Post_Malone_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Post_Malone_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Post_Malone_004_20190911070147_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "910050", "cover_url" to "https://c.saavncdn.com/artists/Post_Malone_004_20190911070147_500x500.jpg")
     ),
     Artist(
-        id = "ar_pritam",
+        id = "456323",
         name = "Pritam",
         subtitle = "68M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Pritam_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Pritam_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Pritam_Chakraborty-20170711073326_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "456323", "cover_url" to "https://c.saavncdn.com/artists/Pritam_Chakraborty-20170711073326_500x500.jpg")
     ),
     Artist(
-        id = "ar_coldplay",
+        id = "575153",
         name = "Coldplay",
         subtitle = "85M Monthly Listeners",
-        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Coldplay_500x500.jpg"), false),
-        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "cover_url" to "https://c.saavncdn.com/artists/Coldplay_500x500.jpg")
+        cover = ImageHolder.NetworkRequestImageHolder(NetworkRequest("https://c.saavncdn.com/artists/Coldplay_002_20241003070447_500x500.jpg"), false),
+        extras = mapOf("extension_id" to "saavn_music", "source_name" to "JioSaavn", "artist_id" to "575153", "cover_url" to "https://c.saavncdn.com/artists/Coldplay_002_20241003070447_500x500.jpg")
     )
 )
 
@@ -468,7 +484,27 @@ fun HomeScreen(
     }
 
     // Playlist Add Modal Dialog
-    trackForPlaylist?.let { track ->
+            // Option B: Nightly Sleep Timer Modal
+        val showSleepTimer by playerViewModel.showSleepTimerDialog.collectAsState()
+        if (showSleepTimer) {
+            NightlySleepTimerModal(
+                playerViewModel = playerViewModel,
+                onDismiss = { playerViewModel.setSleepTimerDialog(false) }
+            )
+        }
+
+        // Option C: Nightly Synchronized Karaoke Lyrics Modal
+        val showLyrics by playerViewModel.showLyricsDialog.collectAsState()
+        if (showLyrics) {
+            val lyricsViewModel: LyricsViewModel = koinInject()
+            NightlyLyricsStudioModal(
+                playerViewModel = playerViewModel,
+                lyricsViewModel = lyricsViewModel,
+                onDismiss = { playerViewModel.setLyricsDialog(false) }
+            )
+        }
+
+        trackForPlaylist?.let { track ->
         AddToPlaylistDialog(
             track = track,
             onDismiss = { trackForPlaylist = null }
@@ -554,6 +590,7 @@ fun HomeScreen(
                         val chosen = pool.shuffled().firstOrNull() ?: candidates.first()
                         playerViewModel.play(chosen)
                     },
+                    playerViewModel = playerViewModel,
                     onLaunchScreensaver = onLaunchScreensaver,
                     onRefresh = { viewModel.loadFeed() }
                 )
@@ -975,7 +1012,7 @@ fun HomeScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                                 contentDescription = null,
-                                tint = Color(0xFF38BDF8),
+                                tint = Color(0xFFFF2A55),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -2548,6 +2585,7 @@ private fun SeniorExecutiveMasthead(
     kicker: String,
     tasteSubline: String,
     currentHour: Int,
+    playerViewModel: PlayerViewModel,
     onInstantMix: () -> Unit,
     onLaunchScreensaver: () -> Unit,
     onRefresh: () -> Unit
@@ -3095,222 +3133,507 @@ private fun BillboardOptionPill(
     }
 }
 
+/**
+ * Pre-allocated GPU Skia resources & real-time cardiac physics state for
+ * [BillboardSoundstageVisualizer]. Zero heap or native allocations occur per frame.
+ */
+private class NeonCardiacSkiaState {
+    val path = SkiaPath()
+    val sampleY = FloatArray(181)
+
+    // Pre-allocated Skia Paints (closed cleanly in DisposableEffect)
+    val outerBloomPaint = SkiaPaint().apply {
+        isAntiAlias = true
+        mode = SkiaPaintMode.STROKE
+        strokeCap = SkiaStrokeCap.ROUND
+        strokeJoin = SkiaStrokeJoin.ROUND
+    }
+    val innerGlowPaint = SkiaPaint().apply {
+        isAntiAlias = true
+        mode = SkiaPaintMode.STROKE
+        strokeCap = SkiaStrokeCap.ROUND
+        strokeJoin = SkiaStrokeJoin.MITER
+        strokeMiter = 3.5f
+    }
+    val corePaint = SkiaPaint().apply {
+        isAntiAlias = true
+        mode = SkiaPaintMode.STROKE
+        strokeCap = SkiaStrokeCap.ROUND
+        strokeJoin = SkiaStrokeJoin.MITER
+        strokeMiter = 3.5f
+    }
+    val filamentPaint = SkiaPaint().apply {
+        isAntiAlias = true
+        mode = SkiaPaintMode.STROKE
+        strokeCap = SkiaStrokeCap.ROUND
+        strokeJoin = SkiaStrokeJoin.MITER
+        strokeMiter = 3.5f
+    }
+    val auraPaint = SkiaPaint().apply {
+        isAntiAlias = true
+        mode = SkiaPaintMode.FILL
+    }
+    val sparkHaloPaint = SkiaPaint().apply {
+        isAntiAlias = true
+        mode = SkiaPaintMode.FILL
+    }
+    val sparkCorePaint = SkiaPaint().apply {
+        isAntiAlias = true
+        mode = SkiaPaintMode.FILL
+    }
+    val reticlePaint = SkiaPaint().apply {
+        isAntiAlias = true
+        mode = SkiaPaintMode.STROKE
+        strokeCap = SkiaStrokeCap.ROUND
+    }
+
+    private var outerBlurFilter: MaskFilter? = null
+    private var innerBlurFilter: MaskFilter? = null
+    private var sparkBlurFilter: MaskFilter? = null
+    private var cachedDensity = -1f
+
+    private var outerShader: SkiaShader? = null
+    private var innerShader: SkiaShader? = null
+    private var coreShader: SkiaShader? = null
+    private var filamentShader: SkiaShader? = null
+    private var auraShader: SkiaShader? = null
+    private var cachedW = -1f
+    private var cachedH = -1f
+
+    // Frame-rate-independent cardiac & vibration physics state
+    var smoothBeat = 0.25f
+    var smoothBass = 0f
+    var smoothMid = 0f
+    var smoothTreble = 0f
+    var smoothRms = 0f
+    var restingPhase = 0f
+    var sweepU = 0f
+    var hfPhase = 0f
+    var lastSeenBeatCount = -1L
+    var shockwaveProgress = 1.5f
+    var shockwavePower = 0f
+    var prevFrameNanos = 0L
+
+    fun ensureDeviceResources(w: Float, h: Float, density: Float, padX: Float, centerU: Float) {
+        if (kotlin.math.abs(density - cachedDensity) > 0.01f) {
+            cachedDensity = density
+            outerBlurFilter?.close()
+            innerBlurFilter?.close()
+            sparkBlurFilter?.close()
+
+            outerBlurFilter = MaskFilter.makeBlur(FilterBlurMode.NORMAL, 7.5f * density, true)
+            innerBlurFilter = MaskFilter.makeBlur(FilterBlurMode.NORMAL, 2.4f * density, true)
+            sparkBlurFilter = MaskFilter.makeBlur(FilterBlurMode.NORMAL, 4.5f * density, true)
+
+            outerBloomPaint.maskFilter = outerBlurFilter
+            innerGlowPaint.maskFilter = innerBlurFilter
+            sparkHaloPaint.maskFilter = sparkBlurFilter
+            reticlePaint.strokeWidth = 0.85f * density
+        }
+
+        if (kotlin.math.abs(w - cachedW) > 0.5f || kotlin.math.abs(h - cachedH) > 0.5f) {
+            cachedW = w
+            cachedH = h
+            val usableW = (w - padX * 2f).coerceAtLeast(1f)
+            val startPt = SkiaPoint(padX, 0f)
+            val endPt = SkiaPoint(padX + usableW, 0f)
+            val stops = floatArrayOf(0.0f, 0.045f, 0.955f, 1.0f)
+
+            outerShader?.close()
+            innerShader?.close()
+            coreShader?.close()
+            filamentShader?.close()
+            auraShader?.close()
+
+            outerShader = SkiaShader.makeLinearGradient(
+                startPt, endPt,
+                intArrayOf(0x00FF0830, 0xFFFF0830.toInt(), 0xFFFF0830.toInt(), 0x00FF0830),
+                stops
+            )
+            innerShader = SkiaShader.makeLinearGradient(
+                startPt, endPt,
+                intArrayOf(0x00FF1E46, 0xFFFF1E46.toInt(), 0xFFFF1E46.toInt(), 0x00FF1E46),
+                stops
+            )
+            coreShader = SkiaShader.makeLinearGradient(
+                startPt, endPt,
+                intArrayOf(0x00FF335C, 0xFFFF335C.toInt(), 0xFFFF335C.toInt(), 0x00FF335C),
+                stops
+            )
+            filamentShader = SkiaShader.makeLinearGradient(
+                startPt, endPt,
+                intArrayOf(0x00FFF2F6, 0xFFFFF2F6.toInt(), 0xFFFFF2F6.toInt(), 0x00FFF2F6),
+                stops
+            )
+
+            val auraRadius = (usableW * 0.24f).coerceAtLeast(h * 0.7f)
+            // Centered at (0,0) so we can squash vertically into an ellipse strictly inside canvas height (zero box clip!)
+            auraShader = SkiaShader.makeRadialGradient(
+                SkiaPoint(0f, 0f),
+                auraRadius,
+                intArrayOf(0xFFFF1642.toInt(), 0x88B80020.toInt(), 0x00000000),
+                floatArrayOf(0.0f, 0.48f, 1.0f)
+            )
+
+            outerBloomPaint.shader = outerShader
+            innerGlowPaint.shader = innerShader
+            corePaint.shader = coreShader
+            filamentPaint.shader = filamentShader
+            auraPaint.shader = auraShader
+        }
+    }
+
+    fun close() {
+        runCatching { outerShader?.close() }
+        runCatching { innerShader?.close() }
+        runCatching { coreShader?.close() }
+        runCatching { filamentShader?.close() }
+        runCatching { auraShader?.close() }
+        runCatching { outerBlurFilter?.close() }
+        runCatching { innerBlurFilter?.close() }
+        runCatching { sparkBlurFilter?.close() }
+        runCatching { outerBloomPaint.close() }
+        runCatching { innerGlowPaint.close() }
+        runCatching { corePaint.close() }
+        runCatching { filamentPaint.close() }
+        runCatching { auraPaint.close() }
+        runCatching { sparkHaloPaint.close() }
+        runCatching { sparkCorePaint.close() }
+        runCatching { reticlePaint.close() }
+        runCatching { path.close() }
+    }
+}
+
 @Composable
 private fun BillboardSoundstageVisualizer(
     isPlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val phase by if (isPlaying) {
-        val infiniteTransition = rememberInfiniteTransition(label = "soundstage_wave")
-        infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = (2 * Math.PI).toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(2600, easing = LinearEasing),
-                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
-            ),
-            label = "soundstage_phase"
-        )
-    } else {
-        val infiniteTransition = rememberInfiniteTransition(label = "soundstage_idle")
-        infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = (2 * Math.PI).toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(6000, easing = LinearEasing),
-                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
-            ),
-            label = "soundstage_idle_phase"
-        )
+    // All Skia native resources & physics state allocated ONCE and cleanly disposed
+    val skiaState = remember { NeonCardiacSkiaState() }
+    DisposableEffect(Unit) {
+        onDispose { skiaState.close() }
     }
 
-    val liveBands by dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.visualizerBands.collectAsState()
-    val isAudioActive = dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager.isAudioActive
+    // Frame tick state read ONLY inside Canvas draw lambda -> ZERO Compose recompositions/sec!
+    val frameTick = remember { mutableLongStateOf(0L) }
+    val playingState = rememberUpdatedState(isPlaying)
 
-    val reusablePath = remember { androidx.compose.ui.graphics.Path() }
+    LaunchedEffect(Unit) {
+        var lastIdleTickNs = 0L
+        while (true) {
+            withFrameNanos { frameNs ->
+                // 60+ FPS VSync while playing; gentle 30 FPS throttle when paused to save CPU/GPU
+                if (playingState.value || (frameNs - lastIdleTickNs) >= 33_000_000L) {
+                    lastIdleTickNs = frameNs
+                    frameTick.longValue = frameNs
+                }
+            }
+        }
+    }
 
     Box(
         modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
         Canvas(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .height(46.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            if (size.width <= 15f || size.height <= 6f) return@Canvas
+            val nowNs = frameTick.longValue
+            if (size.width <= 24f || size.height <= 12f) return@Canvas
+
             val w = size.width
             val h = size.height
-            val centerY = h / 2f
+            val padX = 6.dp.toPx()
+            val padY = (8.dp.toPx()).coerceAtMost(h * 0.16f)
+            val usableW = w - padX * 2f
+            if (usableW <= 16f) return@Canvas
 
-            val padX = 4.dp.toPx()
-            val usableWidth = w - padX * 2f
-            if (usableWidth <= 8f) return@Canvas
+            val centerY = h * 0.50f
+            val maxAmp = ((h * 0.50f) - padY).coerceAtLeast(14f)
+            // Lock R-peak (95/180) and S-trough (98/180) onto EXACT integer path vertices for razor-sharp needle apexes!
+            val centerU = 95f / 180f
 
-            // 1. Ambient Specular Aura Glow behind center
-            val auraRadius = (usableWidth / 2.4f).coerceAtLeast(25f)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        if (isPlaying) Color(0xFF38BDF8).copy(alpha = 0.08f) else Color(0xFF38BDF8).copy(alpha = 0.02f),
-                        if (isPlaying) Color(0xFFEC4899).copy(alpha = 0.05f) else Color(0xFFEC4899).copy(alpha = 0.01f),
-                        Color.Transparent
-                    ),
-                    center = Offset(w / 2f, centerY),
-                    radius = auraRadius
-                ),
-                radius = auraRadius,
-                center = Offset(w / 2f, centerY)
-            )
+            // Frame-rate-independent delta time (seconds, clamped safely for hiccups)
+            val dt = if (skiaState.prevFrameNanos == 0L || nowNs <= skiaState.prevFrameNanos) {
+                0.016f
+            } else {
+                ((nowNs - skiaState.prevFrameNanos) * 1e-9f).coerceIn(0.004f, 0.050f)
+            }
+            skiaState.prevFrameNanos = nowNs
 
-            // 2. Dual Braided Harmonic Ribbons (Electric Cyan & Neon Magenta)
-            val samplePoints = 60
-            val strandsPerRibbon = 7
+            // Lock-free reads of real-time Windows WASAPI audio vibration & beat telemetry
+            val mgr = dev.brahmkshatriya.echo.core.platform.AudioVisualizerManager
+            val playing = playingState.value || (mgr.isAudioActive && mgr.liveRms > 0.01f)
+            val rawBass = if (playing) mgr.liveBass else 0f
+            val rawMid = if (playing) mgr.liveMid else 0f
+            val rawTreble = if (playing) mgr.liveTreble else 0f
+            val rawBeat = if (playing) mgr.liveBeatImpulse else 0f
+            val rawRms = if (playing) mgr.liveRms else 0f
+            val waveSamples = mgr.getLiveWaveform()
 
-            // Ribbon A: Electric Cyan Bundle
-            val cyanPalettes = listOf(
-                Pair(Color(0xFF0284C7), 0.70.dp.toPx()),
-                Pair(Color(0xFF0EA5E9), 0.75.dp.toPx()),
-                Pair(Color(0xFF00F2FE), 0.85.dp.toPx()),
-                Pair(Color(0xFFE0F2FE), 0.95.dp.toPx()),
-                Pair(Color(0xFF38BDF8), 0.85.dp.toPx()),
-                Pair(Color(0xFF06B6D4), 0.75.dp.toPx()),
-                Pair(Color(0xFF0369A1), 0.70.dp.toPx())
-            )
+            // Advance smooth continuous phases
+            val speedBoost = if (playing) (1.0f + skiaState.smoothBass * 0.7f) else 0.55f
+            skiaState.restingPhase = (skiaState.restingPhase + dt * 6.55f) % (2.0 * Math.PI).toFloat()
+            skiaState.hfPhase = (skiaState.hfPhase + dt * (5.2f + skiaState.smoothTreble * 8.0f)) % (2.0 * Math.PI).toFloat()
+            skiaState.sweepU = (skiaState.sweepU + dt * (0.34f * speedBoost)) % 1.0f
 
-            // Ribbon B: Neon Magenta Bundle
-            val magentaPalettes = listOf(
-                Pair(Color(0xFF7E22CE), 0.70.dp.toPx()),
-                Pair(Color(0xFFA855F7), 0.75.dp.toPx()),
-                Pair(Color(0xFFEC4899), 0.85.dp.toPx()),
-                Pair(Color(0xFFFDF2F8), 0.95.dp.toPx()),
-                Pair(Color(0xFFFF2E93), 0.85.dp.toPx()),
-                Pair(Color(0xFFD946EF), 0.75.dp.toPx()),
-                Pair(Color(0xFF9333EA), 0.70.dp.toPx())
-            )
+            // Resting cardiac lub-DUB envelope (~63 BPM) when paused or during silent track breaks
+            val p1 = kotlin.math.sin(skiaState.restingPhase).coerceAtLeast(0f)
+            val lub = p1 * p1 * p1 * p1
+            val p2 = kotlin.math.sin(skiaState.restingPhase - 0.85f).coerceAtLeast(0f)
+            val dub = p2 * p2 * p2 * p2 * p2 * 0.55f
+            val restingEnvelope = (lub + dub).coerceIn(0f, 1f)
 
-            // Determine depth order for 3D cross
-            val centerTheta = (2.0 * Math.PI * 1.70 * 0.5 - phase).toFloat()
-            val cyanInFront = kotlin.math.sin(centerTheta) < 0f
-
-            val ribbonsToDraw = if (cyanInFront) listOf(1, 0) else listOf(0, 1)
-
-            for (ribbonId in ribbonsToDraw) {
-                val isCyan = (ribbonId == 0)
-                val paletteList = if (isCyan) cyanPalettes else magentaPalettes
-
-                for (sIdx in 0 until strandsPerRibbon) {
-                    val s = (sIdx - (strandsPerRibbon - 1) / 2f) / ((strandsPerRibbon - 1) / 2f)
-                    val (baseColor, strokePx) = paletteList[sIdx]
-                    val strandAlpha = (0.55f + 0.40f * (1f - kotlin.math.abs(s) * 0.45f)).coerceIn(0.40f, 0.95f)
-
-                    reusablePath.reset()
-
-                    for (p in 0..samplePoints) {
-                        val u = p.toFloat() / samplePoints.toFloat()
-                        val px = padX + u * usableWidth
-
-                        // Direct logarithmic frequency register mapping (bass -> mid -> treble)
-                        val bFloat = u * 27f
-                        val bLow = bFloat.toInt().coerceIn(0, 27)
-                        val bHigh = (bLow + 1).coerceIn(0, 27)
-                        val frac = bFloat - bLow
-                        val bandEnergy = (liveBands.getOrElse(bLow) { 0f } * (1f - frac) + liveBands.getOrElse(bHigh) { 0f } * frac)
-
-                        val audioAmp = if (isPlaying) {
-                            if (isAudioActive && bandEnergy > 0.005f) {
-                                (0.08f + bandEnergy * 0.92f).coerceIn(0.08f, 1.0f)
-                            } else {
-                                0.08f + 0.02f * kotlin.math.sin(phase + u * 2.0f)
-                            }
-                        } else {
-                            0.04f + 0.015f * kotlin.math.sin(phase + u * 1.5f)
-                        }
-
-                        val maxAmp = (h / 2f - 2.dp.toPx()).coerceAtLeast(3f) * audioAmp
-
-                        // Hann envelope pinching smoothly to 0 at ends
-                        val rawEnv = kotlin.math.sin(u * Math.PI.toFloat())
-                        val env = if (rawEnv > 0f) Math.pow(rawEnv.toDouble(), 1.25).toFloat() else 0f
-
-                        val theta = (2.0 * Math.PI * 1.70 * u - phase).toFloat()
-                        val spine = 0.20f * maxAmp * kotlin.math.sin(2.0 * Math.PI * 1.25 * u - phase * 0.65f).toFloat()
-                        val ribbonSep = 0.60f * maxAmp * kotlin.math.sin(theta)
-
-                        val strandWidth = 0.35f * maxAmp * env
-                        val py = if (isCyan) {
-                            val yCenter = centerY + env * (spine - ribbonSep)
-                            val arch = if (ribbonSep > 0f) -(1f - s * s) * 1.5f * env else (1f - s * s) * 1.5f * env
-                            yCenter + s * strandWidth * kotlin.math.cos(theta + 0.20f) + arch
-                        } else {
-                            val yCenter = centerY + env * (spine + ribbonSep)
-                            val arch = if (ribbonSep < 0f) -(1f - s * s) * 1.5f * env else (1f - s * s) * 1.5f * env
-                            yCenter - s * strandWidth * kotlin.math.cos(theta + 0.20f) + arch
-                        }
-
-                        if (p == 0) {
-                            reusablePath.moveTo(px, py)
-                        } else {
-                            reusablePath.lineTo(px, py)
-                        }
-                    }
-
-                    drawPath(
-                        path = reusablePath,
-                        color = baseColor.copy(alpha = strandAlpha),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(
-                            width = strokePx,
-                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                            join = androidx.compose.ui.graphics.StrokeJoin.Round
-                        )
-                    )
-                }
+            // Detect real beat onset pulses to fire an outward acoustic shockwave along the line
+            val curBeats = mgr.beatCount
+            if (playing && skiaState.lastSeenBeatCount >= 0L && curBeats != skiaState.lastSeenBeatCount) {
+                skiaState.shockwaveProgress = 0f
+                skiaState.shockwavePower = (0.45f + rawBeat * 0.55f).coerceIn(0.4f, 1.0f)
+            }
+            skiaState.lastSeenBeatCount = curBeats
+            if (skiaState.shockwaveProgress < 1.2f) {
+                skiaState.shockwaveProgress += dt * 1.95f
+                skiaState.shockwavePower *= (1f - dt * 2.4f).coerceIn(0.5f, 0.99f)
             }
 
-            // 3. Delicate Luminous Anchor Pins at both ends (matching reference)
-            val pinHeight = 5.5.dp.toPx()
-            val pinWidth = 1.4.dp.toPx()
-            val pinCorner = androidx.compose.ui.geometry.CornerRadius(pinWidth / 2f, pinWidth / 2f)
+            // Crisp cardiac ballistics: instant systolic snap up, muscular diastolic release down
+            val attackK = 1f - kotlin.math.exp(-dt * 34f)
+            val releaseK = 1f - kotlin.math.exp(-dt * 9.5f)
+            val midK = 1f - kotlin.math.exp(-dt * 18f)
 
-            // Pin glow
-            drawCircle(
-                color = Color(0xFF00F2FE).copy(alpha = 0.25f),
-                radius = 3.dp.toPx(),
-                center = Offset(padX, centerY)
-            )
-            drawCircle(
-                color = Color(0xFF00F2FE).copy(alpha = 0.25f),
-                radius = 3.dp.toPx(),
-                center = Offset(padX + usableWidth, centerY)
-            )
+            val targetBeat = if (playing) {
+                if (rawRms > 0.015f) {
+                    // Dramatic real music dynamic range: poised 0.28 -> slamming 1.00 on kicks!
+                    (0.26f + rawBeat * 0.58f + rawBass * 0.24f).coerceIn(0.24f, 1.0f)
+                } else {
+                    // Genuine silent intro/breakdown in song -> calm subtle breathing heartbeat
+                    (0.26f + restingEnvelope * 0.22f)
+                }
+            } else {
+                // Paused: crisp, unmistakable resting human heartbeat
+                (0.30f + restingEnvelope * 0.34f)
+            }
 
-            // Left anchor pin (Cyan / Blue)
-            drawRoundRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF00F2FE), Color(0xFF38BDF8), Color(0xFF0284C7)),
-                    startY = centerY - pinHeight / 2f,
-                    endY = centerY + pinHeight / 2f
-                ),
-                topLeft = Offset(padX - pinWidth / 2f, centerY - pinHeight / 2f),
-                size = Size(pinWidth, pinHeight),
-                cornerRadius = pinCorner
-            )
+            skiaState.smoothBeat += (targetBeat - skiaState.smoothBeat) * if (targetBeat > skiaState.smoothBeat) attackK else releaseK
+            skiaState.smoothBass += (rawBass - skiaState.smoothBass) * if (rawBass > skiaState.smoothBass) attackK else releaseK
+            skiaState.smoothMid += (rawMid - skiaState.smoothMid) * midK
+            skiaState.smoothTreble += (rawTreble - skiaState.smoothTreble) * midK
+            skiaState.smoothRms += (rawRms - skiaState.smoothRms) * midK
 
-            // Right anchor pin (Cyan / Blue)
-            drawRoundRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF00F2FE), Color(0xFF38BDF8), Color(0xFF0284C7)),
-                    startY = centerY - pinHeight / 2f,
-                    endY = centerY + pinHeight / 2f
-                ),
-                topLeft = Offset(padX + usableWidth - pinWidth / 2f, centerY - pinHeight / 2f),
-                size = Size(pinWidth, pinHeight),
-                cornerRadius = pinCorner
-            )
+            val beatAmp = skiaState.smoothBeat
+            val bass = skiaState.smoothBass
+            val mids = skiaState.smoothMid
+            val treble = skiaState.smoothTreble
+            val rms = skiaState.smoothRms
+
+            // Ensure cached GPU Skia blur filters & horizontal edge-fade shaders
+            skiaState.ensureDeviceResources(w, h, density, padX, centerU)
+
+            // =========================================================================
+            // 1. BUILD ECG HEARTBEAT + LIVE MUSIC VIBRATION PATH (181 points, zero GC)
+            // =========================================================================
+            val sampleCount = 181
+            val skPath = skiaState.path
+            skPath.rewind()
+
+            val waveLen = waveSamples.size
+            val hasLiveWave = playing && rms > 0.012f && waveLen > 0
+            val shockPos = skiaState.shockwaveProgress * 0.48f
+            val shockAmp = if (playing && skiaState.shockwaveProgress < 1.05f) {
+                skiaState.shockwavePower * (1f - skiaState.shockwaveProgress).coerceAtLeast(0f)
+            } else 0f
+
+            // Precompute dynamic cardiac component heights driven by real audio bands
+            val pHeight = 0.12f + beatAmp * 0.14f + mids * 0.06f
+            val qDepth = -(0.08f + beatAmp * 0.17f)
+            val rHeight = 0.32f + beatAmp * 0.72f
+            val sDepth = -(0.24f + beatAmp * 0.60f + bass * 0.10f)
+            val rebHeight = 0.14f + beatAmp * 0.23f + mids * 0.08f
+            val dipDepth = -(0.035f + beatAmp * 0.065f)
+            val tHeight = 0.13f + beatAmp * 0.17f + mids * 0.14f
+
+            var rPeakX = padX + centerU * usableW
+            var rPeakY = centerY
+            var rPeakMinDist = 999f
+
+            val invCount = 1.0f / (sampleCount - 1).toFloat()
+            val minY = padY * 0.35f
+            val maxY = h - padY * 0.35f
+
+            for (i in 0 until sampleCount) {
+                val u = i * invCount
+                val px = padX + u * usableW
+                val du = u - centerU
+                val absDu = kotlin.math.abs(du)
+
+                // Fast windowing: skip all 7 ECG terms outside the cardiac zone (saves ~60% math!)
+                var ecg = 0f
+                if (absDu < 0.22f) {
+                    val dP = du + 0.075f
+                    val pWave = pHeight * kotlin.math.exp(-(dP * dP) * 1953.125f) // 1 / (2 * 0.016^2)
+
+                    val dQ = du + 0.016f
+                    val qWave = qDepth * kotlin.math.exp(-(dQ * dQ) * 13888.889f) // 1 / (2 * 0.006^2)
+
+                    val rWave = rHeight * kotlin.math.exp(-absDu * 98.0f) // razor-sharp needle apex at vertex 95
+
+                    val sWave = sDepth * kotlin.math.exp(-kotlin.math.abs(du - (3f / 180f)) * 116.0f) // razor-sharp chasm at vertex 98
+
+                    val dReb = du - 0.035f
+                    val rebWave = rebHeight * kotlin.math.exp(-(dReb * dReb) * 7812.5f)
+
+                    val dDip = du - 0.052f
+                    val dipWave = dipDepth * kotlin.math.exp(-(dDip * dDip) * 10204.08f)
+
+                    val dT = du - 0.095f
+                    val tWave = tHeight * kotlin.math.exp(-(dT * dT) * 868.055f)
+
+                    ecg = pWave + qWave + rWave + sWave + rebWave + dipWave + tWave
+                }
+
+                // Real-time music vibration from live Windows WASAPI PCM samples!
+                var vibration = 0f
+                if (hasLiveWave) {
+                    val wPos = u * (waveLen - 1)
+                    val idx0 = wPos.toInt().coerceIn(0, waveLen - 1)
+                    val idx1 = (idx0 + 1).coerceAtMost(waveLen - 1)
+                    val frac = wPos - idx0
+                    val pcmSample = waveSamples[idx0] * (1f - frac) + waveSamples[idx1] * frac
+
+                    // Strongest vibration in the acoustic zone around the pulse, gracefully radiating across wings
+                    val wingEnvelope = 0.32f + 0.68f * kotlin.math.exp(-(du * du) * 9.5f)
+                    // Keep R/S apex pure & razor-sharp while letting baseline, P, T & wings vibrate organically
+                    val qrsClarity = if (absDu < 0.025f) 0.35f else 1.0f
+                    val vibGain = (rms * 0.17f + mids * 0.11f + treble * 0.07f).coerceAtMost(0.30f)
+                    vibration = pcmSample * vibGain * wingEnvelope * qrsClarity
+
+                    // Subtle high-frequency acoustic shimmer on crisp vocals / hi-hats
+                    if (treble > 0.08f) {
+                        vibration += treble * 0.022f * kotlin.math.sin(u * 170f + skiaState.hfPhase * 9f) * wingEnvelope
+                    }
+                }
+
+                // Expanding physical beat shockwave radiating symmetrically outward from the heartbeat
+                var shockDisp = 0f
+                if (shockAmp > 0.02f && absDu > 0.03f) {
+                    val distToFront = absDu - shockPos
+                    if (kotlin.math.abs(distToFront) < 0.055f) {
+                        val env = kotlin.math.exp(-(distToFront * distToFront) * 1650f)
+                        shockDisp = shockAmp * 0.14f * env * kotlin.math.cos(distToFront * 85f)
+                    }
+                }
+
+                // Smooth zero-displacement edge taper at extreme 3.5% borders
+                val edgeFade = when {
+                    u < 0.035f -> {
+                        val t = u / 0.035f
+                        t * t
+                    }
+                    u > 0.965f -> {
+                        val t = (1f - u) / 0.035f
+                        t * t
+                    }
+                    else -> 1f
+                }
+
+                val totalDisp = (ecg + vibration + shockDisp) * edgeFade
+                val py = (centerY - totalDisp * maxAmp).coerceIn(minY, maxY)
+                skiaState.sampleY[i] = py
+
+                if (absDu < rPeakMinDist) {
+                    rPeakMinDist = absDu
+                    rPeakX = px
+                    rPeakY = py
+                }
+
+                if (i == 0) skPath.moveTo(px, py) else skPath.lineTo(px, py)
+            }
+
+            // =========================================================================
+            // 2. GPU-ACCELERATED SKIA NEON RENDER PASS (Silky Blur Bloom, Zero Artifacts!)
+            // =========================================================================
+            drawIntoCanvas { composeCanvas ->
+                val native = composeCanvas.nativeCanvas
+
+                // A. Seamless Elliptical Radial Crimson Aura (Zero top/bottom box clipping!)
+                val auraAlpha = (0.12f + beatAmp * 0.30f + bass * 0.10f).coerceIn(0.10f, 0.48f)
+                val auraRadius = (usableW * 0.24f).coerceAtLeast(h * 0.7f)
+                val auraCenterX = padX + usableW * centerU
+                skiaState.auraPaint.setAlphaf(auraAlpha)
+                native.save()
+                native.translate(auraCenterX, centerY)
+                native.scale(1.0f, ((h * 0.48f) / auraRadius).coerceIn(0.15f, 1.0f))
+                native.drawCircle(0f, 0f, auraRadius, skiaState.auraPaint)
+                native.restore()
+
+                // B. Subtle Medical Reticle Cross Markers (+) Matching Reference Design
+                val reticleAlpha = (0.28f + beatAmp * 0.26f).coerceIn(0.24f, 0.56f)
+                skiaState.reticlePaint.setARGB((reticleAlpha * 255f).toInt(), 255, 58, 92)
+                val crossArm = 3.2f * density
+
+                val c1X = padX + usableW * (centerU - 0.024f)
+                val c1Y = centerY + maxAmp * 0.58f
+                native.drawLine(c1X - crossArm, c1Y, c1X + crossArm, c1Y, skiaState.reticlePaint)
+                native.drawLine(c1X, c1Y - crossArm, c1X, c1Y + crossArm, skiaState.reticlePaint)
+
+                val c2X = padX + usableW * (centerU + 0.082f)
+                val c2Y = centerY - maxAmp * 0.42f
+                native.drawLine(c2X - crossArm, c2Y, c2X + crossArm, c2Y, skiaState.reticlePaint)
+                native.drawLine(c2X, c2Y - crossArm, c2X, c2Y + crossArm, skiaState.reticlePaint)
+
+                // C. Layer 1: Silky Feathered Outer Neon Crimson Bloom (True Gaussian Blur!)
+                skiaState.outerBloomPaint.strokeWidth = (3.8f + beatAmp * 2.8f) * density
+                skiaState.outerBloomPaint.setAlphaf((0.42f + beatAmp * 0.42f).coerceIn(0.36f, 0.88f))
+                native.drawPath(skPath, skiaState.outerBloomPaint)
+
+                // D. Layer 2: Intense Saturated Scarlet Inner Glow (Tight Gaussian Blur)
+                skiaState.innerGlowPaint.strokeWidth = (2.4f + beatAmp * 0.9f) * density
+                skiaState.innerGlowPaint.setAlphaf((0.72f + beatAmp * 0.24f).coerceIn(0.68f, 0.98f))
+                native.drawPath(skPath, skiaState.innerGlowPaint)
+
+                // E. Layer 3: Razor-Sharp Electric Vermilion Core Beam (Miter-Joined Sharp Apex!)
+                skiaState.corePaint.strokeWidth = (1.85f + beatAmp * 0.35f) * density
+                skiaState.corePaint.setAlphaf(0.97f)
+                native.drawPath(skPath, skiaState.corePaint)
+
+                // F. Layer 4: Incandescent Hot White-Rose Laser Filament Center
+                skiaState.filamentPaint.strokeWidth = (0.85f + beatAmp * 0.25f) * density
+                skiaState.filamentPaint.setAlphaf((0.86f + beatAmp * 0.14f).coerceIn(0.84f, 1.0f))
+                native.drawPath(skPath, skiaState.filamentPaint)
+
+                // G. R-Peak Apex Impact Spark (Ignites softly right at the needle tip on beat kicks!)
+                if (beatAmp > 0.42f) {
+                    val apexGlow = ((beatAmp - 0.42f) / 0.58f).coerceIn(0f, 1f)
+                    skiaState.sparkHaloPaint.setARGB((apexGlow * 175f).toInt(), 255, 36, 76)
+                    native.drawCircle(rPeakX, rPeakY, (3.2f + apexGlow * 3.8f) * density, skiaState.sparkHaloPaint)
+                    skiaState.sparkCorePaint.setARGB((apexGlow * 235f).toInt(), 255, 245, 248)
+                    native.drawCircle(rPeakX, rPeakY, (1.1f + apexGlow * 0.9f) * density, skiaState.sparkCorePaint)
+                }
+
+                // H. Waveform-Locked Subtle Telemetry Pulse Tracer (Rides EXACTLY on the curve!)
+                val sweepPos = skiaState.sweepU * (sampleCount - 1)
+                val sIdx0 = sweepPos.toInt().coerceIn(0, sampleCount - 1)
+                val sIdx1 = (sIdx0 + 1).coerceAtMost(sampleCount - 1)
+                val sFrac = sweepPos - sIdx0
+                val sweepX = padX + skiaState.sweepU * usableW
+                val sweepY = skiaState.sampleY[sIdx0] * (1f - sFrac) + skiaState.sampleY[sIdx1] * sFrac
+                val sweepEdgeAlpha = when {
+                    skiaState.sweepU < 0.06f -> skiaState.sweepU / 0.06f
+                    skiaState.sweepU > 0.94f -> (1f - skiaState.sweepU) / 0.06f
+                    else -> 1f
+                }
+                val sparkIntensity = sweepEdgeAlpha * (0.55f + beatAmp * 0.45f)
+                if (sparkIntensity > 0.05f) {
+                    skiaState.sparkHaloPaint.setARGB((sparkIntensity * 165f).toInt(), 255, 30, 70)
+                    native.drawCircle(sweepX, sweepY, (3.6f + beatAmp * 1.8f) * density, skiaState.sparkHaloPaint)
+                    skiaState.sparkCorePaint.setARGB((sparkIntensity * 240f).toInt(), 255, 248, 250)
+                    native.drawCircle(sweepX, sweepY, (1.35f + beatAmp * 0.45f) * density, skiaState.sparkCorePaint)
+                }
+            }
         }
     }
 }
-
 @Composable
 private fun SeniorEditorialBillboard(
     playerViewModel: PlayerViewModel,
@@ -3353,17 +3676,22 @@ private fun SeniorEditorialBillboard(
         completedDownloads.any { it.track.id == activeTrack.id }
     }
 
-    // Infinite Transitions for Vinyl
-    val infiniteTransition = rememberInfiniteTransition(label = "billboard_fx")
-    val vinylAngle = infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(16000, easing = LinearEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Restart
-        ),
-        label = "vinyl_angle"
-    )
+    // Vinyl spin animation: only ticks GPU clock while actively playing (zero idle overhead when paused!)
+    val vinylAngle = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(isCurrentSession, isPlaying) {
+        if (isCurrentSession && isPlaying) {
+            var lastNs = 0L
+            while (true) {
+                withFrameNanos { ns ->
+                    if (lastNs != 0L) {
+                        val dtSec = ((ns - lastNs) * 1e-9f).coerceIn(0f, 0.1f)
+                        vinylAngle.floatValue = (vinylAngle.floatValue + dtSec * 22.5f) % 360f
+                    }
+                    lastNs = ns
+                }
+            }
+        }
+    }
 
     var showCopiedFeedback by remember { mutableStateOf(false) }
     LaunchedEffect(showCopiedFeedback) {
@@ -3657,55 +3985,114 @@ private fun SeniorEditorialBillboard(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Tier 1: Telemetry Header (Clean, centered, and balanced)
+                // Tier 1: Telemetry Header with Compact Studio Lyrics & EQ Toggle Badges
+                val showAudioEffects by playerViewModel.showAudioEffectsDialog.collectAsState()
+                val showLyrics by playerViewModel.showLyricsDialog.collectAsState()
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .padding(end = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.GraphicEq,
                             contentDescription = null,
-                            tint = Color(0xFF38BDF8),
+                            tint = Color(0xFFFF2A55),
                             modifier = Modifier.size(12.dp)
                         )
                         Text(
-                            text = "STUDIO SOUNDSTAGE  •  320 KBPS LOSSLESS  •  44.1 KHZ",
+                            text = "ACOUSTIC PULSE SOUNDSTAGE • 320 KBPS LOSSLESS",
                             color = Color.White.copy(alpha = 0.85f),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.1.sp
+                            letterSpacing = 1.1.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Synchronized Karaoke Lyrics Studio Toggle Badge
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (showLyrics) Color(0xFFFF2A55).copy(alpha = 0.22f) else Color.White.copy(alpha = 0.08f))
+                                .border(1.dp, if (showLyrics) Color(0xFFFF2A55).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
+                                .pointerHoverIcon(PointerIcon.Hand)
+                                .clickable { playerViewModel.toggleLyricsDialog() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = "Lyrics Studio",
+                                tint = if (showLyrics) Color(0xFFFF2A55) else Color(0xFFFF2A55).copy(alpha = 0.90f),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = "LYRICS",
+                                color = if (showLyrics) Color(0xFFFF2A55) else Color.White.copy(alpha = 0.85f),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            )
+                        }
+
+                        // Compact studio EQ badge in the header - leaves full height for the visualizer!
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (showAudioEffects) Color(0xFFFF2A55).copy(alpha = 0.22f) else Color.White.copy(alpha = 0.08f))
+                                .border(1.dp, if (showAudioEffects) Color(0xFFFF2A55).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
+                                .pointerHoverIcon(PointerIcon.Hand)
+                                .clickable { playerViewModel.toggleAudioEffectsDialog() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Equalizer,
+                                contentDescription = "Studio Equalizer",
+                                tint = if (showAudioEffects) Color(0xFFFF2A55) else Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = "EQUALIZER",
+                                color = if (showAudioEffects) Color(0xFFFF2A55) else Color.White.copy(alpha = 0.8f),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            )
+                        }
                     }
                 }
 
-                // Tier 2: Real Animated Multi-Band Audio Spectrum Visualizer (Spacious 46dp)
+                // Tier 2: Real Animated Music-Vibration ECG Heartbeat Visualizer
                 BillboardSoundstageVisualizer(
-                    isPlaying = isCurrentSession && isPlaying,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-
-                // Tier 3: Sleek Equalizer & Studio Acoustics Action Pill
-                val showAudioEffects by playerViewModel.showAudioEffectsDialog.collectAsState()
-                BillboardOptionPill(
-                    icon = Icons.Default.Equalizer,
-                    label = "Studio Equalizer & Effects",
-                    isActive = showAudioEffects,
-                    activeColor = Color(0xFF38BDF8),
-                    onClick = { playerViewModel.toggleAudioEffectsDialog() }
+                    isPlaying = isPlaying,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
                 )
             }
 
             // ====================================================================================
-            // ZONE 3 (RIGHT): 3D Peeking Vinyl Record & Square Album Jacket
+            // ZONE 3 (RIGHT)   // ZONE 3 (RIGHT): 3D Peeking Vinyl Record & Square Album Jacket
             // ====================================================================================
             Box(
                 modifier = Modifier
@@ -3723,7 +4110,7 @@ private fun SeniorEditorialBillboard(
                         .clip(CircleShape)
                         .background(Color(0xFF0C0D10))
                         .border(1.dp, Color.White.copy(alpha = 0.16f), CircleShape)
-                        .graphicsLayer { rotationZ = if (isCurrentSession && isPlaying) vinylAngle.value else 0f },
+                        .graphicsLayer { rotationZ = if (isCurrentSession && isPlaying) vinylAngle.floatValue else 0f },
                     contentAlignment = Alignment.Center
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -5894,4 +6281,438 @@ fun DecentAmbientScreensaver(
         modifier = modifier,
         screensaverActivatedAt = screensaverActivatedAt
     )
+}
+
+// ================================================================================================
+// NIGHTLY SLEEP TIMER MODAL (Option B)
+// ================================================================================================
+@Composable
+private fun NightlySleepTimerModal(
+    playerViewModel: PlayerViewModel,
+    onDismiss: () -> Unit
+) {
+    val sleepActive by playerViewModel.sleepTimerActive.collectAsState()
+    val sleepMins by playerViewModel.sleepTimerMinutes.collectAsState()
+    val remainingSec by playerViewModel.sleepTimerSecondsRemaining.collectAsState()
+    val fadeOut by playerViewModel.sleepFadeOut.collectAsState()
+    val closeApp by playerViewModel.sleepCloseApp.collectAsState()
+
+    var selectedPreset by remember { mutableIntStateOf(if (sleepMins > 0) sleepMins else 30) }
+    var fadeOutToggle by remember { mutableStateOf(fadeOut) }
+    var closeAppToggle by remember { mutableStateOf(closeApp) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.70f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() }
+            .zIndex(999f),
+        contentAlignment = Alignment.Center
+    ) {
+        LiquidGlassCard(
+            modifier = Modifier
+                .width(420.dp)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { /* intercept click */ },
+            shape = RoundedCornerShape(20.dp),
+            backgroundColor = Color(0xFF0F1117).copy(alpha = 0.95f),
+            borderColor = Color.White.copy(alpha = 0.18f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF59E0B).copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Bedtime,
+                                contentDescription = null,
+                                tint = Color(0xFFF59E0B),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                "Nightly Sleep Timer",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                if (sleepActive) {
+                                    val m = remainingSec / 60
+                                    val s = remainingSec % 60
+                                    "Active • Pausing in ${m}m ${s.toString().padStart(2, '0')}s"
+                                } else "Gentle automatic playback shutdown",
+                                color = if (sleepActive) Color(0xFFF59E0B) else Color.White.copy(alpha = 0.60f),
+                                fontSize = 11.5.sp
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                // Presets Grid
+                Text(
+                    "CHOOSE DURATION",
+                    color = Color.White.copy(alpha = 0.50f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(15, 30, 45, 60).forEach { mins ->
+                        val isSelected = selectedPreset == mins
+                        LiquidGlassBox(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            backgroundColor = if (isSelected) Color(0xFFF59E0B).copy(alpha = 0.22f) else Color.White.copy(alpha = 0.06f),
+                            borderColor = if (isSelected) Color(0xFFF59E0B).copy(alpha = 0.70f) else Color.White.copy(alpha = 0.12f),
+                            onClick = { selectedPreset = mins }
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    "${mins}m",
+                                    color = if (isSelected) Color(0xFFF59E0B) else Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Options (Fade-out & Auto-shutdown)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { fadeOutToggle = !fadeOutToggle }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Smooth 30s Audio Fade-Out", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text("Gradually decreases volume so sleep is not disturbed", color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
+                    }
+                    Checkbox(
+                        checked = fadeOutToggle,
+                        onCheckedChange = { fadeOutToggle = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = Color(0xFFF59E0B),
+                            uncheckedColor = Color.White.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { closeAppToggle = !closeAppToggle }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Exit Nightly when Timer Ends", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text("Fully closes application to save battery and memory", color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
+                    }
+                    Checkbox(
+                        checked = closeAppToggle,
+                        onCheckedChange = { closeAppToggle = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = Color(0xFFF59E0B),
+                            uncheckedColor = Color.White.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (sleepActive) {
+                        Button(
+                            onClick = {
+                                playerViewModel.cancelSleepTimer()
+                                onDismiss()
+                            },
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFEF4444).copy(alpha = 0.20f),
+                                contentColor = Color(0xFFEF4444)
+                            ),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.50f))
+                        ) {
+                            Text("Cancel Timer", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            playerViewModel.startSleepTimer(selectedPreset, fadeOut = fadeOutToggle, closeApp = closeAppToggle)
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f).height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFF59E0B),
+                            contentColor = Color(0xFF0F172A)
+                        )
+                    ) {
+                        Text(if (sleepActive) "Update Timer" else "Start ${selectedPreset}m Timer", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ================================================================================================
+// NIGHTLY SYNCHRONIZED KARAOKE LYRICS MODAL (Option C)
+// ================================================================================================
+@Composable
+private fun NightlyLyricsStudioModal(
+    playerViewModel: PlayerViewModel,
+    lyricsViewModel: LyricsViewModel,
+    onDismiss: () -> Unit
+) {
+    val currentTrack by playerViewModel.currentTrack.collectAsState()
+    val lyricsUiState by lyricsViewModel.uiState.collectAsState()
+    val activeIndex by lyricsViewModel.activeLyricIndex.collectAsState()
+    val listState = rememberLazyListState()
+
+    // Smooth auto-scroll to active lyric line as the song plays
+    LaunchedEffect(activeIndex) {
+        if (activeIndex >= 0) {
+            val target = (activeIndex - 2).coerceAtLeast(0)
+            listState.animateScrollToItem(target)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.75f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() }
+            .zIndex(999f),
+        contentAlignment = Alignment.Center
+    ) {
+        LiquidGlassCard(
+            modifier = Modifier
+                .width(640.dp)
+                .height(580.dp)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { /* intercept click */ },
+            shape = RoundedCornerShape(22.dp),
+            backgroundColor = Color(0xFF0C0E14).copy(alpha = 0.96f),
+            borderColor = Color.White.copy(alpha = 0.18f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Top Header (Track Title, Artist, Close)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFFF2A55).copy(alpha = 0.20f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = Color(0xFFFF2A55),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                currentTrack?.title ?: "Synchronized Lyrics",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                "${currentTrack?.artists?.joinToString(", ") { it.name } ?: "Studio Track"} • Synchronized Lyrics Studio",
+                                color = Color.White.copy(alpha = 0.65f),
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 12.dp))
+
+                // Middle Content: Synchronized Lyrics List
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (val state = lyricsUiState) {
+                        is LyricsUiState.Timed -> {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                                contentPadding = PaddingValues(vertical = 40.dp)
+                            ) {
+                                itemsIndexed(state.items) { index, item ->
+                                    val isActive = index == activeIndex
+                                    val textAlpha = if (isActive) 1.0f else 0.40f
+                                    val textColor = if (isActive) Color.White else Color.White.copy(alpha = textAlpha)
+
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { lyricsViewModel.seekTo(item.startTime) }
+                                            .background(if (isActive) Color(0xFFFF2A55).copy(alpha = 0.12f) else Color.Transparent)
+                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = item.text,
+                                            color = textColor,
+                                            fontSize = if (isActive) 20.sp else 16.sp,
+                                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                            letterSpacing = if (isActive) 0.3.sp else 0.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        is LyricsUiState.Simple -> {
+                            val scroll = rememberScrollState()
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(scroll)
+                                    .padding(16.dp)
+                            ) {
+                                Text(
+                                    text = state.text,
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 15.sp,
+                                    lineHeight = 24.sp
+                                )
+                            }
+                        }
+                        is LyricsUiState.Loading -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                CircularProgressIndicator(color = Color(0xFFFF2A55), modifier = Modifier.size(32.dp))
+                                Text("Searching synchronized lyrics studio...", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
+                            }
+                        }
+                        is LyricsUiState.Empty -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Default.MusicOff, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(40.dp))
+                                Text(state.message.ifBlank { "No synchronized lyrics found for this track." }, color = Color.White.copy(alpha = 0.65f), fontSize = 13.sp)
+                                Button(
+                                    onClick = { lyricsViewModel.reload() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.10f), contentColor = Color.White),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Retry Search", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        else -> {
+                            Text("Ready to load lyrics.", color = Color.White.copy(alpha = 0.6f))
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 10.dp))
+
+                // Bottom Footer: Status and Reload
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val srcName = when (val s = lyricsUiState) {
+                        is LyricsUiState.Timed -> s.sourceName
+                        is LyricsUiState.Simple -> s.sourceName
+                        else -> "Studio Provider"
+                    }
+                    Text(
+                        text = "Source: $srcName • Click any line to seek",
+                        color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 11.sp
+                    )
+
+                    IconButton(
+                        onClick = { lyricsViewModel.reload() },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Reload Lyrics", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+    }
 }

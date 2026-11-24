@@ -1087,67 +1087,91 @@ $mirrorButtonsHtml
 
     suspend fun resolveSoundtrackForMovie(movieTitle: String): List<Track> = withContext(Dispatchers.IO) {
         runCatching {
-            val clean = movieTitle.replace(Regex("""\[.*?]|\(.*?\)|4k|uhd|1080p|season \d+""", RegexOption.IGNORE_CASE), "").trim()
+            val clean = movieTitle.replace(Regex("""\[.*?\]|\(.*?\)|4k|uhd|1080p|season \d+""", RegexOption.IGNORE_CASE), "").trim()
+            val seenTitles = mutableSetOf<String>()
+            val tracks = mutableListOf<Track>()
 
-            // 1. Try direct song search for official theme / OST tracks
-            val songEnc = URLEncoder.encode("$clean theme", "UTF-8")
-            val songUrl = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&p=1&n=10&q=$songEnc"
+            // 1. First try official soundtrack album search
+            val albumQueries = listOf(
+                "$clean original motion picture soundtrack",
+                "$clean soundtrack",
+                clean
+            )
+
+            for (aq in albumQueries) {
+                val enc = URLEncoder.encode(aq, "UTF-8")
+                val url = "https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&ctx=android&p=1&n=3&q=$enc"
+                val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()
+                val body = httpClient.newCall(req).execute().use { it.body?.string().orEmpty() }
+                if (body.isBlank()) continue
+
+                val root = json.parseToJsonElement(body).jsonObject
+                val results = root["results"]?.jsonArray ?: continue
+                if (results.isEmpty()) continue
+
+                val firstAlb = results[0].jsonObject
+                val albId = firstAlb["albumid"]?.jsonPrimitive?.content ?: firstAlb["id"]?.jsonPrimitive?.content ?: continue
+                val albTitle = firstAlb["title"]?.jsonPrimitive?.content ?: firstAlb["album"]?.jsonPrimitive?.content ?: clean
+                val rawImg = firstAlb["image"]?.jsonPrimitive?.content ?: ""
+                val highResImg = rawImg.replace("150x150", "500x500").replace("50x50", "500x500").replace("150x150.webp", "500x500.jpg").replace("50x50.webp", "500x500.jpg")
+
+                val detailUrl = "https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=$albId"
+                val dReq = Request.Builder().url(detailUrl).header("User-Agent", "Mozilla/5.0").build()
+                val dBody = httpClient.newCall(dReq).execute().use { it.body?.string().orEmpty() }
+                if (dBody.isBlank()) continue
+
+                val dRoot = json.parseToJsonElement(dBody).jsonObject
+                val songList = dRoot["songs"]?.jsonArray ?: dRoot["list"]?.jsonArray ?: continue
+
+                for (sElem in songList) {
+                    val sObj = sElem.jsonObject
+                    val sid = sObj["id"]?.jsonPrimitive?.content ?: continue
+                    val sTitle = sObj["song"]?.jsonPrimitive?.content ?: sObj["title"]?.jsonPrimitive?.content ?: continue
+                    val normTitle = sTitle.replace(Regex("""\s*[\(\[\{].*?[\)\]\}]"""), "").trim().lowercase()
+                    if (!seenTitles.add(normTitle)) continue
+
+                    val sArtist = sObj["primary_artists"]?.jsonPrimitive?.content
+                        ?: sObj["more_info"]?.jsonObject?.get("artist_name")?.jsonPrimitive?.content
+                        ?: "Cinema Master"
+                    val sDur = sObj["duration"]?.jsonPrimitive?.content?.toLongOrNull()?.times(1000L)
+                        ?: sObj["more_info"]?.jsonObject?.get("duration")?.jsonPrimitive?.content?.toLongOrNull()?.times(1000L)
+                        ?: 210000L
+                    val songImg = sObj["image"]?.jsonPrimitive?.content?.replace("150x150", "500x500")?.replace("50x50", "500x500")?.replace("150x150.webp", "500x500.jpg")
+                        ?.ifBlank { highResImg } ?: highResImg
+
+                    tracks.add(makeMovieTrack(sid, sTitle, sArtist, albTitle, songImg, sDur))
+                }
+
+                if (tracks.isNotEmpty()) return@runCatching tracks
+            }
+
+            // 2. Fallback to direct song search
+            val songEnc = URLEncoder.encode("$clean", "UTF-8")
+            val songUrl = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&ctx=android&p=1&n=12&q=$songEnc"
             val songReq = Request.Builder().url(songUrl).header("User-Agent", "Mozilla/5.0").build()
             val songBody = httpClient.newCall(songReq).execute().use { it.body?.string().orEmpty() }
             if (songBody.isNotBlank()) {
                 val root = json.parseToJsonElement(songBody).jsonObject
                 val results = root["results"]?.jsonArray
-                if (results != null && results.isNotEmpty()) {
-                    val tracks = mutableListOf<Track>()
+                if (results != null) {
                     for (sElem in results) {
                         val sObj = sElem.jsonObject
                         val sid = sObj["id"]?.jsonPrimitive?.content ?: continue
-                        val sTitle = sObj["title"]?.jsonPrimitive?.content ?: continue
-                        val moreInfo = sObj["more_info"]?.jsonObject
-                        val sArtist = moreInfo?.get("music")?.jsonPrimitive?.content
-                            ?: moreInfo?.get("artist_name")?.jsonPrimitive?.content
-                            ?: "Hans Zimmer / Cinema OST"
-                        val sDur = moreInfo?.get("duration")?.jsonPrimitive?.content?.toLongOrNull()?.times(1000L) ?: 210000L
+                        val sTitle = sObj["song"]?.jsonPrimitive?.content ?: sObj["title"]?.jsonPrimitive?.content ?: continue
+                        val normTitle = sTitle.replace(Regex("""\s*[\(\[\{].*?[\)\]\}]"""), "").trim().lowercase()
+                        if (!seenTitles.add(normTitle)) continue
+
+                        val sArtist = sObj["primary_artists"]?.jsonPrimitive?.content
+                            ?: sObj["more_info"]?.jsonObject?.get("artist_name")?.jsonPrimitive?.content
+                            ?: "Cinema Master"
+                        val sDur = sObj["duration"]?.jsonPrimitive?.content?.toLongOrNull()?.times(1000L) ?: 210000L
                         val rawImg = sObj["image"]?.jsonPrimitive?.content ?: ""
-                        val highResImg = rawImg.replace("150x150", "500x500").replace("50x50", "500x500")
+                        val highResImg = rawImg.replace("150x150", "500x500").replace("50x50", "500x500").replace("150x150.webp", "500x500.jpg")
                         tracks.add(makeMovieTrack(sid, sTitle, sArtist, clean, highResImg, sDur))
                     }
-                    if (tracks.isNotEmpty()) return@runCatching tracks
                 }
             }
 
-            // 2. Try album search
-            val enc = URLEncoder.encode("$clean original soundtrack", "UTF-8")
-            val url = "https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&_marker=0&api_version=4&p=1&n=5&q=$enc"
-            val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()
-            val body = httpClient.newCall(req).execute().use { it.body?.string().orEmpty() }
-            if (body.isBlank()) return@runCatching emptyList()
-
-            val root = json.parseToJsonElement(body).jsonObject
-            val results = root["results"]?.jsonArray ?: return@runCatching emptyList()
-            if (results.isEmpty()) return@runCatching emptyList()
-
-            val firstAlb = results[0].jsonObject
-            val albId = firstAlb["id"]?.jsonPrimitive?.content ?: return@runCatching emptyList()
-            val albTitle = firstAlb["title"]?.jsonPrimitive?.content ?: clean
-            val rawImg = firstAlb["image"]?.jsonPrimitive?.content ?: ""
-            val highResImg = rawImg.replace("150x150", "500x500").replace("50x50", "500x500")
-
-            val detailUrl = "https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&_marker=0&api_version=4&albumid=$albId"
-            val dReq = Request.Builder().url(detailUrl).header("User-Agent", "Mozilla/5.0").build()
-            val dBody = httpClient.newCall(dReq).execute().use { it.body?.string().orEmpty() }
-            val dRoot = json.parseToJsonElement(dBody).jsonObject
-            val songList = dRoot["list"]?.jsonArray ?: return@runCatching emptyList()
-
-            val tracks = mutableListOf<Track>()
-            for (sElem in songList) {
-                val sObj = sElem.jsonObject
-                val sid = sObj["id"]?.jsonPrimitive?.content ?: continue
-                val sTitle = sObj["title"]?.jsonPrimitive?.content ?: continue
-                val sArtist = sObj["more_info"]?.jsonObject?.get("artist_name")?.jsonPrimitive?.content ?: "Cinema Master"
-                val sDur = sObj["more_info"]?.jsonObject?.get("duration")?.jsonPrimitive?.content?.toLongOrNull()?.times(1000L) ?: 210000L
-                tracks.add(makeMovieTrack(sid, sTitle, sArtist, albTitle, highResImg, sDur))
-            }
             tracks
         }.getOrDefault(emptyList())
     }

@@ -178,7 +178,7 @@ private val CURATED_COMMUNITY_EXTENSIONS = listOf(
         name = "Discord Rich Presence",
         version = "1.0.0",
         author = "Echo Community",
-        description = "Broadcasts your currently playing track, artist name, high-res album art, elapsed time, and Audix presence to Discord.",
+        description = "Broadcasts your currently playing track, artist name, high-res album art, elapsed time, and Nightly presence to Discord.",
         type = ExtensionType.TRACKER,
         icon = Icons.Default.Hub,
         capabilities = listOf("Rich Presence", "Live Album Art", "Time Sync", "Discord Activity"),
@@ -190,7 +190,7 @@ private val CURATED_COMMUNITY_EXTENSIONS = listOf(
         name = "Last.fm Scrobbler",
         version = "1.0.0",
         author = "Echo Community",
-        description = "Automatically logs every track you listen to on Audix into your personal Last.fm scrobble profile and listening history.",
+        description = "Automatically logs every track you listen to on Nightly into your personal Last.fm scrobble profile and listening history.",
         type = ExtensionType.TRACKER,
         icon = Icons.Default.Hub,
         capabilities = listOf("Auto Scrobbler", "Now Playing Status", "History Tracking"),
@@ -757,7 +757,7 @@ fun ExtensionsScreen(
                                         }
                                         Spacer(Modifier.width(8.dp))
                                         Text(
-                                            "Audix Community Extensions",
+                                            "Nightly Community Extensions",
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White
@@ -1058,7 +1058,7 @@ private fun InstalledExtensionCard(
                     Spacer(Modifier.height(4.dp))
 
                     Text(
-                        text = if (metadata.description.isNotBlank()) metadata.description else "Audix modular media extension",
+                        text = if (metadata.description.isNotBlank()) metadata.description else "Nightly modular media extension",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.75f),
                         fontSize = 13.sp,
@@ -1468,7 +1468,7 @@ private fun AddExtensionDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Add Audix Extension", fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Add Nightly Extension", fontWeight = FontWeight.Bold, color = Color.White)
             }
         },
         text = {

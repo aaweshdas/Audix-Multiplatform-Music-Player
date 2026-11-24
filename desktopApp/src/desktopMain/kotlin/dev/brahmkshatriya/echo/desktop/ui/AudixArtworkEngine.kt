@@ -52,15 +52,15 @@ object AudixArtworkEngine {
     init {
         // Pre-populate top global & Indian artists with studio HD portraits (500x500+)
         val preloadedArtists = mapOf(
-            "the weeknd" to "https://c.saavncdn.com/artists/The_Weeknd_500x500.jpg",
-            "taylor swift" to "https://c.saavncdn.com/artists/Taylor_Swift_003_20240419075727_500x500.jpg",
+            "the weeknd" to "https://c.saavncdn.com/artists/The_Weeknd_002_20241003071400_500x500.jpg",
+            "taylor swift" to "https://c.saavncdn.com/artists/Taylor_Swift_003_20200226074119_500x500.jpg",
             "arijit singh" to "https://c.saavncdn.com/artists/Arijit_Singh_004_20241118063717_500x500.jpg",
-            "drake" to "https://c.saavncdn.com/artists/Drake_500x500.jpg",
-            "ed sheeran" to "https://c.saavncdn.com/artists/Ed_Sheeran_500x500.jpg",
-            "billie eilish" to "https://c.saavncdn.com/artists/Billie_Eilish_500x500.jpg",
-            "post malone" to "https://c.saavncdn.com/artists/Post_Malone_500x500.jpg",
-            "bruno mars" to "https://c.saavncdn.com/artists/Bruno_Mars_500x500.jpg",
-            "dua lipa" to "https://c.saavncdn.com/artists/Dua_Lipa_500x500.jpg",
+            "drake" to "https://c.saavncdn.com/artists/Drake_006_20260520062317_500x500.jpg",
+            "ed sheeran" to "https://c.saavncdn.com/artists/Ed_Sheeran_002_20250625073038_500x500.jpg",
+            "billie eilish" to "https://c.saavncdn.com/artists/Billie_Eilish_20190211151539_500x500.jpg",
+            "post malone" to "https://c.saavncdn.com/artists/Post_Malone_004_20190911070147_500x500.jpg",
+            "bruno mars" to "https://e-cdns-images.dzcdn.net/images/artist/f1b80bf4a625ff68f18c2b5161d76378/500x500-000000-80-0-0.jpg",
+            "dua lipa" to "https://c.saavncdn.com/artists/Dua_Lipa_004_20231120090922_500x500.jpg",
             "justin bieber" to "https://c.saavncdn.com/artists/Justin_Bieber_500x500.jpg",
             "eminem" to "https://c.saavncdn.com/artists/Eminem_500x500.jpg",
             "rihanna" to "https://c.saavncdn.com/artists/Rihanna_500x500.jpg",
@@ -128,9 +128,11 @@ object AudixArtworkEngine {
                 .replace(Regex("=s\\d+.*$"), "=s800-c")
         }
 
-        // Upgrade JioSaavn thumbnails to 500x500
+        // Upgrade JioSaavn thumbnails to 500x500 studio jpg
         if (u.contains("saavncdn.com")) {
-            u = u.replace("150x150", "500x500")
+            u = u.replace("150x150.webp", "500x500.jpg")
+                .replace("50x50.webp", "500x500.jpg")
+                .replace("150x150", "500x500")
                 .replace("50x50", "500x500")
         }
 

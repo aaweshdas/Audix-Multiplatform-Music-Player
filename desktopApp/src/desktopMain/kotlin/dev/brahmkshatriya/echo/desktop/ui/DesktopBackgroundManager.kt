@@ -173,7 +173,7 @@ object DesktopBackgroundManager {
     }
 
     fun getCustomWallpapersDir(): File {
-        val portableDir = File("release-artifacts/Audix-Windows-Portable/app/custom_wallpapers")
+        val portableDir = File("release-artifacts/Nightly-Windows-Portable/app/custom_wallpapers")
         if (portableDir.parentFile.exists()) {
             if (!portableDir.exists()) portableDir.mkdirs()
             return portableDir
@@ -369,8 +369,8 @@ object DesktopBackgroundManager {
             } else if (wallpaper.thumbResourcePath != null) {
                 val res = wallpaper.thumbResourcePath
                 val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(res)
-                    ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
-                    ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", res).toFile().takeIf { it.exists() }?.inputStream()
+                    ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
+                    ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", res).toFile().takeIf { it.exists() }?.inputStream()
                     ?: Paths.get("desktopApp", "src", "desktopMain", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                     ?: Paths.get("src", "desktopMain", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                 stream?.use { ImageIO.read(it)?.toComposeImageBitmap() }
@@ -380,7 +380,7 @@ object DesktopBackgroundManager {
             } else if (wallpaper.resourcePath != null) {
                 val res = wallpaper.resourcePath
                 val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(res)
-                    ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
+                    ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                     ?: Paths.get("desktopApp", "src", "desktopMain", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                 stream?.use { ImageIO.read(it)?.toComposeImageBitmap() }
             } else null
@@ -402,8 +402,8 @@ object DesktopBackgroundManager {
             } else if (wallpaper.resourcePath != null) {
                 val res = wallpaper.resourcePath
                 val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(res)
-                    ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
-                    ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", res).toFile().takeIf { it.exists() }?.inputStream()
+                    ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
+                    ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", res).toFile().takeIf { it.exists() }?.inputStream()
                     ?: Paths.get("desktopApp", "src", "desktopMain", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                     ?: Paths.get("src", "desktopMain", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                 stream?.use { ImageIO.read(it)?.toComposeImageBitmap() }
@@ -421,7 +421,7 @@ object DesktopBackgroundManager {
         // Graceful fallback to default master
         return bitmapCache["default_master"] ?: runCatching {
             val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_bg.jpg")
-                ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
+                ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
                 ?: Paths.get("desktopApp", "src", "desktopMain", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
             stream?.use { ImageIO.read(it)?.toComposeImageBitmap() }
         }.getOrNull()?.also { bitmapCache["default_master"] = it }
@@ -439,8 +439,8 @@ object DesktopBackgroundManager {
                 wallpaper.resourcePath != null -> {
                     val res = wallpaper.resourcePath
                     val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(res)
-                        ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
-                        ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", res).toFile().takeIf { it.exists() }?.inputStream()
+                        ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
+                        ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", res).toFile().takeIf { it.exists() }?.inputStream()
                         ?: Paths.get("desktopApp", "src", "desktopMain", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                         ?: Paths.get("src", "desktopMain", "resources", res).toFile().takeIf { it.exists() }?.inputStream()
                     stream?.use { it.readBytes() }
@@ -481,7 +481,7 @@ object DesktopBackgroundManager {
         // Graceful fallback to default master
         return blurredBitmapCache["default_master"] ?: runCatching {
             val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("images/audix_bg.jpg")
-                ?: Paths.get("release-artifacts", "Audix-Windows-Portable", "app", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
+                ?: Paths.get("release-artifacts", "Nightly-Windows-Portable", "app", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
                 ?: Paths.get("desktopApp", "src", "desktopMain", "resources", "images", "audix_bg.jpg").toFile().takeIf { it.exists() }?.inputStream()
             val bytes = stream?.use { it.readBytes() }
             if (bytes != null && bytes.isNotEmpty()) {
